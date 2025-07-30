@@ -264,4 +264,97 @@ local function initialize()
     end)
 end
 
+local e = game:GetService('Players').LocalPlayer
+local uis = game:GetService("UserInputService")
+
+local autoFarm = false
+local runningFarm = false
+
+local function m()
+	if runningFarm then return end
+	runningFarm = true
+
+	local k = game:GetService('TweenService')
+	local g = game.Players.LocalPlayer
+	local r = g.Character or g.CharacterAdded:Wait()
+	local A = r:WaitForChild('HumanoidRootPart')
+	local a = r:WaitForChild('Humanoid')
+
+	local function j()
+		while true do
+			for y, E in ipairs(workspace:GetChildren()) do
+				if E:GetAttribute('MapID') and E:FindFirstChild('CoinContainer') then
+					return E
+				end
+			end
+			task.wait()
+		end
+	end
+
+	local function c()
+		local C = j()
+		local D, i = nil, math.huge
+		for p, l in ipairs(C.CoinContainer:GetChildren()) do
+			local q = l:FindFirstChild('CoinVisual')
+			if q and not q:GetAttribute('Collected') then
+				local _ = (A.Position - l.Position).Magnitude
+				if _ < i then
+					D = l
+					i = _
+				end
+			end
+		end
+		return D
+	end
+
+	local function b(B)
+		a:ChangeState(11) -- Nhảy
+		local t = (A.Position - B.Position).Magnitude
+		local f = k:Create(A, TweenInfo.new(t / 25, Enum.EasingStyle.Linear), {CFrame = B.CFrame})
+		f:Play()
+		f.Completed:Wait()
+	end
+
+	while autoFarm do
+		local z = c()
+		if z then
+			b(z)
+			local h = z:FindFirstChild('CoinVisual')
+			while h and not h:GetAttribute('Collected') and h.Parent and autoFarm do
+				local x = c()
+				if x and x ~= z then
+					break
+				end
+				task.wait()
+			end
+		else
+			task.wait(0.1)
+		end
+	end
+
+	runningFarm = false
+end
+
+-- Khi nhân vật chết thì tự chạy lại nếu đang auto
+e.CharacterAdded:Connect(function()
+	task.wait(1)
+	if autoFarm then
+		m()
+	end
+end)
+
+-- Phím C bật/tắt
+uis.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.C then
+		autoFarm = not autoFarm
+		if autoFarm then
+			print("AutoFarm ON")
+			m()
+		else
+			print("AutoFarm OFF")
+		end
+	end
+end)
+
 pcall(initialize)
