@@ -1,0 +1,267 @@
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local localplayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+local ESP_ENABLED = true 
+local SHOOT_OFFSET = 2.8 
+local OFFSET_TO_PING_MULT = 1 
+local UPDATE_INTERVAL = 0.5 
+local RANDOM_DELAY = 0.1 
+
+local playerData = {}
+local espObjects = {}
+local isScriptRunning = false
+local espActive = ESP_ENABLED
+local lastUpdate = tick()
+
+local function isMurderMystery2()
+    return ReplicatedStorage:FindFirstChild("Remotes") 
+        and ReplicatedStorage.Remotes:FindFirstChild("Gameplay")
+end
+
+local function getMap()
+    for _, o in ipairs(Workspace:GetChildren()) do
+        if o:FindFirstChild("CoinContainer") and o:FindFirstChild("Spawns") then
+            return o
+        end
+    end
+    return nil
+end
+
+local function findMurderer()
+    if playerData then
+        for player, data in pairs(playerData) do
+            if data.Role == "Murderer" then
+                local plr = Players:FindFirstChild(player)
+                if plr and plr.Character then
+                    return plr
+                end
+            end
+        end
+    end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= localplayer and plr.Character then
+            if plr.Backpack:FindFirstChild("Knife") or (plr.Character and plr.Character:FindFirstChild("Knife")) then
+                return plr
+            end
+        end
+    end
+    return nil
+end
+
+local function findSheriff()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Character and (plr.Backpack:FindFirstChild("Gun") or (plr.Character and plr.Character:FindFirstChild("Gun"))) then
+            return plr
+        end
+    end
+    if playerData then
+        for player, data in pairs(playerData) do
+            if data.Role == "Sheriff" then
+                local plr = Players:FindFirstChild(player)
+                if plr and plr.Character then
+                    return plr
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function findSheriffThatsNotMe()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= localplayer and plr.Character and (plr.Backpack:FindFirstChild("Gun") or (plr.Character and plr.Character:FindFirstChild("Gun"))) then
+            return plr
+        end
+    end
+    if playerData then
+        for player, data in pairs(playerData) do
+            if data.Role == "Sheriff" and Players:FindFirstChild(player) ~= localplayer then
+                local plr = Players:FindFirstChild(player)
+                if plr and plr.Character then
+                    return plr
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function createESP(object, color)
+    if not espActive or not object then return end
+    pcall(function()
+        if espObjects[object] then
+            espObjects[object].highlight:Destroy()
+            espObjects[object] = nil
+        end
+        local highlight = Instance.new("Highlight")
+        highlight.Parent = object
+        highlight.FillColor = color
+        highlight.OutlineColor = color
+        highlight.FillTransparency = 0.6 
+        highlight.OutlineTransparency = 0.2
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        espObjects[object] = { highlight = highlight }
+    end)
+end
+
+local function clearESP()
+    for object, esp in pairs(espObjects) do
+        pcall(function()
+            esp.highlight:Destroy()
+        end)
+    end
+    espObjects = {}
+end
+
+local function reloadPlayerESP()
+    if not espActive or tick() - lastUpdate < UPDATE_INTERVAL then return end
+    lastUpdate = tick()
+    clearESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character and player ~= localplayer then
+            if player == findMurderer() then
+                createESP(player.Character, Color3.fromRGB(255, 0, 0))
+            elseif player == findSheriff() then
+                createESP(player.Character, Color3.fromRGB(0, 153, 255))
+            else
+                createESP(player.Character, Color3.fromRGB(0, 255, 0))
+            end
+        end
+    end
+    task.wait(math.random(0, RANDOM_DELAY)) 
+end
+
+local function toggleESP()
+    espActive = not espActive
+    if espActive then
+        reloadPlayerESP()
+    else
+        clearESP()
+    end
+end
+
+-- Get Predicted Position for Shooting
+local function getPredictedPosition(player, shootOffset)
+    local success, result = pcall(function()
+        if not player.Character then
+            return Vector3.new(0, 0, 0)
+        end
+        local playerHRP = player.Character:FindFirstChild("UpperTorso")
+        local playerHum = player.Character:FindFirstChild("Humanoid")
+        if not playerHRP or not playerHum then
+            return Vector3.new(0, 0, 0)
+        end
+        local playerPosition = playerHRP.Position
+        local velocity = playerHRP.AssemblyLinearVelocity
+        local playerMoveDirection = playerHum.MoveDirection
+        local predictedPosition = playerPosition + (velocity * Vector3.new(0, 0.5, 0)) * (shootOffset / 15) + playerMoveDirection * shootOffset
+        predictedPosition = predictedPosition * (((localplayer:GetNetworkPing() * 1000) * ((OFFSET_TO_PING_MULT - 1) * 0.01)) + 1)
+        return predictedPosition
+    end)
+    if not success then
+        return Vector3.new(0, 0, 0)
+    end
+    return result
+end
+
+-- Shoot Murderer
+local lastShot = tick()
+local function shootMurderer()
+    if tick() - lastShot < 0.5 then return end 
+    lastShot = tick()
+    if findSheriff() ~= localplayer then
+        return
+    end
+    local murderer = findMurderer() or findSheriffThatsNotMe()
+    if not murderer then
+        return
+    end
+    if not localplayer.Character:FindFirstChild("Gun") then
+        local hum = localplayer.Character:FindFirstChild("Humanoid")
+        if localplayer.Backpack:FindFirstChild("Gun") then
+            hum:EquipTool(localplayer.Backpack:FindFirstChild("Gun"))
+        else
+            return
+        end
+    end
+    local murdererHRP = murderer.Character:FindFirstChild("HumanoidRootPart")
+    if not murdererHRP then
+        return
+    end
+    local predictedPosition = getPredictedPosition(murderer, SHOOT_OFFSET)
+    if predictedPosition == Vector3.new(0, 0, 0) then return end
+    local args = {
+        [1] = 1,
+        [2] = predictedPosition,
+        [3] = "AH2"
+    }
+    pcall(function()
+        localplayer.Character.Gun.KnifeLocal.CreateBeam.RemoteFunction:InvokeServer(unpack(args))
+    end)
+end
+
+Workspace.ChildAdded:Connect(function(ch)
+    if ch == getMap() and espActive then
+        task.wait(math.random(1, 2)) 
+        reloadPlayerESP()
+    end
+end)
+
+Workspace.ChildRemoved:Connect(function(ch)
+    if ch == getMap() and espActive then
+        clearESP()
+    end
+end)
+
+local function initialize()
+    local success, _ = pcall(function()
+        localplayer:WaitForChild("PlayerGui", 15)
+        ReplicatedStorage:WaitForChild("Remotes", 15):WaitForChild("Gameplay", 15):WaitForChild("PlayerDataChanged", 15)
+    end)
+    if not success or not isMurderMystery2() then
+        return
+    end
+    isScriptRunning = true
+    pcall(function()
+        local gameplay = ReplicatedStorage.Remotes.Gameplay.PlayerDataChanged
+        gameplay.OnClientEvent:Connect(function(data)
+            playerData = data
+            if espActive then
+                reloadPlayerESP()
+            end
+        end)
+    end)
+    if espActive then
+        reloadPlayerESP()
+        Players.PlayerAdded:Connect(function(player)
+            player.CharacterAdded:Connect(function()
+                if espActive then
+                    reloadPlayerESP()
+                end
+            end)
+        end)
+        Players.PlayerRemoving:Connect(function()
+            if espActive then
+                reloadPlayerESP()
+            end
+        end)
+    end
+
+    UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+        if gameProcessedEvent or not isScriptRunning then return end
+        if input.KeyCode == Enum.KeyCode.T then
+            toggleESP()
+        elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+            shootMurderer()
+        end
+    end)
+end
+
+pcall(initialize)
