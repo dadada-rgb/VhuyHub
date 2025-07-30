@@ -56,18 +56,9 @@ task.spawn(function()
 end)
 
 local InfiniteJumpEnabled = false
-
-local uis = game:GetService("UserInputService")
-local players = game:GetService("Players")
-local lp = players.LocalPlayer
-
-uis.JumpRequest:Connect(function()
+game:GetService("UserInputService").JumpRequest:Connect(function()
 	if InfiniteJumpEnabled then
-		local char = lp.Character or lp.CharacterAdded:Wait()
-		local hum = char:FindFirstChildOfClass("Humanoid")
-		if hum then
-			hum:ChangeState(Enum.HumanoidStateType.Jumping)
-		end
+		game:GetService("Players").LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
 	end
 end)
 
@@ -84,6 +75,7 @@ local pl = df.LocalPlayer
 
 qw.Parent = pl:WaitForChild("PlayerGui")
 qw.Name = "rtY7mP"
+qw.ResetOnSpawn = false
 
 zx.Parent = qw
 zx.Position = UDim2.new(0.161, 0, 0.21, 0)
