@@ -54,3 +54,70 @@ task.spawn(function()
         task.wait(1)
     end
 end)
+
+local InfiniteJumpEnabled = false
+game:GetService("UserInputService").JumpRequest:connect(function()
+	if InfiniteJumpEnabled then
+		game:GetService"Players".LocalPlayer.Character:FindFirstChildOfClass'Humanoid':ChangeState("Jumping")
+	end
+end)
+
+local df = game:GetService("Players")
+local jk = game:GetService("UserInputService")
+local qw = Instance.new("ScreenGui")
+local zx = Instance.new("Frame")
+local cv = Instance.new("UICorner")
+local bn = Instance.new("TextButton")
+local ty = Instance.new("TextButton")
+local ui = Instance.new("UICorner")
+local op = Instance.new("UICorner")
+local pl = df.LocalPlayer
+
+qw.Parent = pl:WaitForChild("PlayerGui")
+qw.Name = "rtY7mP"
+
+zx.Parent = qw
+zx.Position = UDim2.new(0.161, 0, 0.21, 0)
+zx.Size = UDim2.new(0, 166, 0, 98)
+zx.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+zx.Active = true
+zx.Draggable = true
+
+cv.CornerRadius = UDim.new(0, 8)
+cv.Parent = zx
+
+bn.Parent = zx
+bn.Name = "ghQ2zX"
+bn.Position = UDim2.new(0.036, 0, 0.087, 0)
+bn.Size = UDim2.new(0, 150, 0, 40)
+bn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+bn.Text = "InfJump"
+bn.Font = Enum.Font.SourceSansBold
+bn.TextColor3 = Color3.fromRGB(0, 0, 0)
+bn.TextSize = 14
+
+ui.CornerRadius = UDim.new(0, 8)
+ui.Parent = bn
+
+ty.Parent = zx
+ty.Name = "kL9vW4"
+ty.Position = UDim2.new(0.036, 0, 0.523, 0)
+ty.Size = UDim2.new(0, 150, 0, 40)
+ty.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+ty.Text = "FarmTickets"
+ty.Font = Enum.Font.SourceSansBold
+ty.TextColor3 = Color3.fromRGB(0, 0, 0)
+ty.TextSize = 14
+
+op.CornerRadius = UDim.new(0, 8)
+op.Parent = ty
+
+bn.MouseButton1Click:Connect(function()
+    getgenv().InfiniteJumpEnabled = not getgenv().InfiniteJumpEnabled
+    print("Infinite Jump: " .. tostring(getgenv().InfiniteJumpEnabled))
+end)
+
+ty.MouseButton1Click:Connect(function()
+    getgenv().farm = not getgenv().farm
+    print("Farm mode: " .. tostring(getgenv().farm))
+end)
