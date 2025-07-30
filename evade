@@ -1,58 +1,42 @@
-local a = game:GetService("Players")
-local b = game:GetService("VirtualUser")
-local c = game:GetService("ReplicatedStorage")
-local d = game:GetService("UserInputService")
-local e = game:GetService("RunService")
-local f = a.LocalPlayer
-local g = f.Character or f.CharacterAdded:Wait()
+local Players = game:GetService("Players")
+local VirtualUser = game:GetService("VirtualUser")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
-getgenv().zzz = false
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
 
--- Anti-idle (chống kick afk)
-f.Idled:Connect(function()
-    b:CaptureController()
-    b:ClickButton2(Vector2.new())
+getgenv().farm = false
+
+-- Auto click when idle
+player.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
 end)
 
--- Anti-ban đơn giản (ẩn tên GUI, ngăn detect GUI lạ)
-local function p(q)
-    if q:IsA("ScreenGui") and q ~= nil and q.Name == "rtY7mP" then
-        q.Name = "CoreGui" .. math.random(1000, 9999)
+-- Auto revive when Downed (always running)
+RunService.Stepped:Connect(function()
+    local char = player.Character
+    if char and char:GetAttribute("Downed") then
+        ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
     end
-end
+end)
 
+-- Farming loop
 task.spawn(function()
-    while task.wait(2) do
-        for _, r in ipairs(f:WaitForChild("PlayerGui"):GetChildren()) do
-            p(r)
-        end
-    end
-end)
-
--- Auto revive khi bị "Downed"
-e.Stepped:Connect(function()
-    local s = f.Character
-    if s and s:GetAttribute("Downed") then
-        c.Events.Player.ChangePlayerMode:FireServer(true)
-    end
-end)
-
--- Farm Tickets
-task.spawn(function()
-    local v = workspace:FindFirstChild("Game")
-    local w = v and v:FindFirstChild("Effects")
-    local x = w and w:FindFirstChild("Tickets")
-    if not x then return end
+    local tickets = workspace:FindFirstChild("Game") and workspace.Game:FindFirstChild("Effects") and workspace.Game.Effects:FindFirstChild("Tickets")
+    if not tickets then return end
 
     while true do
-        if getgenv().zzz then
-            local y = f.Character or f.CharacterAdded:Wait()
-            local z = y:FindFirstChild("HumanoidRootPart")
-            if z then
-                for _, aa in ipairs(x:GetChildren()) do
-                    local ab = aa:FindFirstChild("HumanoidRootPart")
-                    if ab then
-                        z.CFrame = ab.CFrame
+        if getgenv().farm then
+            local char = player.Character or player.CharacterAdded:Wait()
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                for _, ticket in ipairs(tickets:GetChildren()) do
+                    local ticketPart = ticket:FindFirstChild("HumanoidRootPart")
+                    if ticketPart then
+                        hrp.CFrame = ticketPart.CFrame
                         task.wait(0.1)
                     end
                 end
@@ -62,40 +46,65 @@ task.spawn(function()
     end
 end)
 
--- GUI tạo nút FarmTickets
-local ac = Instance.new("ScreenGui")
-local ad = Instance.new("Frame")
-local ae = Instance.new("UICorner")
-local af = Instance.new("TextButton")
-local ag = Instance.new("UICorner")
+local InfiniteJumpEnabled = true
+game:GetService("UserInputService").JumpRequest:Connect(function()
+	if InfiniteJumpEnabled then
+		game:GetService("Players").LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+	end
+end)
 
-ac.Name = "rtY7mP"
-ac.ResetOnSpawn = false
-ac.Parent = f:WaitForChild("PlayerGui")
+local df = game:GetService("Players")
+local jk = game:GetService("UserInputService")
+local qw = Instance.new("ScreenGui")
+local zx = Instance.new("Frame")
+local cv = Instance.new("UICorner")
+local bn = Instance.new("TextButton")
+local ty = Instance.new("TextButton")
+local ui = Instance.new("UICorner")
+local op = Instance.new("UICorner")
+local pl = df.LocalPlayer
 
-ad.Parent = ac
-ad.Position = UDim2.new(0.161, 0, 0.21, 0)
-ad.Size = UDim2.new(0, 166, 0, 60)
-ad.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-ad.Active = true
-ad.Draggable = true
+qw.Parent = pl:WaitForChild("PlayerGui")
+qw.Name = "rtY7mP"
+qw.ResetOnSpawn = false
 
-ae.CornerRadius = UDim.new(0, 8)
-ae.Parent = ad
+zx.Parent = qw
+zx.Position = UDim2.new(0.161, 0, 0.21, 0)
+zx.Size = UDim2.new(0, 166, 0, 98)
+zx.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+zx.Active = true
+zx.Draggable = true
 
-af.Parent = ad
-af.Position = UDim2.new(0.036, 0, 0.15, 0)
-af.Size = UDim2.new(0, 150, 0, 40)
-af.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-af.Text = "FarmTickets(Vhuy)"
-af.Font = Enum.Font.SourceSansBold
-af.TextColor3 = Color3.fromRGB(0, 0, 0)
-af.TextSize = 14
+cv.CornerRadius = UDim.new(0, 8)
+cv.Parent = zx
 
-ag.CornerRadius = UDim.new(0, 8)
-ag.Parent = af
+bn.Parent = zx
+bn.Name = "ghQ2zX"
+bn.Position = UDim2.new(0.036, 0, 0.087, 0)
+bn.Size = UDim2.new(0, 150, 0, 40)
+bn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+bn.Text = "InfJump(Vhuy)"
+bn.Font = Enum.Font.SourceSansBold
+bn.TextColor3 = Color3.fromRGB(0, 0, 0)
+bn.TextSize = 14
 
--- Nút toggle farm
-af.MouseButton1Click:Connect(function()
-    getgenv().zzz = not getgenv().zzz
-    print("Farm mode: " .. tostring(getgenv().zzz))
+ui.CornerRadius = UDim.new(0, 8)
+ui.Parent = bn
+
+ty.Parent = zx
+ty.Name = "kL9vW4"
+ty.Position = UDim2.new(0.036, 0, 0.523, 0)
+ty.Size = UDim2.new(0, 150, 0, 40)
+ty.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+ty.Text = "FarmTickets(Vhuy)"
+ty.Font = Enum.Font.SourceSansBold
+ty.TextColor3 = Color3.fromRGB(0, 0, 0)
+ty.TextSize = 14
+
+op.CornerRadius = UDim.new(0, 8)
+op.Parent = ty
+
+ty.MouseButton1Click:Connect(function()
+    getgenv().farm = not getgenv().farm
+    print("Farm mode: " .. tostring(getgenv().farm))
+end) 
