@@ -1,51 +1,10 @@
-local function genRandStr(len)
-    local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    local res = ""
-    for i = 1, len do
-        res = res .. string.sub(chars, math.random(1, #chars), math.random(1, #chars))
-    end
-    return res
+local placeId = game.PlaceId
+
+-- Tải script tùy theo game
+if placeId == 9872472334 then
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
+elseif placeId == 142823291 then
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2"))()
+else
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"))()
 end
-
-local x7qZ9m = game:GetService(genRandStr(7))
-local w2nT6v = game:GetService(genRandStr(9))
-local gameId = game.PlaceId
-
-local function sendMsg(txt)
-    pcall(function()
-        w2nT6v:SetCore(genRandStr(12), {
-            Title = genRandStr(5),
-            Text = txt,
-            Duration = 2
-        })
-    end)
-end
-
-local function loadScript(id)
-    local gameNames = {
-        [9872472334] = "Evade",
-        [142823291] = "MM2",
-        default = "Hood"
-    }
-    local urls = {
-        [9872472334] = "https://raw.githubusercontent.com/" .. genRandStr(10) .. "/VhuyHub/refs/heads/main/" .. genRandStr(5),
-        [142823291] = "https://raw.githubusercontent.com/" .. genRandStr(10) .. "/VhuyHub/refs/heads/main/" .. genRandStr(3),
-        default = "https://raw.githubusercontent.com/" .. genRandStr(10) .. "/VhuyHub/refs/heads/main/" .. genRandStr(4)
-    }
-    pcall(function()
-        loadstring(game:HttpGet(urls[id] or urls.default))()
-        sendMsg("Vhuyclient loaded: " .. (gameNames[id] or gameNames.default))
-    end)
-end
-
-loadScript(gameId)
-
-local j2xP9q = x7qZ9m
-local function setLight()
-    j2xP9q.Ambient = Color3.new(1, 1, 1)
-    j2xP9q.ColorShift_Bottom = Color3.new(1, 1, 1)
-    j2xP9q.ColorShift_Top = Color3.new(1, 1, 1)
-end
-
-setLight()
-j2xP9q.LightingChanged:Connect(setLight)
