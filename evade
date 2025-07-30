@@ -1,0 +1,56 @@
+local Players = game:GetService("Players")
+local VirtualUser = game:GetService("VirtualUser")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+
+getgenv().farm = false
+
+-- Auto click when idle
+player.Idled:Connect(function()
+    VirtualUser:CaptureController()
+    VirtualUser:ClickButton2(Vector2.new())
+end)
+
+-- Auto revive when Downed (always running)
+RunService.Stepped:Connect(function()
+    local char = player.Character
+    if char and char:GetAttribute("Downed") then
+        ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
+    end
+end)
+
+-- Toggle farming with key "B"
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.B then
+        getgenv().farm = not getgenv().farm
+        print("Farm mode: " .. tostring(getgenv().farm))
+    end
+end)
+
+-- Farming loop
+task.spawn(function()
+    local tickets = workspace:FindFirstChild("Game") and workspace.Game:FindFirstChild("Effects") and workspace.Game.Effects:FindFirstChild("Tickets")
+    if not tickets then return end
+
+    while true do
+        if getgenv().farm then
+            local char = player.Character or player.CharacterAdded:Wait()
+            local hrp = char:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                for _, ticket in ipairs(tickets:GetChildren()) do
+                    local ticketPart = ticket:FindFirstChild("HumanoidRootPart")
+                    if ticketPart then
+                        hrp.CFrame = ticketPart.CFrame
+                        task.wait(0.1)
+                    end
+                end
+            end
+        end
+        task.wait(1)
+    end
+end)
