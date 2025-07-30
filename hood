@@ -391,4 +391,4 @@ Utility.newConnection(RunService.Heartbeat, function()
     end
 end)
 
-notify("Script loaded successfully.")
+notify("loaded VhuyHub.")
