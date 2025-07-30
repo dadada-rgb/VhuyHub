@@ -1,5 +1,6 @@
 local placeId = game.PlaceId
 
+-- Tải script tùy theo game
 if placeId == 9872472334 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
 elseif placeId == 142823291 then
@@ -7,3 +8,16 @@ elseif placeId == 142823291 then
 else
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"))()
 end
+
+-- FullBright
+local Lighting = game:GetService("Lighting")
+
+local function dofullbright()
+    Lighting.Ambient = Color3.new(1, 1, 1)
+    Lighting.ColorShift_Bottom = Color3.new(1, 1, 1)
+    Lighting.ColorShift_Top = Color3.new(1, 1, 1)
+end
+
+dofullbright()
+
+Lighting.Changed:Connect(dofullbright)
