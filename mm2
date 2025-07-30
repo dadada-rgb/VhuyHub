@@ -1,380 +1,425 @@
-local function generateRandomString(length)
-    local chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    local result = ""
-    for i = 1, length do
-        local randIndex = math.random(1, #chars)
-        result = result .. string.sub(chars, randIndex, randIndex)
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterGui = game:GetService("StarterGui")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local localplayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+local ESP_ENABLED = true 
+local SHOOT_OFFSET = 2.8 
+local OFFSET_TO_PING_MULT = 1 
+local UPDATE_INTERVAL = 0.5 
+local RANDOM_DELAY = 0.1 
+
+local playerData = {}
+local espObjects = {}
+local isScriptRunning = false
+local espActive = ESP_ENABLED
+local lastUpdate = tick()
+
+local function isMurderMystery2()
+    return ReplicatedStorage:FindFirstChild("Remotes") 
+        and ReplicatedStorage.Remotes:FindFirstChild("Gameplay")
+end
+
+local function getMap()
+    for _, o in ipairs(Workspace:GetChildren()) do
+        if o:FindFirstChild("CoinContainer") and o:FindFirstChild("Spawns") then
+            return o
+        end
+    end
+    return nil
+end
+
+local function findMurderer()
+    if playerData then
+        for player, data in pairs(playerData) do
+            if data.Role == "Murderer" then
+                local plr = Players:FindFirstChild(player)
+                if plr and plr.Character then
+                    return plr
+                end
+            end
+        end
+    end
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= localplayer and plr.Character then
+            if plr.Backpack:FindFirstChild("Knife") or (plr.Character and plr.Character:FindFirstChild("Knife")) then
+                return plr
+            end
+        end
+    end
+    return nil
+end
+
+local function findSheriff()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Character and (plr.Backpack:FindFirstChild("Gun") or (plr.Character and plr.Character:FindFirstChild("Gun"))) then
+            return plr
+        end
+    end
+    if playerData then
+        for player, data in pairs(playerData) do
+            if data.Role == "Sheriff" then
+                local plr = Players:FindFirstChild(player)
+                if plr and plr.Character then
+                    return plr
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function findSheriffThatsNotMe()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= localplayer and plr.Character and (plr.Backpack:FindFirstChild("Gun") or (plr.Character and plr.Character:FindFirstChild("Gun"))) then
+            return plr
+        end
+    end
+    if playerData then
+        for player, data in pairs(playerData) do
+            if data.Role == "Sheriff" and Players:FindFirstChild(player) ~= localplayer then
+                local plr = Players:FindFirstChild(player)
+                if plr and plr.Character then
+                    return plr
+                end
+            end
+        end
+    end
+    return nil
+end
+
+local function createESP(object, color)
+    if not espActive or not object then return end
+    pcall(function()
+        if espObjects[object] then
+            espObjects[object].highlight:Destroy()
+            espObjects[object] = nil
+        end
+        local highlight = Instance.new("Highlight")
+        highlight.Parent = object
+        highlight.FillColor = color
+        highlight.OutlineColor = color
+        highlight.FillTransparency = 0.6 
+        highlight.OutlineTransparency = 0.2
+        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+        espObjects[object] = { highlight = highlight }
+    end)
+end
+
+local function clearESP()
+    for object, esp in pairs(espObjects) do
+        pcall(function()
+            esp.highlight:Destroy()
+        end)
+    end
+    espObjects = {}
+end
+
+local function reloadPlayerESP()
+    if not espActive or tick() - lastUpdate < UPDATE_INTERVAL then return end
+    lastUpdate = tick()
+    clearESP()
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character and player ~= localplayer then
+            if player == findMurderer() then
+                createESP(player.Character, Color3.fromRGB(255, 0, 0))
+            elseif player == findSheriff() then
+                createESP(player.Character, Color3.fromRGB(0, 153, 255))
+            else
+                createESP(player.Character, Color3.fromRGB(0, 255, 0))
+            end
+        end
+    end
+    task.wait(math.random(0, RANDOM_DELAY)) 
+end
+
+local function toggleESP()
+    espActive = not espActive
+    if espActive then
+        reloadPlayerESP()
+    else
+        clearESP()
+    end
+end
+
+-- Get Predicted Position for Shooting
+local function getPredictedPosition(player, shootOffset)
+    local success, result = pcall(function()
+        if not player.Character then
+            return Vector3.new(0, 0, 0)
+        end
+        local playerHRP = player.Character:FindFirstChild("UpperTorso")
+        local playerHum = player.Character:FindFirstChild("Humanoid")
+        if not playerHRP or not playerHum then
+            return Vector3.new(0, 0, 0)
+        end
+        local playerPosition = playerHRP.Position
+        local velocity = playerHRP.AssemblyLinearVelocity
+        local playerMoveDirection = playerHum.MoveDirection
+        local predictedPosition = playerPosition + (velocity * Vector3.new(0, 0.5, 0)) * (shootOffset / 15) + playerMoveDirection * shootOffset
+        predictedPosition = predictedPosition * (((localplayer:GetNetworkPing() * 1000) * ((OFFSET_TO_PING_MULT - 1) * 0.01)) + 1)
+        return predictedPosition
+    end)
+    if not success then
+        return Vector3.new(0, 0, 0)
     end
     return result
 end
 
-local x9qW2z = game:GetService(generateRandomString(10))
-local y7mP8r = game:GetService(generateRandomString(8))
-local k4nY5t = game:GetService(generateRandomString(12))
-local p3rT6u = game:GetService(generateRandomString(9))
-local q8vW2x = game:GetService(generateRandomString(11))
-local j1mH4n = game:GetService(generateRandomString(7))
-local z3xY9q = x9qW2z.LocalPlayer
-local t5rN7k = k4nY5t.CurrentCamera
-
-local b8vJ2m = true
-local c6kP9n = 2.8
-local d4mT7r = 1
-local f2nY5q = 0.5
-local g8vW3x = 0.1
-
-local h7qZ4m = {}
-local l9mP8r = {}
-local r3xT6y = false
-local u2nK5v = b8vJ2m
-local w4vJ9q = tick()
-
-local function a1bC3d()
-    return p3rT6u:FindFirstChild(generateRandomString(6)) and p3rT6u[generateRandomString(6)]:FindFirstChild(generateRandomString(8))
-end
-
-local function e5kM7n()
-    for _, v in ipairs(k4nY5t:GetChildren()) do
-        if v:FindFirstChild(generateRandomString(11)) and v:FindFirstChild(generateRandomString(6)) then
-            return v
-        end
+-- Shoot Murderer
+local lastShot = tick()
+local function shootMurderer()
+    if tick() - lastShot < 0.5 then return end 
+    lastShot = tick()
+    if findSheriff() ~= localplayer then
+        return
     end
-    return nil
-end
-
-local function x9qW2zF()
-    if h7qZ4m then
-        for k, v in pairs(h7qZ4m) do
-            if v[generateRandomString(4)] == generateRandomString(9) then
-                local p = x9qW2z:FindFirstChild(k)
-                if p and p.Character then return p end
-            end
-        end
+    local murderer = findMurderer() or findSheriffThatsNotMe()
+    if not murderer then
+        return
     end
-    for _, p in ipairs(x9qW2z:GetPlayers()) do
-        if p ~= z3xY9q and p.Character then
-            if p.Backpack:FindFirstChild(generateRandomString(5)) or (p.Character and p.Character:FindFirstChild(generateRandomString(5))) then
-                return p
-            end
-        end
-    end
-    return nil
-end
-
-local function y7mP8rF()
-    for _, p in ipairs(x9qW2z:GetPlayers()) do
-        if p.Character and (p.Backpack:FindFirstChild(generateRandomString(3)) or (p.Character and p.Character:FindFirstChild(generateRandomString(3)))) then
-            return p
-        end
-    end
-    if h7qZ4m then
-        for k, v in pairs(h7qZ4m) do
-            if v[generateRandomString(4)] == generateRandomString(7) then
-                local p = x9qW2z:FindFirstChild(k)
-                if p and p.Character then return p end
-            end
-        end
-    end
-    return nil
-end
-
-local function t5rN7kF()
-    for _, p in ipairs(x9qW2z:GetPlayers()) do
-        if p ~= z3xY9q and p.Character and (p.Backpack:FindFirstChild(generateRandomString(3)) or (p.Character and p.Character:FindFirstChild(generateRandomString(3)))) then
-            return p
-        end
-    end
-    if h7qZ4m then
-        for k, v in pairs(h7qZ4m) do
-            if v[generateRandomString(4)] == generateRandomString(7) and x9qW2z:FindFirstChild(k) ~= z3xY9q then
-                local p = x9qW2z:FindFirstChild(k)
-                if p and p.Character then return p end
-            end
-        end
-    end
-    return nil
-end
-
-local function createVisualEffect(obj, clr)
-    if not u2nK5v or not obj then return end
-    pcall(function()
-        if l9mP8r[obj] then
-            l9mP8r[obj].visual:Destroy()
-            l9mP8r[obj] = nil
-        end
-        local v = Instance.new(generateRandomString(9))
-        v.Parent = obj
-        v.FillColor = clr
-        v.OutlineColor = clr
-        v.FillTransparency = 0.6
-        v.OutlineTransparency = 0.2
-        v.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        l9mP8r[obj] = { visual = v }
-    end)
-end
-
-local function clearVisuals()
-    for obj, v in pairs(l9mP8r) do
-        pcall(function() v.visual:Destroy() end)
-    end
-    l9mP8r = {}
-end
-
-local function updateVisuals()
-    if not u2nK5v or tick() - w4vJ9q < f2nY5q then return end
-    w4vJ9q = tick()
-    clearVisuals()
-    for _, p in ipairs(x9qW2z:GetPlayers()) do
-        if p.Character and p ~= z3xY9q then
-            if p == x9qW2zF() then
-                createVisualEffect(p.Character, Color3.fromRGB(255, 0, 0))
-            elseif p == y7mP8rF() then
-                createVisualEffect(p.Character, Color3.fromRGB(0, 153, 255))
-            else
-                createVisualEffect(p.Character, Color3.fromRGB(0, 255, 0))
-            end
-        end
-    end
-    task.wait(math.random(0, g8vW3x))
-end
-
-local function toggleVisuals()
-    u2nK5v = not u2nK5v
-    if u2nK5v then updateVisuals() else clearVisuals() end
-end
-
-local function predictTargetPos(plr, offset)
-    local success, res = pcall(function()
-        if not plr.Character then return Vector3.new(0, 0, 0) end
-        local hrp = plr.Character:FindFirstChild(generateRandomString(11))
-        local hum = plr.Character:FindFirstChild(generateRandomString(8))
-        if not hrp or not hum then return Vector3.new(0, 0, 0) end
-        local pos = hrp.Position
-        local vel = hrp.AssemblyLinearVelocity
-        local dir = hum.MoveDirection
-        local pred = pos + (vel * Vector3.new(0, 0.5, 0)) * (offset / 15) + dir * offset
-        pred = pred * (((z3xY9q:GetNetworkPing() * 1000) * ((d4mT7r - 1) * 0.01)) + 1)
-        return pred
-    end)
-    return success and res or Vector3.new(0, 0, 0)
-end
-
-local lastAction = tick()
-local function performAction()
-    if tick() - lastAction < 0.5 then return end
-    lastAction = tick()
-    if y7mP8rF() ~= z3xY9q then return end
-    local target = x9qW2zF() or t5rN7kF()
-    if not target then return end
-    if not z3xY9q.Character:FindFirstChild(generateRandomString(3)) then
-        local hum = z3xY9q.Character:FindFirstChild(generateRandomString(8))
-        if z3xY9q.Backpack:FindFirstChild(generateRandomString(3)) then
-            hum:EquipTool(z3xY9q.Backpack:FindFirstChild(generateRandomString(3)))
+    if not localplayer.Character:FindFirstChild("Gun") then
+        local hum = localplayer.Character:FindFirstChild("Humanoid")
+        if localplayer.Backpack:FindFirstChild("Gun") then
+            hum:EquipTool(localplayer.Backpack:FindFirstChild("Gun"))
         else
             return
         end
     end
-    local targetHRP = target.Character:FindFirstChild(generateRandomString(12))
-    if not targetHRP then return end
-    local predPos = predictTargetPos(target, c6kP9n)
-    if predPos == Vector3.new(0, 0, 0) then return end
-    local args = { [1] = 1, [2] = predPos, [3] = generateRandomString(3) }
+    local murdererHRP = murderer.Character:FindFirstChild("HumanoidRootPart")
+    if not murdererHRP then
+        return
+    end
+    local predictedPosition = getPredictedPosition(murderer, SHOOT_OFFSET)
+    if predictedPosition == Vector3.new(0, 0, 0) then return end
+    local args = {
+        [1] = 1,
+        [2] = predictedPosition,
+        [3] = "AH2"
+    }
     pcall(function()
-        z3xY9q.Character[generateRandomString(3)][generateRandomString(10)][generateRandomString(12)][generateRandomString(11)]:InvokeServer(unpack(args))
+        localplayer.Character.Gun.KnifeLocal.CreateBeam.RemoteFunction:InvokeServer(unpack(args))
     end)
 end
 
-k4nY5t.ChildAdded:Connect(function(ch)
-    if ch == e5kM7n() and u2nK5v then
-        task.wait(math.random(1, 2))
-        updateVisuals()
+Workspace.ChildAdded:Connect(function(ch)
+    if ch == getMap() and espActive then
+        task.wait(math.random(1, 2)) 
+        reloadPlayerESP()
     end
 end)
 
-k4nY5t.ChildRemoved:Connect(function(ch)
-    if ch == e5kM7n() and u2nK5v then clearVisuals() end
+Workspace.ChildRemoved:Connect(function(ch)
+    if ch == getMap() and espActive then
+        clearESP()
+    end
 end)
 
-local function initSystem()
+local function initialize()
     local success, _ = pcall(function()
-        z3xY9q:WaitForChild(generateRandomString(10), 15)
-        p3rT6u:WaitForChild(generateRandomString(6), 15):WaitForChild(generateRandomString(8), 15):WaitForChild(generateRandomString(14), 15)
+        localplayer:WaitForChild("PlayerGui", 15)
+        ReplicatedStorage:WaitForChild("Remotes", 15):WaitForChild("Gameplay", 15):WaitForChild("PlayerDataChanged", 15)
     end)
-    if not success or not a1bC3d() then return end
-    r3xT6y = true
+    if not success or not isMurderMystery2() then
+        return
+    end
+    isScriptRunning = true
     pcall(function()
-        local g = p3rT6u[generateRandomString(6)][generateRandomString(8)][generateRandomString(14)]
-        g.OnClientEvent:Connect(function(data)
-            h7qZ4m = data
-            if u2nK5v then updateVisuals() end
+        local gameplay = ReplicatedStorage.Remotes.Gameplay.PlayerDataChanged
+        gameplay.OnClientEvent:Connect(function(data)
+            playerData = data
+            if espActive then
+                reloadPlayerESP()
+            end
         end)
     end)
-    if u2nK5v then
-        updateVisuals()
-        x9qW2z.PlayerAdded:Connect(function(p)
-            p.CharacterAdded:Connect(function()
-                if u2nK5v then updateVisuals() end
+    if espActive then
+        reloadPlayerESP()
+        Players.PlayerAdded:Connect(function(player)
+            player.CharacterAdded:Connect(function()
+                if espActive then
+                    reloadPlayerESP()
+                end
             end)
         end)
-        x9qW2z.PlayerRemoving:Connect(function()
-            if u2nK5v then updateVisuals() end
+        Players.PlayerRemoving:Connect(function()
+            if espActive then
+                reloadPlayerESP()
+            end
         end)
     end
-    q8vW2x.InputBegan:Connect(function(input, processed)
-        if processed or not r3xT6y then return end
+
+    UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+        if gameProcessedEvent or not isScriptRunning then return end
         if input.KeyCode == Enum.KeyCode.T then
-            toggleVisuals()
+            toggleESP()
         elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
-            performAction()
+            shootMurderer()
         end
     end)
 end
 
-local z3xY9qP = x9qW2z.LocalPlayer
-local q8vW2xP = q8vW2x
-local autoMode = false
-local isRunning = false
+local e = game:GetService('Players').LocalPlayer
+local uis = game:GetService("UserInputService")
 
-local function runSystem()
-    if isRunning then return end
-    isRunning = true
-    local ts = j1mH4n
-    local plr = x9qW2zP
-    local chr = plr.Character or plr.CharacterAdded:Wait()
-    local hrp = chr:WaitForChild(generateRandomString(12))
-    local hum = chr:WaitForChild(generateRandomString(8))
+local autoFarm = false
+local runningFarm = false
 
-    local function findMap()
-        while true do
-            for _, v in ipairs(k4nY5t:GetChildren()) do
-                if v:GetAttribute(generateRandomString(6)) and v:FindFirstChild(generateRandomString(11)) then
-                    return v
-                end
-            end
-            task.wait()
-        end
-    end
+local function m()
+	if runningFarm then return end
+	runningFarm = true
 
-    local function findTarget()
-        local map = findMap()
-        local target, dist = nil, math.huge
-        for _, v in ipairs(map[generateRandomString(11)]:GetChildren()) do
-            local vis = v:FindFirstChild(generateRandomString(10))
-            if vis and not vis:GetAttribute(generateRandomString(9)) then
-                local d = (hrp.Position - v.Position).Magnitude
-                if d < dist then
-                    target = v
-                    dist = d
-                end
-            end
-        end
-        return target
-    end
+	local k = game:GetService('TweenService')
+	local g = game.Players.LocalPlayer
+	local r = g.Character or g.CharacterAdded:Wait()
+	local A = r:WaitForChild('HumanoidRootPart')
+	local a = r:WaitForChild('Humanoid')
 
-    local function moveToTarget(t)
-        hum:ChangeState(11)
-        local dist = (hrp.Position - t.Position).Magnitude
-        local tween = ts:Create(hrp, TweenInfo.new(dist / 25, Enum.EasingStyle.Linear), {CFrame = t.CFrame})
-        tween:Play()
-        tween.Completed:Wait()
-    end
+	local function j()
+		while true do
+			for y, E in ipairs(workspace:GetChildren()) do
+				if E:GetAttribute('MapID') and E:FindFirstChild('CoinContainer') then
+					return E
+				end
+			end
+			task.wait()
+		end
+	end
 
-    while autoMode do
-        local t = findTarget()
-        if t then
-            moveToTarget(t)
-            local vis = t:FindFirstChild(generateRandomString(10))
-            while vis and not vis:GetAttribute(generateRandomString(9)) and vis.Parent and autoMode do
-                local newT = findTarget()
-                if newT and newT ~= t then break end
-                task.wait()
-            end
-        else
-            task.wait(0.1)
-        end
-    end
-    isRunning = false
+	local function c()
+		local C = j()
+		local D, i = nil, math.huge
+		for p, l in ipairs(C.CoinContainer:GetChildren()) do
+			local q = l:FindFirstChild('CoinVisual')
+			if q and not q:GetAttribute('Collected') then
+				local _ = (A.Position - l.Position).Magnitude
+				if _ < i then
+					D = l
+					i = _
+				end
+			end
+		end
+		return D
+	end
+
+	local function b(B)
+		a:ChangeState(11) -- Nhảy
+		local t = (A.Position - B.Position).Magnitude
+		local f = k:Create(A, TweenInfo.new(t / 25, Enum.EasingStyle.Linear), {CFrame = B.CFrame})
+		f:Play()
+		f.Completed:Wait()
+	end
+
+	while autoFarm do
+		local z = c()
+		if z then
+			b(z)
+			local h = z:FindFirstChild('CoinVisual')
+			while h and not h:GetAttribute('Collected') and h.Parent and autoFarm do
+				local x = c()
+				if x and x ~= z then
+					break
+				end
+				task.wait()
+			end
+		else
+			task.wait(0.1)
+		end
+	end
+
+	runningFarm = false
 end
 
-z3xY9qP.CharacterAdded:Connect(function()
-    task.wait(1)
-    if autoMode then runSystem() end
+-- Khi nhân vật chết thì tự chạy lại nếu đang auto
+e.CharacterAdded:Connect(function()
+	task.wait(1)
+	if autoFarm then
+		m()
+	end
 end)
 
-q8vW2xP.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.KeyCode == Enum.KeyCode.C then
-        autoMode = not autoMode
-        if autoMode then
-            print(generateRandomString(8) .. " ON")
-            runSystem()
-        else
-            print(generateRandomString(8) .. " OFF")
-        end
-    end
+-- Phím C bật/tắt
+uis.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.C then
+		autoFarm = not autoFarm
+		if autoFarm then
+			print("AutoFarm ON")
+			m()
+		else
+			print("AutoFarm OFF")
+		end
+	end
 end)
 
-local gui = Instance.new(generateRandomString(9))
-local frame = Instance.new(generateRandomString(5))
-local corner = Instance.new(generateRandomString(8))
-local btn1 = Instance.new(generateRandomString(10))
-local btn2 = Instance.new(generateRandomString(10))
-local corner1 = Instance.new(generateRandomString(8))
-local corner2 = Instance.new(generateRandomString(8))
-local plr = x9qW2z.LocalPlayer
+local xy = game:GetService("Players")
+local ab = game:GetService("UserInputService")
+local pq = Instance.new("ScreenGui")
+local rs = Instance.new("Frame")
+local tu = Instance.new("UICorner")
+local vw = Instance.new("TextButton")
+local mn = Instance.new("TextButton")
+local kl = Instance.new("UICorner")
+local ef = Instance.new("UICorner")
+local gh = xy.LocalPlayer
 
-gui.Parent = plr:WaitForChild(generateRandomString(10))
-gui.Name = generateRandomString(7)
-gui.ResetOnSpawn = false
+pq.Parent = gh:WaitForChild("PlayerGui")
+pq.Name = "zX9qW2"
+pq.ResetOnSpawn = false
 
-frame.Parent = gui
-frame.Position = UDim2.new(0.161, 0, 0.21, 0)
-frame.Size = UDim2.new(0, 166, 0, 98)
-frame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-frame.Active = true
-frame.Draggable = true
+rs.Parent = pq
+rs.Position = UDim2.new(0.161, 0, 0.21, 0)
+rs.Size = UDim2.new(0, 166, 0, 98)
+rs.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+rs.Active = true
+rs.Draggable = true
 
-corner.CornerRadius = UDim.new(0, 8)
-corner.Parent = frame
+tu.CornerRadius = UDim.new(0, 8)
+tu.Parent = rs
 
-btn1.Parent = frame
-btn1.Name = generateRandomString(7)
-btn1.Position = UDim2.new(0.036, 0, 0.087, 0)
-btn1.Size = UDim2.new(0, 150, 0, 40)
-btn1.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-btn1.Text = generateRandomString(6)
-btn1.Font = Enum.Font.SourceSansBold
-btn1.TextColor3 = Color3.fromRGB(0, 0, 0)
-btn1.TextSize = 14
+vw.Parent = rs
+vw.Name = "jH4mP8"
+vw.Position = UDim2.new(0.036, 0, 0.087, 0)
+vw.Size = UDim2.new(0, 150, 0, 40)
+vw.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+vw.Text = "AutoFarm(Vhuy)"
+vw.Font = Enum.Font.SourceSansBold
+vw.TextColor3 = Color3.fromRGB(0, 0, 0)
+vw.TextSize = 14
 
-corner1.CornerRadius = UDim.new(0, 8)
-corner1.Parent = btn1
+kl.CornerRadius = UDim.new(0, 8)
+kl.Parent = vw
 
-btn2.Parent = frame
-btn2.Name = generateRandomString(7)
-btn2.Position = UDim2.new(0.036, 0, 0.523, 0)
-btn2.Size = UDim2.new(0, 150, 0, 40)
-btn2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-btn2.Text = generateRandomString(6)
-btn2.Font = Enum.Font.SourceSansBold
-btn2.TextColor3 = Color3.fromRGB(0, 0, 0)
-btn2.TextSize = 14
+mn.Parent = rs
+mn.Name = "tR7nY5"
+mn.Position = UDim2.new(0.036, 0, 0.523, 0)
+mn.Size = UDim2.new(0, 150, 0, 40)
+mn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+mn.Text = "Shoot(Vhuy)"
+mn.Font = Enum.Font.SourceSansBold
+mn.TextColor3 = Color3.fromRGB(0, 0, 0)
+mn.TextSize = 14
 
-corner2.CornerRadius = UDim.new(0, 8)
-corner2.Parent = btn2
+ef.CornerRadius = UDim.new(0, 8)
+ef.Parent = mn
 
-btn1.MouseButton1Click:Connect(function()
-    autoMode = not autoMode
-    if autoMode then
-        print(generateRandomString(8) .. " ON")
-        runSystem()
+vw.MouseButton1Click:Connect(function()
+    autoFarm = not autoFarm
+    if autoFarm then
+        print("AutoFarm ON")
+        m()
     else
-        print(generateRandomString(8) .. " OFF")
+        print("AutoFarm OFF")
     end
 end)
 
-btn2.MouseButton1Click:Connect(function()
-    performAction()
+mn.MouseButton1Click:Connect(function()
+    shootMurderer()
 end)
 
-pcall(initSystem)
+pcall(initialize)
