@@ -56,9 +56,18 @@ task.spawn(function()
 end)
 
 local InfiniteJumpEnabled = false
-game:GetService("UserInputService").JumpRequest:connect(function()
+
+local uis = game:GetService("UserInputService")
+local players = game:GetService("Players")
+local lp = players.LocalPlayer
+
+uis.JumpRequest:Connect(function()
 	if InfiniteJumpEnabled then
-		game:GetService"Players".LocalPlayer.Character:FindFirstChildOfClass'Humanoid':ChangeState("Jumping")
+		local char = lp.Character or lp.CharacterAdded:Wait()
+		local hum = char:FindFirstChildOfClass("Humanoid")
+		if hum then
+			hum:ChangeState(Enum.HumanoidStateType.Jumping)
+		end
 	end
 end)
 
