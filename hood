@@ -1,0 +1,394 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local StarterGui = game:GetService("StarterGui")
+local Workspace = game:GetService("Workspace")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local CoreGui = game:GetService("CoreGui")
+
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+
+local AIM_RADIUS = 200
+local lastCheck = 0
+local connections = {}
+local espDrawings = {}
+
+getgenv().Config = {
+    Status = false, -- Controls aimlock + TriggerBot
+    Hitpart = "HumanoidRootPart",
+    SelectedTargets = {},
+    ESPEnabled = false,
+    FlyEnabled = false,
+    FlySpeed = 18,
+    SpeedEnabled = false,
+    SpeedAmount = 14,
+    Prediction = { X = 0.165, Y = 0.1 },
+    TriggerBotFOVRadius = 20,
+    TriggerBotPredictionTime = 0
+}
+
+local function notify(txt)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = "Feature",
+            Text = txt,
+            Duration = 2
+        })
+    end)
+end
+
+local Utility = {
+    hasCharacter = function(player)
+        return player and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character:FindFirstChild("HumanoidRootPart")
+    end,
+    newConnection = function(signal, callback)
+        local connection = signal:Connect(callback)
+        table.insert(connections, connection)
+        return connection
+    end,
+    drawingNew = function(type, props)
+        local success, drawing = pcall(function()
+            local d = Drawing.new(type)
+            for key, value in pairs(props) do
+                d[key] = value
+            end
+            return d
+        end)
+        if not success then
+            notify("⚠️ Drawing API not supported!")
+            return nil
+        end
+        return drawing
+    end
+}
+
+local function TargetCheck(char)
+    if not char then return false end
+    local bodyEffects = char:FindFirstChild("BodyEffects")
+    local isKOd = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
+    local isGrabbed = char:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
+    return not (isKOd or isGrabbed)
+end
+
+local function createESP(player)
+    if espDrawings[player] then
+        pcall(function()
+            espDrawings[player].box:Remove()
+            espDrawings[player].text:Remove()
+        end)
+        espDrawings[player] = nil
+    end
+    local box = Utility.drawingNew("Square", {
+        Visible = false,
+        Color = Color3.fromRGB(200, 200, 200),
+        Thickness = 1,
+        Transparency = 0.7,
+        Filled = false
+    })
+    local text = Utility.drawingNew("Text", {
+        Visible = false,
+        Color = Color3.fromRGB(200, 200, 200),
+        Size = 14,
+        Center = true,
+        Outline = true,
+        Font = Drawing.Fonts.UI,
+        Text = player.DisplayName
+    })
+    if box and text then
+        espDrawings[player] = { box = box, text = text }
+    end
+end
+
+local function updateESP()
+    if not getgenv().Config.ESPEnabled then
+        for _, drawing in pairs(espDrawings) do
+            pcall(function()
+                drawing.box.Visible = false
+                drawing.text.Visible = false
+            end)
+        end
+        return
+    end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            if Utility.hasCharacter(player) then
+                local char = player.Character
+                local humanoidRootPart = char:FindFirstChild("HumanoidRootPart")
+                local head = char:FindFirstChild("Head")
+                if humanoidRootPart and head then
+                    local headPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                    local rootPos = Camera:WorldToViewportPoint(humanoidRootPart.Position)
+                    if not espDrawings[player] then
+                        createESP(player)
+                    end
+                    if espDrawings[player] then
+                        local drawing = espDrawings[player]
+                        local isSelected = getgenv().Config.SelectedTargets[player.Name]
+                        drawing.box.Color = isSelected and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 200, 200)
+                        drawing.text.Color = isSelected and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(200, 200, 200)
+                        if onScreen and TargetCheck(char) then
+                            local height = math.abs(headPos.Y - rootPos.Y) * 1.2
+                            local width = height * 0.5
+                            drawing.box.Size = Vector2.new(width, height)
+                            drawing.box.Position = Vector2.new(rootPos.X - width / 2, rootPos.Y - height / 2)
+                            drawing.box.Visible = true
+                            drawing.text.Position = Vector2.new(headPos.X, headPos.Y - 25)
+                            drawing.text.Visible = true
+                        else
+                            drawing.box.Visible = false
+                            drawing.text.Visible = false
+                        end
+                    end
+                elseif espDrawings[player] then
+                    pcall(function()
+                        espDrawings[player].box:Remove()
+                        espDrawings[player].text:Remove()
+                    end)
+                    espDrawings[player] = nil
+                end
+            elseif espDrawings[player] then
+                pcall(function()
+                    espDrawings[player].box:Remove()
+                    espDrawings[player].text:Remove()
+                end)
+                espDrawings[player] = nil
+            end
+        end
+    end
+end
+
+local function validPart(p)
+    if not p or not p.Parent then return false end
+    local character = p.Parent
+    local humanoid = character:FindFirstChild("Humanoid")
+    local player = Players:GetPlayerFromCharacter(character)
+
+    if not humanoid or not player then
+        return false
+    end
+
+    -- Bất kể TriggerBotOnly bật hay tắt, chỉ bắn vào Hitpart
+    return p.Name == getgenv().Config.Hitpart
+end
+
+local function click()
+    local success, err = pcall(function()
+        local mousePos = UserInputService:GetMouseLocation()
+        local randomDelay = math.random(300, 400) / 1000
+        VirtualInputManager:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, true, game, 0)
+        task.wait(randomDelay)
+        VirtualInputManager:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, false, game, 0)
+    end)
+    if not success then
+        notify("⚠️ Input error: " .. tostring(err))
+    end
+end
+
+local function getClosestTarget()
+    local bestTarget = nil
+    local closestDist = math.huge
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and getgenv().Config.SelectedTargets[player.Name] then
+            local humanoid = player.Character:FindFirstChild("Humanoid")
+            local hitPart = player.Character:FindFirstChild(getgenv().Config.Hitpart)
+            local bodyEffects = player.Character:FindFirstChild("BodyEffects")
+            local isKOd = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
+            local isGrabbed = player.Character:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
+            if humanoid and hitPart and not isKOd and not isGrabbed then
+                local myCharacter = LocalPlayer.Character
+                local myRoot = myCharacter and myCharacter:FindFirstChild("HumanoidRootPart")
+                if myRoot then
+                    local dist = (myRoot.Position - hitPart.Position).Magnitude
+                    if dist < closestDist and dist <= AIM_RADIUS then
+                        local rayParams = RaycastParams.new()
+                        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                        rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                        local ray = Workspace:Raycast(Camera.CFrame.Position, (hitPart.Position - Camera.CFrame.Position), rayParams)
+                        if ray and ray.Instance:IsDescendantOf(player.Character) then
+                            bestTarget = hitPart
+                            closestDist = dist
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return bestTarget
+end
+
+-- Aimlock and TriggerBot
+Utility.newConnection(RunService.RenderStepped, function()
+    local character = LocalPlayer.Character
+    if not character then
+        getgenv().Config.Status = false
+        return
+    end
+    local humanoid = character:FindFirstChild("Humanoid")
+    local bodyEffects = character:FindFirstChild("BodyEffects")
+    local isKOd = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
+    local isGrabbed = character:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
+    if not humanoid or isKOd or isGrabbed then
+        getgenv().Config.Status = false
+        return
+    end
+
+    local toolEquipped = false
+    for _, item in pairs(character:GetChildren()) do
+        if item:IsA("Tool") then
+            toolEquipped = true
+            break
+        end
+    end
+
+    if getgenv().Config.Status and toolEquipped then
+        local target = getClosestTarget()
+        if target then
+            if getgenv().Config.Status then
+                -- Aimlock with prediction
+                local predictVec = target.Position + (target.Parent:FindFirstChild(getgenv().Config.Hitpart).Velocity * Vector3.new(getgenv().Config.Prediction.X, getgenv().Config.Prediction.Y, getgenv().Config.Prediction.X))
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictVec)
+				if validPart(target) then
+				    click()
+				end
+            end
+        end
+    end
+end)
+
+-- Input handling
+Utility.newConnection(UserInputService.InputBegan, function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        local char = LocalPlayer.Character
+        if not char or not char:FindFirstChildOfClass("Tool") then return end
+        local target = getClosestTarget()
+        if target then
+            local distance = (Camera.CFrame.Position - target.Position).Magnitude
+            if distance <= AIM_RADIUS then
+                getgenv().Config.Status = true
+                getgenv().Config.SpeedEnabled = true
+            end
+        end
+    elseif input.KeyCode == Enum.KeyCode.K then
+        getgenv().Config.ESPEnabled = not getgenv().Config.ESPEnabled
+        notify((getgenv().Config.ESPEnabled and "On" or "Off") .. " ESP")
+    elseif input.KeyCode == Enum.KeyCode.Q then
+        getgenv().Config.FlyEnabled = not getgenv().Config.FlyEnabled
+        notify("Fly: " .. (getgenv().Config.FlyEnabled and "On" or "Off"))
+    elseif input.KeyCode == Enum.KeyCode.T then
+        getgenv().Config.SelectedTargets = {}
+        notify("Cleared all selected targets")
+    elseif input.KeyCode == Enum.KeyCode.Z then
+        getgenv().Config.SpeedEnabled = not getgenv().Config.SpeedEnabled
+        notify("Speed: " .. (getgenv().Config.SpeedEnabled and "On" or "Off"))
+    elseif input.UserInputType == Enum.UserInputType.MouseButton1 and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+        local target = Mouse.Target
+        if not target then return end
+        local model = target:FindFirstAncestorOfClass("Model")
+        if not model then return end
+        local player = Players:GetPlayerFromCharacter(model)
+        if player and player ~= LocalPlayer then
+            local selected = getgenv().Config.SelectedTargets[player.Name]
+            if selected then
+                getgenv().Config.SelectedTargets[player.Name] = nil
+                notify("❌ Deselect " .. player.DisplayName)
+            else
+                getgenv().Config.SelectedTargets[player.Name] = true
+                notify("✅ Selected " .. player.DisplayName)
+            end
+        end
+    end
+end)
+
+Utility.newConnection(UserInputService.InputEnded, function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        getgenv().Config.Status = false
+        getgenv().Config.SpeedEnabled = false
+    end
+end)
+
+Utility.newConnection(RunService.RenderStepped, updateESP)
+
+Utility.newConnection(RunService.Heartbeat, function(deltaTime)
+    if getgenv().Config.SpeedEnabled and Utility.hasCharacter(LocalPlayer) then
+        local humanoidRootPart = LocalPlayer.Character.HumanoidRootPart
+        local humanoid = LocalPlayer.Character.Humanoid
+        local speed = getgenv().Config.SpeedAmount / 10
+        humanoidRootPart.CFrame = humanoidRootPart.CFrame + humanoid.MoveDirection * speed
+    end
+    if getgenv().Config.FlyEnabled and Utility.hasCharacter(LocalPlayer) then
+        local moveDirection = LocalPlayer.Character.Humanoid.MoveDirection
+        local humanoidRootPart = LocalPlayer.Character.HumanoidRootPart
+        local vertical = Vector3.new(0, UserInputService:IsKeyDown(Enum.KeyCode.Space) and getgenv().Config.FlySpeed / 10 or
+            UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and -getgenv().Config.FlySpeed / 10 or 0, 0)
+        humanoidRootPart.CFrame = humanoidRootPart.CFrame + (moveDirection * deltaTime * getgenv().Config.FlySpeed * 8)
+        humanoidRootPart.CFrame = humanoidRootPart.CFrame + vertical
+        humanoidRootPart.Velocity = humanoidRootPart.Velocity * Vector3.new(1, 0, 1)
+    end
+end)
+
+local lastDowned = {}
+
+Utility.newConnection(RunService.Heartbeat, function()
+    for name, _ in pairs(getgenv().Config.SelectedTargets) do
+        local plr = Players:FindFirstChild(name)
+        if plr and Utility.hasCharacter(plr) then
+            local bodyEffects = plr.Character:FindFirstChild("BodyEffects")
+            local isKO = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
+            if isKO and not lastDowned[name] then
+                lastDowned[name] = true
+                notify("☠️ " .. name .. " Knocked")
+            elseif not isKO then
+                lastDowned[name] = false
+            end
+        end
+    end
+end)
+
+Utility.newConnection(Players.PlayerAdded, function(player)
+    task.wait(2)
+    if getgenv().Config.SelectedTargets[player.Name] then
+        notify(player.Name .. " rejoined.")
+    end
+    Utility.newConnection(player.CharacterRemoving, function()
+        if espDrawings[player] then
+            pcall(function()
+                espDrawings[player].box:Remove()
+                espDrawings[player].text:Remove()
+            end)
+            espDrawings[player] = nil
+        end
+    end)
+end)
+
+Utility.newConnection(Players.PlayerRemoving, function(player)
+    if getgenv().Config.SelectedTargets[player.Name] then
+        notify(player.Name .. " left the game.")
+    end
+    if espDrawings[player] then
+        pcall(function()
+            espDrawings[player].box:Remove()
+            espDrawings[player].text:Remove()
+        end)
+        espDrawings[player] = nil
+    end
+end)
+
+Utility.newConnection(RunService.Heartbeat, function()
+    if getgenv().Config.Status then
+        if not lastCheck then lastCheck = 0 end
+        if os.clock() - lastCheck >= 50 then
+            local hitparts = {"Head", "HumanoidRootPart"}
+            getgenv().Config.Hitpart = hitparts[math.random(1, 2)]
+            notify("Hitpart changed to: " .. getgenv().Config.Hitpart)
+            lastCheck = os.clock()
+        end
+    end
+end)
+
+notify("Script loaded successfully.") 
