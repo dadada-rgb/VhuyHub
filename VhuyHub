@@ -1,0 +1,12 @@
+local placeId = game.PlaceId
+
+if placeId == 9872472334 then
+    -- Evade
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
+elseif placeId == 142823291 then
+    -- MM2
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2"))()
+else
+    -- Các game còn lại
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"))()
+end
