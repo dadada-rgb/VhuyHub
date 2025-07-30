@@ -357,4 +357,68 @@ uis.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
+local xy = game:GetService("Players")
+local ab = game:GetService("UserInputService")
+local pq = Instance.new("ScreenGui")
+local rs = Instance.new("Frame")
+local tu = Instance.new("UICorner")
+local vw = Instance.new("TextButton")
+local mn = Instance.new("TextButton")
+local kl = Instance.new("UICorner")
+local ef = Instance.new("UICorner")
+local gh = xy.LocalPlayer
+
+pq.Parent = gh:WaitForChild("PlayerGui")
+pq.Name = "zX9qW2"
+
+rs.Parent = pq
+rs.Position = UDim2.new(0.161, 0, 0.21, 0)
+rs.Size = UDim2.new(0, 166, 0, 98)
+rs.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+rs.Active = true
+rs.Draggable = true
+
+tu.CornerRadius = UDim.new(0, 8)
+tu.Parent = rs
+
+vw.Parent = rs
+vw.Name = "jH4mP8"
+vw.Position = UDim2.new(0.036, 0, 0.087, 0)
+vw.Size = UDim2.new(0, 150, 0, 40)
+vw.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+vw.Text = "AutoFarm(Vhuy)"
+vw.Font = Enum.Font.SourceSansBold
+vw.TextColor3 = Color3.fromRGB(0, 0, 0)
+vw.TextSize = 14
+
+kl.CornerRadius = UDim.new(0, 8)
+kl.Parent = vw
+
+mn.Parent = rs
+mn.Name = "tR7nY5"
+mn.Position = UDim2.new(0.036, 0, 0.523, 0)
+mn.Size = UDim2.new(0, 150, 0, 40)
+mn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+mn.Text = "Shoot(Vhuy)"
+mn.Font = Enum.Font.SourceSansBold
+mn.TextColor3 = Color3.fromRGB(0, 0, 0)
+mn.TextSize = 14
+
+ef.CornerRadius = UDim.new(0, 8)
+ef.Parent = mn
+
+vw.MouseButton1Click:Connect(function()
+    autoFarm = not autoFarm
+    if autoFarm then
+        print("AutoFarm ON")
+        m()
+    else
+        print("AutoFarm OFF")
+    end
+end)
+
+mn.MouseButton1Click:Connect(function()
+    shootMurderer()
+end)
+
 pcall(initialize)
