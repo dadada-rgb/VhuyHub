@@ -1,110 +1,273 @@
-local Players = game:GetService("Players")
-local VirtualUser = game:GetService("VirtualUser")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
+-- Services
+local a = game:GetService("Players")
+local b = game:GetService("VirtualUser")
+local c = game:GetService("ReplicatedStorage")
+local d = game:GetService("UserInputService")
+local e = game:GetService("RunService")
+local f = game:GetService("TweenService")
 
-local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
+-- Player and character
+local g = a.LocalPlayer
+local h = g.Character or g.CharacterAdded:Wait()
 
-getgenv().farm = false
+-- Global variables
+getgenv().x1 = false -- Farm toggle
+getgenv().x2 = false -- ESP toggle
+getgenv().x3 = false -- Bhop toggle
+local q = false -- InfJump toggle
+local espConnections = {} -- Track ESP connections
 
--- Auto click when idle
-player.Idled:Connect(function()
-    VirtualUser:CaptureController()
-    VirtualUser:ClickButton2(Vector2.new())
+-- Anti-idle
+g.Idled:Connect(function()
+    b:CaptureController()
+    b:ClickButton2(Vector2.new())
 end)
 
--- Auto revive when Downed (always running)
-RunService.Stepped:Connect(function()
-    local char = player.Character
-    if char and char:GetAttribute("Downed") then
-        ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
+-- Auto-revive
+e.Stepped:Connect(function()
+    local i = g.Character
+    if i and i:GetAttribute("Downed") then
+        c.Events.Player.ChangePlayerMode:FireServer(true)
+        task.wait(math.random(0.5, 1.5))
     end
 end)
 
 -- Farming loop
 task.spawn(function()
-    local tickets = workspace:FindFirstChild("Game") and workspace.Game:FindFirstChild("Effects") and workspace.Game.Effects:FindFirstChild("Tickets")
-    if not tickets then return end
+    local j = workspace:FindFirstChild("Game") and workspace.Game:FindFirstChild("Effects") and workspace.Game.Effects:FindFirstChild("Tickets")
+    if not j then return end
 
     while true do
-        if getgenv().farm then
-            local char = player.Character or player.CharacterAdded:Wait()
-            local hrp = char:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                for _, ticket in ipairs(tickets:GetChildren()) do
-                    local ticketPart = ticket:FindFirstChild("HumanoidRootPart")
-                    if ticketPart then
-                        hrp.CFrame = ticketPart.CFrame
-                        task.wait(0.1)
+        if getgenv().x1 then
+            local k = g.Character or g.CharacterAdded:Wait()
+            local l = k:FindFirstChild("HumanoidRootPart")
+            if l then
+                for _, m in ipairs(j:GetChildren()) do
+                    local n = m:FindFirstChild("HumanoidRootPart")
+                    if n then
+                        local o = TweenInfo.new(math.random(0.3, 0.7), Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+                        local p = f:Create(l, o, {CFrame = n.CFrame + Vector3.new(0, 3, 0)})
+                        p:Play()
+                        p.Completed:Wait()
+                        task.wait(math.random(0.1, 0.3))
                     end
                 end
             end
         end
-        task.wait(1)
+        task.wait(math.random(0.8, 1.2))
     end
 end)
 
-local InfiniteJumpEnabled = true
-game:GetService("UserInputService").JumpRequest:Connect(function()
-	if InfiniteJumpEnabled then
-		game:GetService("Players").LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
-	end
+-- Infinite jump
+d.InputBegan:Connect(function(input, gameProcessed)
+    if q and not gameProcessed and input.KeyCode == Enum.KeyCode.Space then
+        local k = g.Character
+        local r = k and k:FindFirstChildOfClass("Humanoid")
+        if r and r:GetState() ~= Enum.HumanoidStateType.Jumping and r:GetState() ~= Enum.HumanoidStateType.Freefall and r.FloorMaterial ~= Enum.Material.Air then
+            r:ChangeState("Jumping")
+            task.wait(math.random(0.1, 0.2)) -- Slightly longer delay for natural feel
+        end
+    end
 end)
 
-local df = game:GetService("Players")
-local jk = game:GetService("UserInputService")
-local qw = Instance.new("ScreenGui")
-local zx = Instance.new("Frame")
-local cv = Instance.new("UICorner")
-local bn = Instance.new("TextButton")
-local ty = Instance.new("TextButton")
-local ui = Instance.new("UICorner")
-local op = Instance.new("UICorner")
-local pl = df.LocalPlayer
+-- Auto Bhop
+task.spawn(function()
+    while true do
+        if getgenv().x3 then
+            local k = g.Character
+            local r = k and k:FindFirstChildOfClass("Humanoid")
+            if r and r:GetState() == Enum.HumanoidStateType.Running and r.MoveDirection.Magnitude > 0 and r.FloorMaterial ~= Enum.Material.Air then
+                r:ChangeState("Jumping")
+                task.wait(math.random(0.05, 0.15))
+            end
+        end
+        task.wait(0.05)
+    end
+end)
 
-qw.Parent = pl:WaitForChild("PlayerGui")
-qw.Name = "rtY7mP"
-qw.ResetOnSpawn = false
+-- Auto Bhop hotkey (G)
+d.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.KeyCode == Enum.KeyCode.G then
+        getgenv().x3 = not getgenv().x3
+        ff.Text = "Auto Bhop (" .. (getgenv().x3 and "On" or "Off") .. ")"
+    end
+end)
 
-zx.Parent = qw
-zx.Position = UDim2.new(0.161, 0, 0.21, 0)
-zx.Size = UDim2.new(0, 166, 0, 98)
-zx.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-zx.Active = true
-zx.Draggable = true
+-- ESP functionality
+local function addESP()
+    for _, s in ipairs(a:GetPlayers()) do
+        if s ~= g and s.Character then
+            local t = s.Character:FindFirstChild("Head")
+            if t and not t:FindFirstChild("x3z9q") then
+                local u = Instance.new("BillboardGui")
+                u.Name = "x3z9q"
+                u.Adornee = t
+                u.Size = UDim2.new(0, 100, 0, 30)
+                u.StudsOffset = Vector3.new(0, 3, 0)
+                u.AlwaysOnTop = true
+                u.Parent = t
 
-cv.CornerRadius = UDim.new(0, 8)
-cv.Parent = zx
+                local v = Instance.new("TextLabel")
+                v.Size = UDim2.new(1, 0, 1, 0)
+                v.BackgroundTransparency = 1
+                v.Text = s.Name
+                v.TextColor3 = Color3.fromRGB(255, 182, 193) -- Pastel pink
+                v.TextSize = 14
+                v.Font = Enum.Font.SourceSansBold
+                v.Parent = u
 
-bn.Parent = zx
-bn.Name = "ghQ2zX"
-bn.Position = UDim2.new(0.036, 0, 0.087, 0)
-bn.Size = UDim2.new(0, 150, 0, 40)
-bn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-bn.Text = "InfJump(Vhuy)"
-bn.Font = Enum.Font.SourceSansBold
-bn.TextColor3 = Color3.fromRGB(0, 0, 0)
-bn.TextSize = 14
+                local conn = e.RenderStepped:Connect(function()
+                    if not s.Character or not s.Character:FindFirstChild("Head") or not getgenv().x2 then
+                        u:Destroy()
+                        conn:Disconnect()
+                    end
+                end)
+                table.insert(espConnections, conn)
+            end
+        end
+    end
+end
 
-ui.CornerRadius = UDim.new(0, 8)
-ui.Parent = bn
+local function removeESP()
+    for _, conn in ipairs(espConnections) do
+        conn:Disconnect()
+    end
+    espConnections = {}
+    for _, s in ipairs(a:GetPlayers()) do
+        if s.Character then
+            local t = s.Character:FindFirstChild("Head")
+            if t and t:FindFirstChild("x3z9q") then
+                t.x3z9q:Destroy()
+            end
+        end
+    end
+end
 
-ty.Parent = zx
-ty.Name = "kL9vW4"
-ty.Position = UDim2.new(0.036, 0, 0.523, 0)
-ty.Size = UDim2.new(0, 150, 0, 40)
-ty.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-ty.Text = "FarmTickets(Vhuy)"
-ty.Font = Enum.Font.SourceSansBold
-ty.TextColor3 = Color3.fromRGB(0, 0, 0)
-ty.TextSize = 14
+-- Handle character respawn for ESP
+a.PlayerAdded:Connect(function(s)
+    if getgenv().x2 then
+        task.wait(1)
+        addESP()
+    end
+end)
+g.CharacterAdded:Connect(function()
+    if getgenv().x2 then
+        task.wait(1)
+        addESP()
+    end
+end)
+for _, s in ipairs(a:GetPlayers()) do
+    if s ~= g then
+        s.CharacterAdded:Connect(function()
+            if getgenv().x2 then
+                task.wait(1)
+                addESP()
+            end
+        end)
+    end
+end
 
-op.CornerRadius = UDim.new(0, 8)
-op.Parent = ty
+-- GUI setup
+local w = Instance.new("ScreenGui")
+local x = Instance.new("Frame")
+local y = Instance.new("UICorner")
+local z = Instance.new("TextButton") -- InfJump
+local aa = Instance.new("TextButton") -- FarmTickets
+local bb = Instance.new("TextButton") -- ESP
+local ff = Instance.new("TextButton") -- Auto Bhop
+local cc = Instance.new("UICorner")
+local dd = Instance.new("UICorner")
+local ee = Instance.new("UICorner")
+local gg = Instance.new("UICorner")
 
-ty.MouseButton1Click:Connect(function()
-    getgenv().farm = not getgenv().farm
-    print("Farm mode: " .. tostring(getgenv().farm))
-end) 
+w.Parent = g:WaitForChild("PlayerGui")
+w.Name = "aB7kP9"
+w.ResetOnSpawn = false
+
+x.Parent = w
+x.Position = UDim2.new(0.161, 0, 0.21, 0)
+x.Size = UDim2.new(0, 120, 0, 140) -- Smaller frame
+x.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+x.Active = true
+x.Draggable = true
+
+y.CornerRadius = UDim.new(0, 8)
+y.Parent = x
+
+z.Parent = x
+z.Name = "pQ8mX2"
+z.Position = UDim2.new(0.083, 0, 0.057, 0)
+z.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
+z.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+z.Text = "InfJump (Off)"
+z.Font = Enum.Font.SourceSansBold
+z.TextColor3 = Color3.fromRGB(0, 0, 0)
+z.TextSize = 12
+
+cc.CornerRadius = UDim.new(0, 8)
+cc.Parent = z
+
+aa.Parent = x
+aa.Name = "rT5vN3"
+aa.Position = UDim2.new(0.083, 0, 0.286, 0)
+aa.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
+aa.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+aa.Text = "FarmTickets (Off)"
+aa.Font = Enum.Font.SourceSansBold
+aa.TextColor3 = Color3.fromRGB(0, 0, 0)
+aa.TextSize = 12
+
+dd.CornerRadius = UDim.new(0, 8)
+dd.Parent = aa
+
+bb.Parent = x
+bb.Name = "sJ6wY4"
+bb.Position = UDim2.new(0.083, 0, 0.514, 0)
+bb.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
+bb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+bb.Text = "ESP (Off)"
+bb.Font = Enum.Font.SourceSansBold
+bb.TextColor3 = Color3.fromRGB(0, 0, 0)
+bb.TextSize = 12
+
+ee.CornerRadius = UDim.new(0, 8)
+ee.Parent = bb
+
+ff.Parent = x
+ff.Name = "tK7xZ5"
+ff.Position = UDim2.new(0.083, 0, 0.743, 0)
+ff.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
+ff.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+ff.Text = "Auto Bhop (Off)"
+ff.Font = Enum.Font.SourceSansBold
+ff.TextColor3 = Color3.fromRGB(0, 0, 0)
+ff.TextSize = 12
+
+gg.CornerRadius = UDim.new(0, 8)
+gg.Parent = ff
+
+-- Button functionality
+z.MouseButton1Click:Connect(function()
+    q = not q
+    z.Text = "InfJump (" .. (q and "On" or "Off") .. ")"
+end)
+
+aa.MouseButton1Click:Connect(function()
+    getgenv().x1 = not getgenv().x1
+    aa.Text = "FarmTickets (" .. (getgenv().x1 and "On" or "Off") .. ")"
+end)
+
+bb.MouseButton1Click:Connect(function()
+    getgenv().x2 = not getgenv().x2
+    bb.Text = "ESP (" .. (getgenv().x2 and "On" or "Off") .. ")"
+    if getgenv().x2 then
+        addESP()
+    else
+        removeESP()
+    end
+end)
+
+ff.MouseButton1Click:Connect(function()
+    getgenv().x3 = not getgenv().x3
+    ff.Text = "Auto Bhop (" .. (getgenv().x3 and "On" or "Off") .. ")"
+end)
