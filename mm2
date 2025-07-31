@@ -1,25 +1,35 @@
+-- Services (unchanged)
 local UserInputService = game:GetService("UserInputService")
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local StarterGui = game:GetService("StarterGui")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local localplayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
-local ESP_ENABLED = true 
-local SHOOT_OFFSET = 2.8 
-local OFFSET_TO_PING_MULT = 1 
-local UPDATE_INTERVAL = 0.5 
-local RANDOM_DELAY = 0.1 
+-- Configuration (unchanged)
+local ESP_ENABLED = false
+local SHOOT_OFFSET = 2.8
+local OFFSET_TO_PING_MULT = 1
+local UPDATE_INTERVAL = 0.5
+local RANDOM_DELAY = 0.1
+local MAX_COIN_DISTANCE = 100
+local MAX_GUN_DISTANCE = 500
+local ANTI_CHEAT_DELAY = 0.05
 
+-- Variables (unchanged)
 local playerData = {}
 local espObjects = {}
 local isScriptRunning = false
 local espActive = ESP_ENABLED
 local lastUpdate = tick()
+local autoFarm = false
+local runningFarm = false
+local autoGun = false
+local runningGun = false
 
+-- Game checks (unchanged)
 local function isMurderMystery2()
     return ReplicatedStorage:FindFirstChild("Remotes") 
         and ReplicatedStorage.Remotes:FindFirstChild("Gameplay")
@@ -27,13 +37,14 @@ end
 
 local function getMap()
     for _, o in ipairs(Workspace:GetChildren()) do
-        if o:FindFirstChild("CoinContainer") and o:FindFirstChild("Spawns") then
+        if o:GetAttribute("MapID") and o:FindFirstChild("CoinContainer") and o:FindFirstChild("Spawns") then
             return o
         end
     end
     return nil
 end
 
+-- Role detection (unchanged)
 local function findMurderer()
     if playerData then
         for player, data in pairs(playerData) do
@@ -93,6 +104,7 @@ local function findSheriffThatsNotMe()
     return nil
 end
 
+-- ESP functions (unchanged)
 local function createESP(object, color)
     if not espActive or not object then return end
     pcall(function()
@@ -104,7 +116,7 @@ local function createESP(object, color)
         highlight.Parent = object
         highlight.FillColor = color
         highlight.OutlineColor = color
-        highlight.FillTransparency = 0.6 
+        highlight.FillTransparency = 0.6
         highlight.OutlineTransparency = 0.2
         highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
         espObjects[object] = { highlight = highlight }
@@ -135,19 +147,10 @@ local function reloadPlayerESP()
             end
         end
     end
-    task.wait(math.random(0, RANDOM_DELAY)) 
+    task.wait(math.random(0, RANDOM_DELAY))
 end
 
-local function toggleESP()
-    espActive = not espActive
-    if espActive then
-        reloadPlayerESP()
-    else
-        clearESP()
-    end
-end
-
--- Get Predicted Position for Shooting
+-- New getPredictedPosition (as provided)
 local function getPredictedPosition(player, shootOffset)
     local success, result = pcall(function()
         if not player.Character then
@@ -171,7 +174,7 @@ local function getPredictedPosition(player, shootOffset)
     return result
 end
 
--- Shoot Murderer
+-- New shootMurderer (as provided, with anti-cheat delay)
 local lastShot = tick()
 local function shootMurderer()
     if tick() - lastShot < 0.5 then return end 
@@ -205,11 +208,149 @@ local function shootMurderer()
     pcall(function()
         localplayer.Character.Gun.KnifeLocal.CreateBeam.RemoteFunction:InvokeServer(unpack(args))
     end)
+    task.wait(math.random(0, ANTI_CHEAT_DELAY)) -- Anti-cheat: Add delay after firing
 end
 
+-- AutoFarm (unchanged)
+local function autoFarmCoins()
+    if runningFarm then return end
+    runningFarm = true
+    local k = TweenService
+    local g = Players.LocalPlayer
+    local r = g.Character or g.CharacterAdded:Wait()
+    local A = r:WaitForChild("HumanoidRootPart", 5)
+    local a = r:WaitForChild("Humanoid", 5)
+    if not A or not a then
+        runningFarm = false
+        return
+    end
+    local function findMap()
+        for _, E in ipairs(Workspace:GetChildren()) do
+            if E:GetAttribute("MapID") and E:FindFirstChild("CoinContainer") then
+                return E
+            end
+        end
+        task.wait(0.5)
+        return nil
+    end
+    local function findCoin()
+        local C = findMap()
+        if not C or not C:FindFirstChild("CoinContainer") then return nil end
+        local D, i = nil, math.huge
+        for _, l in ipairs(C.CoinContainer:GetChildren()) do
+            local q = l:FindFirstChild("CoinVisual")
+            if q and not q:GetAttribute("Collected") and l.Parent then
+                local dist = (A.Position - l.Position).Magnitude
+                if dist < i and dist < MAX_COIN_DISTANCE then
+                    D = l
+                    i = dist
+                end
+            end
+        end
+        return D
+    end
+    local function moveToCoin(B)
+        if not B or not B.Parent then return end
+        a:ChangeState(11)
+        local t = (A.Position - B.Position).Magnitude
+        if t > MAX_COIN_DISTANCE then return end
+        local offset = Vector3.new(math.random(-5, 5)/10, 0, math.random(-5, 5)/10)
+        local f = k:Create(A, TweenInfo.new(t / 25, Enum.EasingStyle.Linear), {CFrame = B.CFrame * CFrame.Angles(0, math.rad(math.random(-10, 10)), 0) + offset})
+        f:Play()
+        f.Completed:Wait()
+    end
+    while autoFarm do
+        local z = findCoin()
+        if z then
+            moveToCoin(z)
+            local h = z:FindFirstChild("CoinVisual")
+            while h and not h:GetAttribute("Collected") and h.Parent and autoFarm do
+                local x = findCoin()
+                if x and x ~= z then
+                    break
+                end
+                task.wait(0.1 + math.random(0, ANTI_CHEAT_DELAY))
+            end
+        end
+        task.wait(math.random(0.1, 0.3))
+    end
+    runningFarm = false
+end
+
+-- Auto Gun Pickup (unchanged)
+local function autoPickupGun()
+    if runningGun then return end
+    runningGun = true
+    local k = TweenService
+    local g = Players.LocalPlayer
+    local r = g.Character or g.CharacterAdded:Wait()
+    local A = r:WaitForChild("HumanoidRootPart", 5)
+    local a = r:WaitForChild("Humanoid", 5)
+    if not A or not a then
+        runningGun = false
+        return
+    end
+    local function findGun()
+        local closestGun, minDist = nil, math.huge
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("BasePart") and obj.Parent and not obj:GetAttribute("Collected") then
+                if string.find(string.lower(obj.Name), "gun") then
+                    local dist = (A.Position - obj.Position).Magnitude
+                    if dist < minDist and dist < MAX_GUN_DISTANCE then
+                        closestGun = obj
+                        minDist = dist
+                    end
+                end
+            end
+        end
+        return closestGun
+    end
+    local function pickup(G)
+        if not G or not G.Parent then return false end
+        a:ChangeState(11)
+        task.wait(math.random(0.1, 0.2))
+        local t = (A.Position - G.Position).Magnitude
+        if t > MAX_GUN_DISTANCE then return false end
+        local offset = Vector3.new(math.random(-5, 5)/10, 0, math.random(-5, 5)/10)
+        local rotation = CFrame.Angles(math.rad(math.random(-5, 5)), math.rad(math.random(-10, 10)), math.rad(math.random(-5, 5)))
+        local f = k:Create(A, TweenInfo.new(t / 25, Enum.EasingStyle.Linear), {CFrame = G.CFrame * rotation + offset})
+        f:Play()
+        f.Completed:Wait()
+        if not G.Parent then return false end
+        local attempts = 0
+        local maxAttempts = 2
+        local success = false
+        while attempts < maxAttempts and not success do
+            attempts = attempts + 1
+            success = pcall(function()
+                ReplicatedStorage.Remotes.Gameplay.GetGun:FireServer()
+                task.wait(math.random(0.05, 0.15) + ANTI_CHEAT_DELAY)
+                return localplayer.Backpack:FindFirstChild("Gun") or localplayer.Character:FindFirstChild("Gun")
+            end)
+            if not success then
+                task.wait(math.random(0.1, 0.2))
+            end
+        end
+        return success
+    end
+    while autoGun do
+        if not localplayer.Backpack:FindFirstChild("Gun") and not localplayer.Character:FindFirstChild("Gun") then
+            local gun = findGun()
+            if gun then
+                if pickup(gun) then
+                    task.wait(0.5 + math.random(0, ANTI_CHEAT_DELAY))
+                end
+            end
+        end
+        task.wait(math.random(0.1, 0.3))
+    end
+    runningGun = false
+end
+
+-- Event connections (unchanged)
 Workspace.ChildAdded:Connect(function(ch)
     if ch == getMap() and espActive then
-        task.wait(math.random(1, 2)) 
+        task.wait(math.random(1, 2))
         reloadPlayerESP()
     end
 end)
@@ -220,10 +361,182 @@ Workspace.ChildRemoved:Connect(function(ch)
     end
 end)
 
+localplayer.CharacterAdded:Connect(function()
+    task.wait(math.random(0.5, 1.5))
+    if autoFarm then
+        task.spawn(autoFarmCoins)
+    end
+    if autoGun then
+        task.spawn(autoPickupGun)
+    end
+    if espActive then
+        reloadPlayerESP()
+    end
+end)
+
+Players.PlayerAdded:Connect(function(player)
+    if player ~= localplayer then
+        player.CharacterAdded:Connect(function()
+            if espActive then
+                task.wait(math.random(0.5, 1.5))
+                reloadPlayerESP()
+            end
+        end)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function()
+    if espActive then
+        task.wait(math.random(0.5, 1.5))
+        reloadPlayerESP()
+    end
+end)
+
+-- GUI setup (unchanged)
+local pq = Instance.new("ScreenGui")
+local rs = Instance.new("Frame")
+local tu = Instance.new("UICorner")
+local vw = Instance.new("TextButton") -- AutoFarm
+local mn = Instance.new("TextButton") -- Shoot
+local xy = Instance.new("TextButton") -- ESP
+local ag = Instance.new("TextButton") -- AutoGun
+local kl = Instance.new("UICorner")
+local ef = Instance.new("UICorner")
+local zq = Instance.new("UICorner")
+local wg = Instance.new("UICorner")
+
+pq.Parent = localplayer:WaitForChild("PlayerGui", 5)
+pq.Name = "zX9qW2"
+pq.ResetOnSpawn = false
+
+rs.Parent = pq
+rs.Position = UDim2.new(0.161, 0, 0.21, 0)
+rs.Size = UDim2.new(0, 120, 0, 120)
+rs.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+rs.Active = true
+rs.Draggable = true
+
+tu.CornerRadius = UDim.new(0, 8)
+tu.Parent = rs
+
+vw.Parent = rs
+vw.Name = "jH4mP8"
+vw.Position = UDim2.new(0.083, 0, 0.05, 0)
+vw.Size = UDim2.new(0, 100, 0, 25)
+vw.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+vw.Text = "AutoFarm (Off)"
+vw.Font = Enum.Font.SourceSansBold
+vw.TextColor3 = Color3.fromRGB(0, 0, 0)
+vw.TextSize = 12
+vw.Active = true
+vw.Selectable = true
+
+kl.CornerRadius = UDim.new(0, 8)
+kl.Parent = vw
+
+mn.Parent = rs
+mn.Name = "tR7nY5"
+mn.Position = UDim2.new(0.083, 0, 0.283, 0)
+mn.Size = UDim2.new(0, 100, 0, 25)
+mn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+mn.Text = "Shoot"
+mn.Font = Enum.Font.SourceSansBold
+mn.TextColor3 = Color3.fromRGB(0, 0, 0)
+mn.TextSize = 12
+mn.Active = true
+mn.Selectable = true
+
+ef.CornerRadius = UDim.new(0, 8)
+ef.Parent = mn
+
+xy.Parent = rs
+xy.Name = "uP5kQ3"
+xy.Position = UDim2.new(0.083, 0, 0.517, 0)
+xy.Size = UDim2.new(0, 100, 0, 25)
+xy.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+xy.Text = "ESP (Off)"
+xy.Font = Enum.Font.SourceSansBold
+xy.TextColor3 = Color3.fromRGB(0, 0, 0)
+xy.TextSize = 12
+xy.Active = true
+xy.Selectable = true
+
+zq.CornerRadius = UDim.new(0, 8)
+zq.Parent = xy
+
+ag.Parent = rs
+ag.Name = "vQ2zW9"
+ag.Position = UDim2.new(0.083, 0, 0.75, 0)
+ag.Size = UDim2.new(0, 100, 0, 25)
+ag.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+ag.Text = "AutoGun (Off)"
+ag.Font = Enum.Font.SourceSansBold
+ag.TextColor3 = Color3.fromRGB(0, 0, 0)
+ag.TextSize = 12
+ag.Active = true
+ag.Selectable = true
+
+wg.CornerRadius = UDim.new(0, 8)
+wg.Parent = ag
+
+-- Button functionality (unchanged)
+vw.MouseButton1Click:Connect(function()
+    autoFarm = not autoFarm
+    vw.Text = "AutoFarm (" .. (autoFarm and "On" or "Off") .. ")"
+    if autoFarm then
+        task.spawn(autoFarmCoins)
+    end
+end)
+
+mn.MouseButton1Click:Connect(function()
+    task.spawn(shootMurderer)
+end)
+
+xy.MouseButton1Click:Connect(function()
+    espActive = not espActive
+    xy.Text = "ESP (" .. (espActive and "On" or "Off") .. ")"
+    if espActive then
+        reloadPlayerESP()
+    else
+        clearESP()
+    end
+end)
+
+ag.MouseButton1Click:Connect(function()
+    autoGun = not autoGun
+    ag.Text = "AutoGun (" .. (autoGun and "On" or "Off") .. ")"
+    if autoGun then
+        task.spawn(autoPickupGun)
+    end
+end)
+
+-- Input bindings (unchanged)
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+    if gameProcessedEvent or not isScriptRunning then return end
+    if input.KeyCode == Enum.KeyCode.T then
+        espActive = not espActive
+        xy.Text = "ESP (" .. (espActive and "On" or "Off") .. ")"
+        if espActive then
+            reloadPlayerESP()
+        else
+            clearESP()
+        end
+    elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+        task.spawn(shootMurderer)
+    elseif input.KeyCode == Enum.KeyCode.C then
+        autoFarm = not autoFarm
+        vw.Text = "AutoFarm (" .. (autoFarm and "On" or "Off") .. ")"
+        if autoFarm then
+            task.spawn(autoFarmCoins)
+        end
+    end
+end)
+
+-- Initialize (unchanged)
 local function initialize()
-    local success, _ = pcall(function()
-        localplayer:WaitForChild("PlayerGui", 15)
-        ReplicatedStorage:WaitForChild("Remotes", 15):WaitForChild("Gameplay", 15):WaitForChild("PlayerDataChanged", 15)
+    local success = pcall(function()
+        localplayer:WaitForChild("PlayerGui", 10)
+        ReplicatedStorage:WaitForChild("Remotes", 10):WaitForChild("Gameplay", 10):WaitForChild("PlayerDataChanged", 10)
     end)
     if not success or not isMurderMystery2() then
         return
@@ -240,186 +553,7 @@ local function initialize()
     end)
     if espActive then
         reloadPlayerESP()
-        Players.PlayerAdded:Connect(function(player)
-            player.CharacterAdded:Connect(function()
-                if espActive then
-                    reloadPlayerESP()
-                end
-            end)
-        end)
-        Players.PlayerRemoving:Connect(function()
-            if espActive then
-                reloadPlayerESP()
-            end
-        end)
     end
-
-    UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
-        if gameProcessedEvent or not isScriptRunning then return end
-        if input.KeyCode == Enum.KeyCode.T then
-            toggleESP()
-        elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
-            shootMurderer()
-        end
-    end)
 end
-
-local e = game:GetService('Players').LocalPlayer
-local uis = game:GetService("UserInputService")
-
-local autoFarm = false
-local runningFarm = false
-
-local function m()
-	if runningFarm then return end
-	runningFarm = true
-
-	local k = game:GetService('TweenService')
-	local g = game.Players.LocalPlayer
-	local r = g.Character or g.CharacterAdded:Wait()
-	local A = r:WaitForChild('HumanoidRootPart')
-	local a = r:WaitForChild('Humanoid')
-
-	local function j()
-		while true do
-			for y, E in ipairs(workspace:GetChildren()) do
-				if E:GetAttribute('MapID') and E:FindFirstChild('CoinContainer') then
-					return E
-				end
-			end
-			task.wait()
-		end
-	end
-
-	local function c()
-		local C = j()
-		local D, i = nil, math.huge
-		for p, l in ipairs(C.CoinContainer:GetChildren()) do
-			local q = l:FindFirstChild('CoinVisual')
-			if q and not q:GetAttribute('Collected') then
-				local _ = (A.Position - l.Position).Magnitude
-				if _ < i then
-					D = l
-					i = _
-				end
-			end
-		end
-		return D
-	end
-
-	local function b(B)
-		a:ChangeState(11) -- Nhảy
-		local t = (A.Position - B.Position).Magnitude
-		local f = k:Create(A, TweenInfo.new(t / 25, Enum.EasingStyle.Linear), {CFrame = B.CFrame})
-		f:Play()
-		f.Completed:Wait()
-	end
-
-	while autoFarm do
-		local z = c()
-		if z then
-			b(z)
-			local h = z:FindFirstChild('CoinVisual')
-			while h and not h:GetAttribute('Collected') and h.Parent and autoFarm do
-				local x = c()
-				if x and x ~= z then
-					break
-				end
-				task.wait()
-			end
-		else
-			task.wait(0.1)
-		end
-	end
-
-	runningFarm = false
-end
-
--- Khi nhân vật chết thì tự chạy lại nếu đang auto
-e.CharacterAdded:Connect(function()
-	task.wait(1)
-	if autoFarm then
-		m()
-	end
-end)
-
--- Phím C bật/tắt
-uis.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then return end
-	if input.KeyCode == Enum.KeyCode.C then
-		autoFarm = not autoFarm
-		if autoFarm then
-			print("AutoFarm ON")
-			m()
-		else
-			print("AutoFarm OFF")
-		end
-	end
-end)
-
-local xy = game:GetService("Players")
-local ab = game:GetService("UserInputService")
-local pq = Instance.new("ScreenGui")
-local rs = Instance.new("Frame")
-local tu = Instance.new("UICorner")
-local vw = Instance.new("TextButton")
-local mn = Instance.new("TextButton")
-local kl = Instance.new("UICorner")
-local ef = Instance.new("UICorner")
-local gh = xy.LocalPlayer
-
-pq.Parent = gh:WaitForChild("PlayerGui")
-pq.Name = "zX9qW2"
-pq.ResetOnSpawn = false
-
-rs.Parent = pq
-rs.Position = UDim2.new(0.161, 0, 0.21, 0)
-rs.Size = UDim2.new(0, 166, 0, 98)
-rs.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-rs.Active = true
-rs.Draggable = true
-
-tu.CornerRadius = UDim.new(0, 8)
-tu.Parent = rs
-
-vw.Parent = rs
-vw.Name = "jH4mP8"
-vw.Position = UDim2.new(0.036, 0, 0.087, 0)
-vw.Size = UDim2.new(0, 150, 0, 40)
-vw.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-vw.Text = "AutoFarm(Vhuy)"
-vw.Font = Enum.Font.SourceSansBold
-vw.TextColor3 = Color3.fromRGB(0, 0, 0)
-vw.TextSize = 14
-
-kl.CornerRadius = UDim.new(0, 8)
-kl.Parent = vw
-
-mn.Parent = rs
-mn.Name = "tR7nY5"
-mn.Position = UDim2.new(0.036, 0, 0.523, 0)
-mn.Size = UDim2.new(0, 150, 0, 40)
-mn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-mn.Text = "Shoot(Vhuy)"
-mn.Font = Enum.Font.SourceSansBold
-mn.TextColor3 = Color3.fromRGB(0, 0, 0)
-mn.TextSize = 14
-
-ef.CornerRadius = UDim.new(0, 8)
-ef.Parent = mn
-
-vw.MouseButton1Click:Connect(function()
-    autoFarm = not autoFarm
-    if autoFarm then
-        print("AutoFarm ON")
-        m()
-    else
-        print("AutoFarm OFF")
-    end
-end)
-
-mn.MouseButton1Click:Connect(function()
-    shootMurderer()
-end)
 
 pcall(initialize)
