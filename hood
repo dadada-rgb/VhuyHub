@@ -220,7 +220,7 @@ local function cc()
             cf.Size = UDim2.new(1, -4, 0, 18)
             cf.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
             cf.BackgroundTransparency = 0.2
-            cf.TextColor3 = Color3.fromRGB(255, 255, 255)
+            cf.TextColor3 = Color3.fromRGB(0, 0, 0)
             cf.TextSize = 12
             cf.Font = Enum.Font.SourceSans
             cf.AutoButtonColor = false
