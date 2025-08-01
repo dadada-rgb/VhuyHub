@@ -207,28 +207,21 @@ r(e.InputBegan, function(ca, cb)
         local ray = h:ScreenPointToRay(mousePos.X, mousePos.Y)
         local raycastParams = RaycastParams.new()
         raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-        raycastParams.FilterDescendantsInstances = {g.Character}
-        local rayResult = d:Raycast(ray.Origin, ray.Direction * 1000, raycastParams)
-
+        raycastParams.FilterDescendantsInstances = {g.Character, d:FindFirstChild("Terrain") or {}}
+        local rayResult = d:Raycast(ray.Origin, ray.Direction * 500, raycastParams)
+    
         if rayResult and rayResult.Instance then
-            -- Tìm mô hình nhân vật gốc của người chơi
             local instance = rayResult.Instance
             while instance and not a:GetPlayerFromCharacter(instance) do
                 instance = instance.Parent
             end
-
+        
             local targetPlayer = instance and a:GetPlayerFromCharacter(instance)
             if targetPlayer and targetPlayer ~= g then
-                -- Toggle chọn / bỏ chọn
-                if i.v[targetPlayer.Name] then
-                    i.v[targetPlayer.Name] = nil -- Bỏ chọn nếu đã chọn
-                else
-                    i.v[targetPlayer.Name] = true -- Chọn nếu chưa chọn
-                end
-                cc() -- Cập nhật lại GUI hiển thị
+                i.v[targetPlayer.Name] = not i.v[targetPlayer.Name] and true or nil
+                cc()
             end
         end
-    end
 
     elseif ca.KeyCode == Enum.KeyCode.K then
         i.w = not i.w
