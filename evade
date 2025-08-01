@@ -1,296 +1,270 @@
--- Services
 local a = game:GetService("Players")
 local b = game:GetService("VirtualUser")
 local c = game:GetService("ReplicatedStorage")
 local d = game:GetService("UserInputService")
 local e = game:GetService("RunService")
 local f = game:GetService("TweenService")
-
--- Player and character
 local g = a.LocalPlayer
 local h = g.Character or g.CharacterAdded:Wait()
+local i = { j = false, k = false, l = false }
+local m = {}
+local n = false
 
--- Global variables
-getgenv().x1 = false -- Farm toggle
-getgenv().x2 = false -- ESP toggle
-getgenv().x3 = false -- Bhop toggle
-local q = false -- InfJump toggle
-local espConnections = {} -- Track ESP connections
-
--- Anti-idle
 g.Idled:Connect(function()
-    b:CaptureController()
-    b:ClickButton2(Vector2.new())
+    pcall(function()
+        b:CaptureController()
+        b:ClickButton2(Vector2.new())
+    end)
 end)
 
--- Auto-revive (luôn hoạt động, ngay lập tức)
 task.spawn(function()
-    local function GetDownedPlr()
-        for _, v in pairs(workspace.Game.Players:GetChildren()) do
-            if v:GetAttribute("Downed") then
-                return v
-            end
-        end
-    end
-
     while true do
-        local downedplr = GetDownedPlr()
-        if downedplr and downedplr:FindFirstChild("HumanoidRootPart") then
-            local k = g.Character
-            if k and k:FindFirstChild("HumanoidRootPart") then
-                k.HumanoidRootPart.CFrame = CFrame.new(downedplr.HumanoidRootPart.Position + Vector3.new(0, 3, 0))
-                c.Events.Revive.RevivePlayer:FireServer(tostring(downedplr), true)
+        local o = nil
+        for _, p in pairs(workspace.Game.Players:GetChildren()) do
+            if p:GetAttribute("Downed") then o = p break end
+        end
+        if o and o:FindFirstChild("HumanoidRootPart") then
+            local q = g.Character
+            if q and q:FindFirstChild("HumanoidRootPart") then
+                q.HumanoidRootPart.CFrame = CFrame.new(o.HumanoidRootPart.Position + Vector3.new(0, 3, 0))
+                pcall(function() c.Events.Revive.RevivePlayer:FireServer(tostring(o), true) end)
             end
         end
-        task.wait(0.1) -- Giảm độ trễ để kiểm tra nhanh hơn
+        task.wait(math.random(80, 120) / 1000)
     end
 end)
 
--- Auto-revive when downed
 e.Stepped:Connect(function()
-    local i = g.Character
-    if i and i:GetAttribute("Downed") then
-        c.Events.Player.ChangePlayerMode:FireServer(true)
-        task.wait(math.random(0.5, 1.5))
+    local q = g.Character
+    if q and q:GetAttribute("Downed") then
+        pcall(function() c.Events.Player.ChangePlayerMode:FireServer(true) end)
+        task.wait(math.random(600, 1600) / 1000)
     end
 end)
 
--- Farming loop
 task.spawn(function()
-    local j = workspace:FindFirstChild("Game") and workspace.Game:FindFirstChild("Effects") and workspace.Game.Effects:FindFirstChild("Tickets")
-    if not j then return end
-
+    local r = workspace.Game and workspace.Game.Effects and workspace.Game.Effects.Tickets
+    if not r then return end
     while true do
-        if getgenv().x1 then
-            local k = g.Character or g.CharacterAdded:Wait()
-            local l = k:FindFirstChild("HumanoidRootPart")
-            if l then
-                for _, m in ipairs(j:GetChildren()) do
-                    local n = m:FindFirstChild("HumanoidRootPart")
-                    if n then
-                        local o = TweenInfo.new(math.random(0.3, 0.7), Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
-                        local p = f:Create(l, o, {CFrame = n.CFrame + Vector3.new(0, 3, 0)})
-                        p:Play()
-                        p.Completed:Wait()
-                        task.wait(math.random(0.1, 0.3))
+        if i.j then
+            local q = g.Character or g.CharacterAdded:Wait()
+            local s = q:FindFirstChild("HumanoidRootPart")
+            if s then
+                for _, t in ipairs(r:GetChildren()) do
+                    local u = t:FindFirstChild("HumanoidRootPart")
+                    if u then
+                        local v = TweenInfo.new(math.random(400, 800) / 1000, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+                        local w = f:Create(s, v, {CFrame = u.CFrame + Vector3.new(math.random(-5, 5) / 10, 3, math.random(-5, 5) / 10)})
+                        w:Play()
+                        w.Completed:Wait()
+                        task.wait(math.random(150, 350) / 1000)
                     end
                 end
             end
         end
-        task.wait(math.random(0.8, 1.2))
+        task.wait(math.random(900, 1300) / 1000)
     end
 end)
 
--- Infinite jump
-d.InputBegan:Connect(function(input, gameProcessed)
-    if q and not gameProcessed and input.KeyCode == Enum.KeyCode.Space then
-        local k = g.Character
-        local r = k and k:FindFirstChildOfClass("Humanoid")
-        if r and r:GetState() ~= Enum.HumanoidStateType.Jumping and r:GetState() ~= Enum.HumanoidStateType.Freefall and r.FloorMaterial ~= Enum.Material.Air then
-            r:ChangeState("Jumping")
-            task.wait(math.random(0.1, 0.2))
+d.InputBegan:Connect(function(x, y)
+    if n and not y and x.KeyCode == Enum.KeyCode.Space then
+        local q = g.Character
+        local z = q and q:FindFirstChildOfClass("Humanoid")
+        if z and z:GetState() ~= Enum.HumanoidStateType.Jumping and z:GetState() ~= Enum.HumanoidStateType.Freefall and z.FloorMaterial ~= Enum.Material.Air then
+            z:ChangeState("Jumping")
+            task.wait(math.random(120, 220) / 1000)
         end
     end
 end)
 
--- Auto Bhop (chỉ chạy khi WalkSpeed > 30)
 task.spawn(function()
     while true do
-        if getgenv().x3 then
-            local k = g.Character
-            local r = k and k:FindFirstChildOfClass("Humanoid")
-            if r and r.WalkSpeed > 30 and r:GetState() == Enum.HumanoidStateType.Running and r.MoveDirection.Magnitude > 0 and r.FloorMaterial ~= Enum.Material.Air then
-                r:ChangeState("Jumping")
-                task.wait(math.random(0.05, 0.15))
+        if i.l then
+            local q = g.Character
+            local z = q and q:FindFirstChildOfClass("Humanoid")
+            if z and z.WalkSpeed > 30 and z:GetState() == Enum.HumanoidStateType.Running and z.MoveDirection.Magnitude > 0 and z.FloorMaterial ~= Enum.Material.Air then
+                z:ChangeState("Jumping")
+                task.wait(math.random(60, 160) / 1000)
             end
         end
-        task.wait(0.05)
+        task.wait(math.random(40, 60) / 1000)
     end
 end)
 
--- Auto Bhop hotkey (Middle Mouse Button)
-d.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.UserInputType == Enum.UserInputType.MouseButton3 then
-        getgenv().x3 = not getgenv().x3
-        ff.Text = "Auto Bhop (" .. (getgenv().x3 and "On" or "Off") .. ")"
+d.InputBegan:Connect(function(x, y)
+    if not y and x.UserInputType == Enum.UserInputType.MouseButton3 then
+        i.l = not i.l
+        aa.Text = "Bhop (" .. (i.l and "On" or "Off") .. ")"
     end
 end)
 
--- ESP functionality
-local function addESP()
-    for _, s in ipairs(a:GetPlayers()) do
-        if s ~= g and s.Character then
-            local t = s.Character:FindFirstChild("Head")
-            if t and not t:FindFirstChild("x3z9q") then
-                local u = Instance.new("BillboardGui")
-                u.Name = "x3z9q"
-                u.Adornee = t
-                u.Size = UDim2.new(0, 100, 0, 30)
-                u.StudsOffset = Vector3.new(0, 3, 0)
-                u.AlwaysOnTop = true
-                u.Parent = t
+local function ab()
+    for _, ac in ipairs(m) do pcall(function() ac:Disconnect() end) end
+    m = {}
+    for _, ad in ipairs(a:GetPlayers()) do
+        if ad.Character then
+            local ae = ad.Character:FindFirstChild("Head")
+            if ae and ae:FindFirstChild("x3z9q") then
+                pcall(function() ae.x3z9q:Destroy() end)
+            end
+        end
+    end
+end
 
-                local v = Instance.new("TextLabel")
-                v.Size = UDim2.new(1, 0, 1, 0)
-                v.BackgroundTransparency = 1
-                v.Text = s.Name
-                v.TextColor3 = Color3.fromRGB(255, 182, 193)
-                v.TextSize = 14
-                v.Font = Enum.Font.SourceSansBold
-                v.Parent = u
-
-                local conn = e.RenderStepped:Connect(function()
-                    if not s.Character or not s.Character:FindFirstChild("Head") or not getgenv().x2 then
-                        u:Destroy()
-                        conn:Disconnect()
+local function af()
+    for _, ad in ipairs(a:GetPlayers()) do
+        if ad ~= g and ad.Character then
+            local ae = ad.Character:FindFirstChild("Head")
+            if ae and not ae:FindFirstChild("x3z9q") then
+                local ag = Instance.new("BillboardGui")
+                ag.Name = "x3z9q"
+                ag.Adornee = ae
+                ag.Size = UDim2.new(0, 80, 0, 25)
+                ag.StudsOffset = Vector3.new(0, 2.5, 0)
+                ag.AlwaysOnTop = true
+                ag.Parent = ae
+                local ah = Instance.new("TextLabel")
+                ah.Size = UDim2.new(1, 0, 1, 0)
+                ah.BackgroundTransparency = 1
+                ah.Text = ad.Name
+                ah.TextColor3 = Color3.fromRGB(255, 182, 193)
+                ah.TextSize = 12
+                ah.Font = Enum.Font.SourceSans
+                ah.Parent = ag
+                local ai = e.RenderStepped:Connect(function()
+                    if not ad.Character or not ad.Character:FindFirstChild("Head") or not i.k then
+                        pcall(function() ag:Destroy() ai:Disconnect() end)
                     end
                 end)
-                table.insert(espConnections, conn)
+                table.insert(m, ai)
             end
         end
     end
 end
 
-local function removeESP()
-    for _, conn in ipairs(espConnections) do
-        conn:Disconnect()
-    end
-    espConnections = {}
-    for _, s in ipairs(a:GetPlayers()) do
-        if s.Character then
-            local t = s.Character:FindFirstChild("Head")
-            if t and t:FindFirstChild("x3z9q") then
-                t.x3z9q:Destroy()
-            end
-        end
-    end
-end
-
--- Handle character respawn for ESP
-a.PlayerAdded:Connect(function(s)
-    if getgenv().x2 then
-        task.wait(1)
-        addESP()
-    end
+a.PlayerAdded:Connect(function(ad)
+    if i.k then task.wait(math.random(800, 1200) / 1000) af() end
 end)
 g.CharacterAdded:Connect(function()
-    if getgenv().x2 then
-        task.wait(1)
-        addESP()
-    end
+    if i.k then task.wait(math.random(800, 1200) / 1000) af() end
 end)
-for _, s in ipairs(a:GetPlayers()) do
-    if s ~= g then
-        s.CharacterAdded:Connect(function()
-            if getgenv().x2 then
-                task.wait(1)
-                addESP()
-            end
+for _, ad in ipairs(a:GetPlayers()) do
+    if ad ~= g then
+        ad.CharacterAdded:Connect(function()
+            if i.k then task.wait(math.random(800, 1200) / 1000) af() end
         end)
     end
 end
 
--- GUI setup
-local w = Instance.new("ScreenGui")
-local x = Instance.new("Frame")
-local y = Instance.new("UICorner")
-local z = Instance.new("TextButton") -- InfJump
-local aa = Instance.new("TextButton") -- FarmTickets
-local bb = Instance.new("TextButton") -- ESP
-local ff = Instance.new("TextButton") -- Auto Bhop
-local cc = Instance.new("UICorner")
-local dd = Instance.new("UICorner")
-local ee = Instance.new("UICorner")
-local gg = Instance.new("UICorner")
+local aj = Instance.new("ScreenGui")
+local ak = Instance.new("Frame")
+local al = Instance.new("UICorner")
+local am = Instance.new("TextButton")
+local an = Instance.new("TextButton")
+local ao = Instance.new("TextButton")
+local aa = Instance.new("TextButton")
+local ap = Instance.new("UICorner")
+local aq = Instance.new("UICorner")
+local ar = Instance.new("UICorner")
+local as = Instance.new("UICorner")
 
-w.Parent = g:WaitForChild("PlayerGui")
-w.Name = "aB7kP9"
-w.ResetOnSpawn = false
+aj.Parent = g:WaitForChild("PlayerGui", 5)
+aj.Name = tostring(math.random(1e6, 1e7))
+aj.ResetOnSpawn = false
+aj.Enabled = false
 
-x.Parent = w
-x.Position = UDim2.new(0.161, 0, 0.21, 0)
-x.Size = UDim2.new(0, 120, 0, 140)
-x.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-x.Active = true
-x.Draggable = true
+ak.Size = UDim2.new(0, 100, 0, 120)
+ak.Position = UDim2.new(0.15, 0, 0.25, 0)
+ak.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+ak.BackgroundTransparency = 0.3
+ak.Active = true
+ak.Draggable = true
+ak.Parent = aj
 
-y.CornerRadius = UDim.new(0, 8)
-y.Parent = x
+al.CornerRadius = UDim.new(0, 8)
+al.Parent = ak
 
-z.Parent = x
-z.Name = "pQ8mX2"
-z.Position = UDim2.new(0.083, 0, 0.057, 0)
-z.Size = UDim2.new(0, 100, 0, 25)
-z.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-z.Text = "InfJump (Off)"
-z.Font = Enum.Font.SourceSansBold
-z.TextColor3 = Color3.fromRGB(0, 0, 0)
-z.TextSize = 12
+am.Size = UDim2.new(0, 80, 0, 20)
+am.Position = UDim2.new(0.1, 0, 0.06, 0)
+am.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+am.Text = "Jump (" .. (n and "On" or "Off") .. ")"
+am.TextColor3 = Color3.fromRGB(255, 255, 255)
+am.TextSize = 12
+am.Font = Enum.Font.SourceSans
+am.Parent = ak
 
-cc.CornerRadius = UDim.new(0, 8)
-cc.Parent = z
+ap.CornerRadius = UDim.new(0, 8)
+ap.Parent = am
 
-aa.Parent = x
-aa.Name = "rT5vN3"
-aa.Position = UDim2.new(0.083, 0, 0.286, 0)
-aa.Size = UDim2.new(0, 100, 0, 25)
+an.Size = UDim2.new(0, 80, 0, 20)
+an.Position = UDim2.new(0.1, 0, 0.28, 0)
+an.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+an.Text = "Farm (" .. (i.j and "On" or "Off") .. ")"
+an.TextColor3 = Color3.fromRGB(255, 255, 255)
+an.TextSize = 12
+an.Font = Enum.Font.SourceSans
+an.Parent = ak
+
+aq.CornerRadius = UDim.new(0, 8)
+aq.Parent = an
+
+ao.Size = UDim2.new(0, 80, 0, 20)
+ao.Position = UDim2.new(0.1, 0, 0.5, 0)
+ao.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+ao.Text = "ESP (" .. (i.k and "On" or "Off") .. ")"
+ao.TextColor3 = Color3.fromRGB(255, 255, 255)
+ao.TextSize = 12
+ao.Font = Enum.Font.SourceSans
+ao.Parent = ak
+
+ar.CornerRadius = UDim.new(0, 8)
+ar.Parent = ao
+
+aa.Size = UDim2.new(0, 80, 0, 20)
+aa.Position = UDim2.new(0.1, 0, 0.72, 0)
 aa.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-aa.Text = "FarmTickets (Off)"
-aa.Font = Enum.Font.SourceSansBold
-aa.TextColor3 = Color3.fromRGB(0, 0, 0)
+aa.Text = "Bhop (" .. (i.l and "On" or "Off") .. ")"
+aa.TextColor3 = Color3.fromRGB(255, 255, 255)
 aa.TextSize = 12
+aa.Font = Enum.Font.SourceSans
+aa.Parent = ak
 
-dd.CornerRadius = UDim.new(0, 8)
-dd.Parent = aa
+as.CornerRadius = UDim.new(0, 8)
+as.Parent = aa
 
-bb.Parent = x
-bb.Name = "sJ6wY4"
-bb.Position = UDim2.new(0.083, 0, 0.514, 0)
-bb.Size = UDim2.new(0, 100, 0, 25)
-bb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-bb.Text = "ESP (Off)"
-bb.Font = Enum.Font.SourceSansBold
-bb.TextColor3 = Color3.fromRGB(0, 0, 0)
-bb.TextSize = 12
+am.MouseButton1Click:Connect(function()
+    n = not n
+    am.Text = "Jump (" .. (n and "On" or "Off") .. ")"
+end)
 
-ee.CornerRadius = UDim.new(0, 8)
-ee.Parent = bb
+an.MouseButton1Click:Connect(function()
+    i.j = not i.j
+    an.Text = "Farm (" .. (i.j and "On" or "Off") .. ")"
+end)
 
-ff.Parent = x
-ff.Name = "tK7xZ5"
-ff.Position = UDim2.new(0.083, 0, 0.743, 0)
-ff.Size = UDim2.new(0, 100, 0, 25)
-ff.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-ff.Text = "Auto Bhop (Off)"
-ff.Font = Enum.Font.SourceSansBold
-ff.TextColor3 = Color3.fromRGB(0, 0, 0)
-ff.TextSize = 12
-
-gg.CornerRadius = UDim.new(0, 8)
-gg.Parent = ff
-
--- Button functionality
-z.MouseButton1Click:Connect(function()
-    q = not q
-    z.Text = "InfJump (" .. (q and "On" or "Off") .. ")"
+ao.MouseButton1Click:Connect(function()
+    i.k = not i.k
+    ao.Text = "ESP (" .. (i.k and "On" or "Off") .. ")"
+    if i.k then af() else ab() end
 end)
 
 aa.MouseButton1Click:Connect(function()
-    getgenv().x1 = not getgenv().x1
-    aa.Text = "FarmTickets (" .. (getgenv().x1 and "On" or "Off") .. ")"
+    i.l = not i.l
+    aa.Text = "Bhop (" .. (i.l and "On" or "Off") .. ")"
 end)
 
-bb.MouseButton1Click:Connect(function()
-    getgenv().x2 = not getgenv().x2
-    bb.Text = "ESP (" .. (getgenv().x2 and "On" or "Off") .. ")"
-    if getgenv().x2 then
-        addESP()
-    else
-        removeESP()
+d.InputBegan:Connect(function(x, y)
+    if y then return end
+    if x.KeyCode == Enum.KeyCode.RightShift then
+        aj.Enabled = not aj.Enabled
     end
 end)
 
-ff.MouseButton1Click:Connect(function()
-    getgenv().x3 = not getgenv().x3
-    ff.Text = "Auto Bhop (" .. (getgenv().x3 and "On" or "Off") .. ")"
-end)
+local function at()
+    for _, ac in pairs(m) do pcall(function() ac:Disconnect() end) end
+    m = {}
+    pcall(function() aj:Destroy() end)
+    i.j, i.k, i.l, n = false, false, false, false
+end
+
+game:BindToClose(at)
