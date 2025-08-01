@@ -1,4 +1,3 @@
--- Services
 local a = game:GetService("Players")
 local b = game:GetService("VirtualUser")
 local c = game:GetService("ReplicatedStorage")
@@ -23,30 +22,7 @@ g.Idled:Connect(function()
     b:ClickButton2(Vector2.new())
 end)
 
--- Auto-revive (luôn hoạt động, ngay lập tức)
-task.spawn(function()
-    local function GetDownedPlr()
-        for _, v in pairs(workspace.Game.Players:GetChildren()) do
-            if v:GetAttribute("Downed") then
-                return v
-            end
-        end
-    end
-
-    while true do
-        local downedplr = GetDownedPlr()
-        if downedplr and downedplr:FindFirstChild("HumanoidRootPart") then
-            local k = g.Character
-            if k and k:FindFirstChild("HumanoidRootPart") then
-                k.HumanoidRootPart.CFrame = CFrame.new(downedplr.HumanoidRootPart.Position + Vector3.new(0, 3, 0))
-                c.Events.Revive.RevivePlayer:FireServer(tostring(downedplr), true)
-            end
-        end
-        task.wait(0.1) -- Giảm độ trễ để kiểm tra nhanh hơn
-    end
-end)
-
--- Auto-revive when downed
+-- Auto-revive
 e.Stepped:Connect(function()
     local i = g.Character
     if i and i:GetAttribute("Downed") then
@@ -81,25 +57,23 @@ task.spawn(function()
     end
 end)
 
--- Infinite jump
-d.InputBegan:Connect(function(input, gameProcessed)
-    if q and not gameProcessed and input.KeyCode == Enum.KeyCode.Space then
+d.JumpRequest:Connect(function()
+    if q then
         local k = g.Character
         local r = k and k:FindFirstChildOfClass("Humanoid")
-        if r and r:GetState() ~= Enum.HumanoidStateType.Jumping and r:GetState() ~= Enum.HumanoidStateType.Freefall and r.FloorMaterial ~= Enum.Material.Air then
-            r:ChangeState("Jumping")
-            task.wait(math.random(0.1, 0.2))
+        if r then
+            r:ChangeState(Enum.HumanoidStateType.Jumping)
         end
     end
 end)
 
--- Auto Bhop (chỉ chạy khi WalkSpeed > 30)
+-- Auto Bhop
 task.spawn(function()
     while true do
         if getgenv().x3 then
             local k = g.Character
             local r = k and k:FindFirstChildOfClass("Humanoid")
-            if r and r.WalkSpeed > 30 and r:GetState() == Enum.HumanoidStateType.Running and r.MoveDirection.Magnitude > 0 and r.FloorMaterial ~= Enum.Material.Air then
+            if r and r:GetState() == Enum.HumanoidStateType.Running and r.MoveDirection.Magnitude > 0 and r.FloorMaterial ~= Enum.Material.Air then
                 r:ChangeState("Jumping")
                 task.wait(math.random(0.05, 0.15))
             end
@@ -108,7 +82,7 @@ task.spawn(function()
     end
 end)
 
--- Auto Bhop hotkey (Middle Mouse Button)
+-- Auto Bhop toggle bằng chuột giữa
 d.InputBegan:Connect(function(input, gameProcessed)
     if not gameProcessed and input.UserInputType == Enum.UserInputType.MouseButton3 then
         getgenv().x3 = not getgenv().x3
@@ -116,79 +90,74 @@ d.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
--- ESP functionality
-local function addESP()
-    for _, s in ipairs(a:GetPlayers()) do
-        if s ~= g and s.Character then
-            local t = s.Character:FindFirstChild("Head")
-            if t and not t:FindFirstChild("x3z9q") then
-                local u = Instance.new("BillboardGui")
-                u.Name = "x3z9q"
-                u.Adornee = t
-                u.Size = UDim2.new(0, 100, 0, 30)
-                u.StudsOffset = Vector3.new(0, 3, 0)
-                u.AlwaysOnTop = true
-                u.Parent = t
+-- ESP Safe (WorldToViewportPoint) with antiban
+local Camera = workspace.CurrentCamera
+local espGui = Instance.new("ScreenGui", g:WaitForChild("PlayerGui"))
+espGui.Name = "SafeESP"
+espGui.ResetOnSpawn = false
+espGui.IgnoreGuiInset = true
 
-                local v = Instance.new("TextLabel")
-                v.Size = UDim2.new(1, 0, 1, 0)
-                v.BackgroundTransparency = 1
-                v.Text = s.Name
-                v.TextColor3 = Color3.fromRGB(255, 182, 193)
-                v.TextSize = 14
-                v.Font = Enum.Font.SourceSansBold
-                v.Parent = u
+local espLabels = {}
 
-                local conn = e.RenderStepped:Connect(function()
-                    if not s.Character or not s.Character:FindFirstChild("Head") or not getgenv().x2 then
-                        u:Destroy()
-                        conn:Disconnect()
-                    end
-                end)
-                table.insert(espConnections, conn)
-            end
-        end
-    end
+local function createLabel(player)
+	if espLabels[player] then return end
+
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.TextColor3 = Color3.fromRGB(255, 182, 193) -- pastel pink
+	label.TextSize = 13
+	label.Font = Enum.Font.SourceSansBold
+	label.Text = player.Name
+	label.Size = UDim2.new(0, 200, 0, 20)
+	label.AnchorPoint = Vector2.new(0.5, 0.5)
+	label.Position = UDim2.new(0.5, 0, 0.5, 0)
+	label.Visible = false
+	label.Parent = espGui
+
+	espLabels[player] = label
 end
 
-local function removeESP()
-    for _, conn in ipairs(espConnections) do
-        conn:Disconnect()
-    end
-    espConnections = {}
-    for _, s in ipairs(a:GetPlayers()) do
-        if s.Character then
-            local t = s.Character:FindFirstChild("Head")
-            if t and t:FindFirstChild("x3z9q") then
-                t.x3z9q:Destroy()
-            end
-        end
-    end
+local function removeLabel(player)
+	if espLabels[player] then
+		espLabels[player]:Destroy()
+		espLabels[player] = nil
+	end
 end
 
--- Handle character respawn for ESP
-a.PlayerAdded:Connect(function(s)
-    if getgenv().x2 then
-        task.wait(1)
-        addESP()
-    end
+-- Auto update ESP every frame
+e.RenderStepped:Connect(function()
+	if not getgenv().x2 then
+		for _, v in pairs(espLabels) do
+			v.Visible = false
+		end
+		return
+	end
+
+	for _, player in ipairs(a:GetPlayers()) do
+		if player ~= g and player.Character and player.Character:FindFirstChild("Head") then
+			createLabel(player)
+			local headPos = player.Character.Head.Position
+			local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
+
+			local label = espLabels[player]
+			if label then
+				if onScreen then
+					label.Visible = true
+					label.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y - 20)
+				else
+					label.Visible = false
+				end
+			end
+		else
+			removeLabel(player)
+		end
+	end
 end)
-g.CharacterAdded:Connect(function()
-    if getgenv().x2 then
-        task.wait(1)
-        addESP()
-    end
+
+-- Player join/leave ESP cleanup
+a.PlayerRemoving:Connect(function(plr)
+	removeLabel(plr)
 end)
-for _, s in ipairs(a:GetPlayers()) do
-    if s ~= g then
-        s.CharacterAdded:Connect(function()
-            if getgenv().x2 then
-                task.wait(1)
-                addESP()
-            end
-        end)
-    end
-end
 
 -- GUI setup
 local w = Instance.new("ScreenGui")
@@ -209,7 +178,7 @@ w.ResetOnSpawn = false
 
 x.Parent = w
 x.Position = UDim2.new(0.161, 0, 0.21, 0)
-x.Size = UDim2.new(0, 120, 0, 140)
+x.Size = UDim2.new(0, 120, 0, 140) -- Smaller frame
 x.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
 x.Active = true
 x.Draggable = true
@@ -220,7 +189,7 @@ y.Parent = x
 z.Parent = x
 z.Name = "pQ8mX2"
 z.Position = UDim2.new(0.083, 0, 0.057, 0)
-z.Size = UDim2.new(0, 100, 0, 25)
+z.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
 z.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 z.Text = "InfJump (Off)"
 z.Font = Enum.Font.SourceSansBold
@@ -233,7 +202,7 @@ cc.Parent = z
 aa.Parent = x
 aa.Name = "rT5vN3"
 aa.Position = UDim2.new(0.083, 0, 0.286, 0)
-aa.Size = UDim2.new(0, 100, 0, 25)
+aa.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
 aa.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 aa.Text = "FarmTickets (Off)"
 aa.Font = Enum.Font.SourceSansBold
@@ -246,7 +215,7 @@ dd.Parent = aa
 bb.Parent = x
 bb.Name = "sJ6wY4"
 bb.Position = UDim2.new(0.083, 0, 0.514, 0)
-bb.Size = UDim2.new(0, 100, 0, 25)
+bb.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
 bb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 bb.Text = "ESP (Off)"
 bb.Font = Enum.Font.SourceSansBold
@@ -259,7 +228,7 @@ ee.Parent = bb
 ff.Parent = x
 ff.Name = "tK7xZ5"
 ff.Position = UDim2.new(0.083, 0, 0.743, 0)
-ff.Size = UDim2.new(0, 100, 0, 25)
+ff.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
 ff.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 ff.Text = "Auto Bhop (Off)"
 ff.Font = Enum.Font.SourceSansBold
