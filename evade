@@ -35,7 +35,6 @@ end)
 task.spawn(function()
     local j = workspace:FindFirstChild("Game") and workspace.Game:FindFirstChild("Effects") and workspace.Game.Effects:FindFirstChild("Tickets")
     if not j then return end
-
     while true do
         if getgenv().x1 then
             local k = g.Character or g.CharacterAdded:Wait()
@@ -98,65 +97,85 @@ espGui.ResetOnSpawn = false
 espGui.IgnoreGuiInset = true
 
 local espLabels = {}
+local espHighlights = {}
 
 local function createLabel(player)
-	if espLabels[player] then return end
+    if espLabels[player] then return end
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(255, 182, 193) -- pastel pink
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamBlack -- Phông chữ đẹp, dễ nhìn
+    label.Text = player.Name
+    label.TextStrokeTransparency = 0.7 -- Thêm viền chữ nhẹ
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.Size = UDim2.new(0, 200, 0, 20)
+    label.AnchorPoint = Vector2.new(0.5, 0.5)
+    label.Position = UDim2.new(0.5, 0, 0.5, 0)
+    label.Visible = false
+    label.Parent = espGui
+    espLabels[player] = label
 
-	local label = Instance.new("TextLabel")
-	label.BackgroundTransparency = 1
-	label.TextColor3 = Color3.fromRGB(255, 182, 193) -- pastel pink
-	label.TextSize = 13
-	label.Font = Enum.Font.SourceSansBold
-	label.Text = player.Name
-	label.Size = UDim2.new(0, 200, 0, 20)
-	label.AnchorPoint = Vector2.new(0.5, 0.5)
-	label.Position = UDim2.new(0.5, 0, 0.5, 0)
-	label.Visible = false
-	label.Parent = espGui
-
-	espLabels[player] = label
+    -- Thêm highlight an toàn
+    local highlight = Instance.new("Highlight")
+    highlight.Enabled = false
+    highlight.FillTransparency = 0.7
+    highlight.OutlineTransparency = 0.3
+    highlight.FillColor = Color3.fromRGB(255, 182, 193)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.Adornee = player.Character
+    highlight.Parent = espGui
+    espHighlights[player] = highlight
 end
 
 local function removeLabel(player)
-	if espLabels[player] then
-		espLabels[player]:Destroy()
-		espLabels[player] = nil
-	end
+    if espLabels[player] then
+        espLabels[player]:Destroy()
+        espLabels[player] = nil
+    end
+    if espHighlights[player] then
+        espHighlights[player]:Destroy()
+        espHighlights[player] = nil
+    end
 end
 
 -- Auto update ESP every frame
 e.RenderStepped:Connect(function()
-	if not getgenv().x2 then
-		for _, v in pairs(espLabels) do
-			v.Visible = false
-		end
-		return
-	end
-
-	for _, player in ipairs(a:GetPlayers()) do
-		if player ~= g and player.Character and player.Character:FindFirstChild("Head") then
-			createLabel(player)
-			local headPos = player.Character.Head.Position
-			local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
-
-			local label = espLabels[player]
-			if label then
-				if onScreen then
-					label.Visible = true
-					label.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y - 20)
-				else
-					label.Visible = false
-				end
-			end
-		else
-			removeLabel(player)
-		end
-	end
+    if not getgenv().x2 then
+        for _, v in pairs(espLabels) do
+            v.Visible = false
+        end
+        for _, v in pairs(espHighlights) do
+            v.Enabled = false
+        end
+        return
+    end
+    for _, player in ipairs(a:GetPlayers()) do
+        if player ~= g and player.Character and player.Character:FindFirstChild("Head") then
+            createLabel(player)
+            local headPos = player.Character.Head.Position
+            local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
+            local label = espLabels[player]
+            local highlight = espHighlights[player]
+            if label and highlight then
+                if onScreen then
+                    label.Visible = true
+                    label.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y - 20)
+                    highlight.Enabled = true
+                else
+                    label.Visible = false
+                    highlight.Enabled = false
+                end
+            end
+        else
+            removeLabel(player)
+        end
+    end
 end)
 
 -- Player join/leave ESP cleanup
 a.PlayerRemoving:Connect(function(plr)
-	removeLabel(plr)
+    removeLabel(plr)
 end)
 
 -- GUI setup
@@ -175,66 +194,56 @@ local gg = Instance.new("UICorner")
 w.Parent = g:WaitForChild("PlayerGui")
 w.Name = "aB7kP9"
 w.ResetOnSpawn = false
-
 x.Parent = w
 x.Position = UDim2.new(0.161, 0, 0.21, 0)
-x.Size = UDim2.new(0, 120, 0, 140) -- Smaller frame
+x.Size = UDim2.new(0, 120, 0, 140)
 x.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
 x.Active = true
 x.Draggable = true
-
 y.CornerRadius = UDim.new(0, 8)
 y.Parent = x
-
 z.Parent = x
 z.Name = "pQ8mX2"
 z.Position = UDim2.new(0.083, 0, 0.057, 0)
-z.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
+z.Size = UDim2.new(0, 100, 0, 25)
 z.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 z.Text = "InfJump (Off)"
 z.Font = Enum.Font.SourceSansBold
 z.TextColor3 = Color3.fromRGB(0, 0, 0)
 z.TextSize = 12
-
 cc.CornerRadius = UDim.new(0, 8)
 cc.Parent = z
-
 aa.Parent = x
 aa.Name = "rT5vN3"
 aa.Position = UDim2.new(0.083, 0, 0.286, 0)
-aa.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
+aa.Size = UDim2.new(0, 100, 0, 25)
 aa.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 aa.Text = "FarmTickets (Off)"
 aa.Font = Enum.Font.SourceSansBold
 aa.TextColor3 = Color3.fromRGB(0, 0, 0)
 aa.TextSize = 12
-
 dd.CornerRadius = UDim.new(0, 8)
 dd.Parent = aa
-
 bb.Parent = x
 bb.Name = "sJ6wY4"
 bb.Position = UDim2.new(0.083, 0, 0.514, 0)
-bb.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
+bb.Size = UDim2.new(0, 100, 0, 25)
 bb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 bb.Text = "ESP (Off)"
 bb.Font = Enum.Font.SourceSansBold
 bb.TextColor3 = Color3.fromRGB(0, 0, 0)
 bb.TextSize = 12
-
 ee.CornerRadius = UDim.new(0, 8)
 ee.Parent = bb
-
 ff.Parent = x
 ff.Name = "tK7xZ5"
 ff.Position = UDim2.new(0.083, 0, 0.743, 0)
-ff.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
+ff.Size = UDim2.new(0, 100, 0, 25)
 ff.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 ff.Text = "Auto Bhop (Off)"
 ff.Font = Enum.Font.SourceSansBold
 ff.TextColor3 = Color3.fromRGB(0, 0, 0)
 ff.TextSize = 12
-
 gg.CornerRadius = UDim.new(0, 8)
 gg.Parent = ff
 
@@ -252,11 +261,6 @@ end)
 bb.MouseButton1Click:Connect(function()
     getgenv().x2 = not getgenv().x2
     bb.Text = "ESP (" .. (getgenv().x2 and "On" or "Off") .. ")"
-    if getgenv().x2 then
-        addESP()
-    else
-        removeESP()
-    end
 end)
 
 ff.MouseButton1Click:Connect(function()
