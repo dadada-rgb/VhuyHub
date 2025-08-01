@@ -1,3 +1,4 @@
+-- Dịch vụ
 local x7z = game:GetService("Lighting")
 local qw9 = game:GetService("TweenService")
 local k2p = game:GetService("RunService")
@@ -60,10 +61,13 @@ end
 
 pcall(k7j)
 
+-- Điều kiện chạy script dựa trên ID game
 if p1d == 9872472334 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
 elseif p1d == 142823291 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2"))()
+elseif p1d == 108083853 then -- Thêm ID từ ảnh
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
 else
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"))()
 end
