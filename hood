@@ -164,12 +164,7 @@ local function validPart(p)
     local character = p.Parent
     local humanoid = character:FindFirstChild("Humanoid")
     local player = Players:GetPlayerFromCharacter(character)
-
-    if not humanoid or not player then
-        return false
-    end
-
-    -- Bất kể TriggerBotOnly bật hay tắt, chỉ bắn vào Hitpart
+    if not humanoid or not player then return false end
     return p.Name == getgenv().Config.Hitpart
 end
 
@@ -189,7 +184,6 @@ end
 local function getClosestTarget()
     local bestTarget = nil
     local closestDist = math.huge
-
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character and getgenv().Config.SelectedTargets[player.Name] then
             local humanoid = player.Character:FindFirstChild("Humanoid")
@@ -216,9 +210,113 @@ local function getClosestTarget()
             end
         end
     end
-
     return bestTarget
 end
+
+-- GUI Implementation (from Script 1)
+local zX9qW2 = Instance.new("ScreenGui")
+local kL7mP9 = Instance.new("Frame")
+local qW3rT8 = Instance.new("UICorner")
+local nY5vU2 = Instance.new("TextLabel")
+local pX6sQ1 = Instance.new("UICorner")
+local mZ4tW7 = Instance.new("ScrollingFrame")
+local rT2nQ4 = Instance.new("UIListLayout")
+
+zX9qW2.Parent = LocalPlayer:WaitForChild("PlayerGui", 5)
+zX9qW2.Name = "zX9qW2"
+zX9qW2.ResetOnSpawn = false
+zX9qW2.Enabled = false
+
+kL7mP9.Name = "kL7mP9"
+kL7mP9.Size = UDim2.new(0, 150, 0, 200)
+kL7mP9.Position = UDim2.new(0, 10, 0.4, -90)
+kL7mP9.BackgroundColor3 = Color3.fromRGB(255, 179, 186) -- Pastel pink
+kL7mP9.BorderSizePixel = 0
+kL7mP9.Active = true
+kL7mP9.Draggable = true
+kL7mP9.Parent = zX9qW2
+
+qW3rT8.CornerRadius = UDim.new(0, 6)
+qW3rT8.Parent = kL7mP9
+
+nY5vU2.Size = UDim2.new(1, 0, 0, 20)
+nY5vU2.Position = UDim2.new(0, 0, 0, 0)
+nY5vU2.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+nY5vU2.Text = "Targets"
+nY5vU2.TextColor3 = Color3.new(0.9, 0.9, 0.9)
+nY5vU2.Font = Enum.Font.SourceSans
+nY5vU2.TextSize = 12
+nY5vU2.Parent = kL7mP9
+
+pX6sQ1.CornerRadius = UDim.new(0, 6)
+pX6sQ1.Parent = nY5vU2
+
+mZ4tW7.Size = UDim2.new(1, -6, 1, -26)
+mZ4tW7.Position = UDim2.new(0, 3, 0, 23)
+mZ4tW7.CanvasSize = UDim2.new(0, 0, 0, 0)
+mZ4tW7.ScrollBarThickness = 4
+mZ4tW7.BackgroundTransparency = 1
+mZ4tW7.ClipsDescendants = true
+mZ4tW7.Parent = kL7mP9
+
+rT2nQ4.SortOrder = Enum.SortOrder.LayoutOrder
+rT2nQ4.Padding = UDim.new(0, 2)
+rT2nQ4.Parent = mZ4tW7
+
+rT2nQ4:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    mZ4tW7.CanvasSize = UDim2.new(0, 0, 0, rT2nQ4.AbsoluteContentSize.Y)
+end)
+
+Utility.newConnection(UserInputService.InputBegan, function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.RightControl then
+        zX9qW2.Enabled = not zX9qW2.Enabled
+    end
+end)
+
+function refreshPlayerList()
+    for _, child in pairs(mZ4tW7:GetChildren()) do
+        if child:IsA("TextButton") then child:Destroy() end
+    end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local button = Instance.new("TextButton")
+            button.Size = UDim2.new(1, -4, 0, 20)
+            button.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- White
+            button.TextColor3 = Color3.new(0.9, 0.9, 0.9)
+            button.BorderSizePixel = 0
+            button.TextSize = 12
+            button.Font = Enum.Font.SourceSans
+            button.AutoButtonColor = false
+            button.Parent = mZ4tW7
+            local function updateText()
+                local selected = getgenv().Config.SelectedTargets[player.Name]
+                button.Text = (selected and "✓ " or "○ ") .. player.DisplayName
+            end
+            button.MouseButton1Click:Connect(function()
+                if getgenv().Config.SelectedTargets[player.Name] then
+                    getgenv().Config.SelectedTargets[player.Name] = nil
+                    notify("❌ Deselect " .. player.DisplayName)
+                else
+                    getgenv().Config.SelectedTargets[player.Name] = true
+                    notify("✅ Selected " .. player.DisplayName)
+                end
+                updateText()
+            end)
+            updateText()
+        end
+    end
+end
+
+Players.PlayerAdded:Connect(refreshPlayerList)
+Players.PlayerRemoving:Connect(refreshPlayerList)
+
+task.spawn(function()
+    while true do
+        refreshPlayerList()
+        task.wait(10)
+    end
+end)
 
 -- Aimlock and TriggerBot
 Utility.newConnection(RunService.RenderStepped, function()
@@ -235,7 +333,6 @@ Utility.newConnection(RunService.RenderStepped, function()
         getgenv().Config.Status = false
         return
     end
-
     local toolEquipped = false
     for _, item in pairs(character:GetChildren()) do
         if item:IsA("Tool") then
@@ -243,17 +340,13 @@ Utility.newConnection(RunService.RenderStepped, function()
             break
         end
     end
-
     if getgenv().Config.Status and toolEquipped then
         local target = getClosestTarget()
         if target then
-            if getgenv().Config.Status then
-                -- Aimlock with prediction
-                local predictVec = target.Position + (target.Parent:FindFirstChild(getgenv().Config.Hitpart).Velocity * Vector3.new(getgenv().Config.Prediction.X, getgenv().Config.Prediction.Y, getgenv().Config.Prediction.X))
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictVec)
-				if validPart(target) then
-				    click()
-				end
+            local predictVec = target.Position + (target.Parent:FindFirstChild(getgenv().Config.Hitpart).Velocity * Vector3.new(getgenv().Config.Prediction.X, getgenv().Config.Prediction.Y, getgenv().Config.Prediction.X))
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictVec)
+            if validPart(target) then
+                click()
             end
         end
     end
@@ -262,7 +355,6 @@ end)
 -- Input handling
 Utility.newConnection(UserInputService.InputBegan, function(input, gameProcessed)
     if gameProcessed then return end
-
     if input.UserInputType == Enum.UserInputType.MouseButton2 then
         local char = LocalPlayer.Character
         if not char or not char:FindFirstChildOfClass("Tool") then return end
@@ -280,28 +372,9 @@ Utility.newConnection(UserInputService.InputBegan, function(input, gameProcessed
     elseif input.KeyCode == Enum.KeyCode.Q then
         getgenv().Config.FlyEnabled = not getgenv().Config.FlyEnabled
         notify("Fly: " .. (getgenv().Config.FlyEnabled and "On" or "Off"))
-    elseif input.KeyCode == Enum.KeyCode.T then
-        getgenv().Config.SelectedTargets = {}
-        notify("Cleared all selected targets")
     elseif input.KeyCode == Enum.KeyCode.Z then
         getgenv().Config.SpeedEnabled = not getgenv().Config.SpeedEnabled
         notify("Speed: " .. (getgenv().Config.SpeedEnabled and "On" or "Off"))
-    elseif input.UserInputType == Enum.UserInputType.MouseButton1 and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-        local target = Mouse.Target
-        if not target then return end
-        local model = target:FindFirstAncestorOfClass("Model")
-        if not model then return end
-        local player = Players:GetPlayerFromCharacter(model)
-        if player and player ~= LocalPlayer then
-            local selected = getgenv().Config.SelectedTargets[player.Name]
-            if selected then
-                getgenv().Config.SelectedTargets[player.Name] = nil
-                notify("❌ Deselect " .. player.DisplayName)
-            else
-                getgenv().Config.SelectedTargets[player.Name] = true
-                notify("✅ Selected " .. player.DisplayName)
-            end
-        end
     end
 end)
 
