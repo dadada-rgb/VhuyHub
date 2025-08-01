@@ -61,13 +61,20 @@ end
 
 pcall(k7j)
 
--- Điều kiện chạy script dựa trên ID game
 if p1d == 9872472334 then
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
+elseif p1d == 10662542523 then 
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
+elseif p1d == 10324347967 then 
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
+elseif p1d == 10324346056 then 
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
+elseif p1d == 10530697691 then 
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
+elseif p1d == 10808838353 then 
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
 elseif p1d == 142823291 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2"))()
-elseif p1d == 108083853 then -- Thêm ID từ ảnh
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
 else
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"))()
 end
