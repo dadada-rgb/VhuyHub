@@ -98,8 +98,3 @@ elseif p1d == 13772394625 then
 else
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"))()
 end
-
-game:BindToClose(function()
-    z3q = false
-    sg9:Destroy()
-end)
