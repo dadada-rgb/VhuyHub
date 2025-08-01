@@ -241,7 +241,7 @@ qW3rT8.Parent = kL7mP9
 
 nY5vU2.Size = UDim2.new(1, 0, 0, 20)
 nY5vU2.Position = UDim2.new(0, 0, 0, 0)
-nY5vU2.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+nY5vU2.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
 nY5vU2.Text = "Targets"
 nY5vU2.TextColor3 = Color3.new(0.9, 0.9, 0.9)
 nY5vU2.Font = Enum.Font.SourceSans
