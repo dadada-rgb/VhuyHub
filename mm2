@@ -493,4 +493,13 @@ local function initialize()
     end
 end
 
+local function cleanup()
+    clearESP()
+    autoFarm = false
+    espActive = false
+    isScriptRunning = false
+    pq:Destroy()
+end
+
+game:BindToClose(cleanup)
 pcall(initialize)
