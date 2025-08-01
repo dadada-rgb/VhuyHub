@@ -23,7 +23,30 @@ g.Idled:Connect(function()
     b:ClickButton2(Vector2.new())
 end)
 
--- Auto-revive
+-- Auto-revive (luôn hoạt động, ngay lập tức)
+task.spawn(function()
+    local function GetDownedPlr()
+        for _, v in pairs(workspace.Game.Players:GetChildren()) do
+            if v:GetAttribute("Downed") then
+                return v
+            end
+        end
+    end
+
+    while true do
+        local downedplr = GetDownedPlr()
+        if downedplr and downedplr:FindFirstChild("HumanoidRootPart") then
+            local k = g.Character
+            if k and k:FindFirstChild("HumanoidRootPart") then
+                k.HumanoidRootPart.CFrame = CFrame.new(downedplr.HumanoidRootPart.Position + Vector3.new(0, 3, 0))
+                c.Events.Revive.RevivePlayer:FireServer(tostring(downedplr), true)
+            end
+        end
+        task.wait(0.1) -- Giảm độ trễ để kiểm tra nhanh hơn
+    end
+end)
+
+-- Auto-revive when downed
 e.Stepped:Connect(function()
     local i = g.Character
     if i and i:GetAttribute("Downed") then
@@ -65,18 +88,18 @@ d.InputBegan:Connect(function(input, gameProcessed)
         local r = k and k:FindFirstChildOfClass("Humanoid")
         if r and r:GetState() ~= Enum.HumanoidStateType.Jumping and r:GetState() ~= Enum.HumanoidStateType.Freefall and r.FloorMaterial ~= Enum.Material.Air then
             r:ChangeState("Jumping")
-            task.wait(math.random(0.1, 0.2)) -- Slightly longer delay for natural feel
+            task.wait(math.random(0.1, 0.2))
         end
     end
 end)
 
--- Auto Bhop
+-- Auto Bhop (chỉ chạy khi WalkSpeed > 30)
 task.spawn(function()
     while true do
         if getgenv().x3 then
             local k = g.Character
             local r = k and k:FindFirstChildOfClass("Humanoid")
-            if r and r:GetState() == Enum.HumanoidStateType.Running and r.MoveDirection.Magnitude > 0 and r.FloorMaterial ~= Enum.Material.Air then
+            if r and r.WalkSpeed > 30 and r:GetState() == Enum.HumanoidStateType.Running and r.MoveDirection.Magnitude > 0 and r.FloorMaterial ~= Enum.Material.Air then
                 r:ChangeState("Jumping")
                 task.wait(math.random(0.05, 0.15))
             end
@@ -85,9 +108,9 @@ task.spawn(function()
     end
 end)
 
--- Auto Bhop hotkey (G)
+-- Auto Bhop hotkey (Middle Mouse Button)
 d.InputBegan:Connect(function(input, gameProcessed)
-    if not gameProcessed and input.KeyCode == Enum.KeyCode.G then
+    if not gameProcessed and input.UserInputType == Enum.UserInputType.MouseButton3 then
         getgenv().x3 = not getgenv().x3
         ff.Text = "Auto Bhop (" .. (getgenv().x3 and "On" or "Off") .. ")"
     end
@@ -111,7 +134,7 @@ local function addESP()
                 v.Size = UDim2.new(1, 0, 1, 0)
                 v.BackgroundTransparency = 1
                 v.Text = s.Name
-                v.TextColor3 = Color3.fromRGB(255, 182, 193) -- Pastel pink
+                v.TextColor3 = Color3.fromRGB(255, 182, 193)
                 v.TextSize = 14
                 v.Font = Enum.Font.SourceSansBold
                 v.Parent = u
@@ -186,7 +209,7 @@ w.ResetOnSpawn = false
 
 x.Parent = w
 x.Position = UDim2.new(0.161, 0, 0.21, 0)
-x.Size = UDim2.new(0, 120, 0, 140) -- Smaller frame
+x.Size = UDim2.new(0, 120, 0, 140)
 x.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
 x.Active = true
 x.Draggable = true
@@ -197,7 +220,7 @@ y.Parent = x
 z.Parent = x
 z.Name = "pQ8mX2"
 z.Position = UDim2.new(0.083, 0, 0.057, 0)
-z.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
+z.Size = UDim2.new(0, 100, 0, 25)
 z.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 z.Text = "InfJump (Off)"
 z.Font = Enum.Font.SourceSansBold
@@ -210,7 +233,7 @@ cc.Parent = z
 aa.Parent = x
 aa.Name = "rT5vN3"
 aa.Position = UDim2.new(0.083, 0, 0.286, 0)
-aa.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
+aa.Size = UDim2.new(0, 100, 0, 25)
 aa.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 aa.Text = "FarmTickets (Off)"
 aa.Font = Enum.Font.SourceSansBold
@@ -223,7 +246,7 @@ dd.Parent = aa
 bb.Parent = x
 bb.Name = "sJ6wY4"
 bb.Position = UDim2.new(0.083, 0, 0.514, 0)
-bb.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
+bb.Size = UDim2.new(0, 100, 0, 25)
 bb.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 bb.Text = "ESP (Off)"
 bb.Font = Enum.Font.SourceSansBold
@@ -236,7 +259,7 @@ ee.Parent = bb
 ff.Parent = x
 ff.Name = "tK7xZ5"
 ff.Position = UDim2.new(0.083, 0, 0.743, 0)
-ff.Size = UDim2.new(0, 100, 0, 25) -- Smaller button
+ff.Size = UDim2.new(0, 100, 0, 25)
 ff.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 ff.Text = "Auto Bhop (Off)"
 ff.Font = Enum.Font.SourceSansBold
