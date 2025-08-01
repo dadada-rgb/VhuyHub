@@ -3,7 +3,6 @@ local x7z = game:GetService("Lighting")
 local qw9 = game:GetService("TweenService")
 local k2p = game:GetService("RunService")
 local p1d = game.PlaceId
-local u1s = game:GetService("UserInputService") -- Thêm UserInputService
 local z3q = true
 local m9x = 1.13
 local v6t = 0.09
@@ -11,90 +10,67 @@ local r4w = 2.87
 local n8b = 9998
 local y2f = Color3.fromRGB(255, 254, 253)
 local j5h = false
-
--- Hàm tạo độ trễ ngẫu nhiên
 local function t8r()
-    return math.random() * v6t
+    return math.random() * v6t
 end
-
--- Hàm áp dụng Fullbright
 local function q9v()
-    if not z3q then return end
-    pcall(function()
-        local u3k = {Brightness = r4w, FogEnd = n8b, Ambient = y2f}
-        for k, v in pairs(u3k) do
-            local x1p = TweenInfo.new(0.47 + t8r(), Enum.EasingStyle.Linear)
-            local w2m = qw9:Create(x7z, x1p, {[k] = v})
-            w2m:Play()
-            w2m.Completed:Wait()
-        end
-        x7z.GlobalShadows = j5h
-        task.wait(t8r())
-    end)
+    if not z3q then return end
+    pcall(function()
+        local u3k = {Brightness = r4w, FogEnd = n8b, Ambient = y2f}
+        for k, v in pairs(u3k) do
+            local x1p = TweenInfo.new(0.47 + t8r(), Enum.EasingStyle.Linear)
+            local w2m = qw9:Create(x7z, x1p, {[k] = v})
+            w2m:Play()
+            w2m.Completed:Wait()
+        end
+        x7z.GlobalShadows = j5h
+        task.wait(t8r())
+    end)
 end
-
--- Hàm kiểm tra và duy trì Fullbright
 local function e6y()
-    local function h4n()
-        local c3t = false
-        pcall(function()
-            c3t = x7z.Brightness < r4w or x7z.FogEnd < n8b or x7z.Ambient ~= y2f or x7z.GlobalShadows ~= j5h
-        end)
-        return c3t
-    end
-    while z3q do
-        if h4n() then
-            q9v()
-        end
-        task.wait(m9x + t8r())
-    end
+    local function h4n()
+        local c3t = false
+        pcall(function()
+            c3t = x7z.Brightness < r4w or x7z.FogEnd < n8b or x7z.Ambient ~= y2f or x7z.GlobalShadows ~= j5h
+        end)
+        return c3t
+    end
+    while z3q do
+        if h4n() then
+            q9v()
+        end
+        task.wait(m9x + t8r())
+    end
 end
-
--- Hàm khởi tạo Fullbright
 local function k7j()
-    pcall(function()
-        q9v()
-        task.spawn(function()
-            local i2r = 0
-            while i2r < 1 do
-                i2r = i2r + 1
-                e6y()
-            end
-        end)
-    end)
+    pcall(function()
+        q9v()
+        task.spawn(function()
+            local i2r = 0
+            while i2r < 1 do
+                i2r = i2r + 1
+                e6y()
+            end
+        end)
+    end)
 end
-
--- Xử lý phím B
-u1s.InputBegan:Connect(function(inp, gpe)
-    if gpe then return end
-    if inp.KeyCode == Enum.KeyCode.B then
-        z3q = not z3q
-        if z3q then
-            task.spawn(k7j)
-        end
-    end)
-end)
-
--- Khởi tạo
 pcall(k7j)
-
--- Tải script khác
 if p1d == 9872472334 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
 elseif p1d == 10662542523 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
 elseif p1d == 10324347967 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
 elseif p1d == 10324346056 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
 elseif p1d == 10530697691 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
 elseif p1d == 10808838353 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
 elseif p1d == 142823291 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2"))()
 elseif p1d == 13772394625 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball"))()
 else
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"))()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"))()
 end
