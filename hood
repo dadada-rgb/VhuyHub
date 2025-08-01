@@ -6,18 +6,11 @@ local e = game:GetService("UserInputService")
 local f = game:GetService("VirtualInputManager")
 local g = a.LocalPlayer
 local h = d.CurrentCamera
-
-local i = { r = 150, t = false, u = "HumanoidRootPart", v = {}, w = false, z = false, aa = 12, ab = { ac = 0.14, ad = 0.08 }, ae = 15, af = 0 }
+local i = { r = 150, t = false, u = "HumanoidRootPart", v = {}, w = false, ab = { ac = 0.14, ad = 0.08 }, ae = 15, af = 0 }
 local j = {}
 local k = {}
 local l = false
 local m = {}
-
-local function n(o)
-    pcall(function()
-        c:SetCore("SendNotification", { Title = "", Text = o, Duration = 2 })
-    end)
-end
 
 local function p(q)
     return q and q.Character and q.Character:FindFirstChild("Humanoid") and q.Character:FindFirstChild("HumanoidRootPart")
@@ -169,7 +162,7 @@ bt.Enabled = false
 bu.Size = UDim2.new(0, 120, 0, 160)
 bu.Position = UDim2.new(0.1, 0, 0.3, 0)
 bu.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-bu.BackgroundTransparency = 0.3
+bu.BackgroundTransparency = 1
 bu.Active = true
 bu.Draggable = true
 bu.Parent = bt
@@ -207,6 +200,50 @@ r(e.InputBegan, function(ca, cb)
     if cb then return end
     if ca.KeyCode == Enum.KeyCode.RightShift then
         bt.Enabled = not bt.Enabled
+    elseif ca.UserInputType == Enum.UserInputType.MouseButton2 and p(g) then
+        local ci = g.Character
+        local co = bf()
+        if co and ci:FindFirstChildOfClass("Tool") then
+            local cq = (h.CFrame.Position - co.Position).Magnitude
+            if cq <= i.r then
+                i.t = true
+            end
+        end
+    elseif ca.KeyCode == Enum.KeyCode.K then
+        i.w = not i.w
+    end
+end)
+
+r(e.InputEnded, function(ca)
+    if ca.UserInputType == Enum.UserInputType.MouseButton2 then
+        i.t = false
+    end
+end)
+
+r(b.RenderStepped, aj)
+
+r(a.PlayerAdded, function(cx)
+    task.wait(math.random(2, 3))
+    if k[cx] then
+        pcall(function() k[cx].ah:Remove() k[cx].ai:Remove() end)
+        k[cx] = nil
+    end
+end)
+
+r(a.PlayerRemoving, function(cx)
+    if k[cx] then
+        pcall(function() k[cx].ah:Remove() k[cx].ai:Remove() end)
+        k[cx] = nil
+    end
+end)
+
+r(b.Heartbeat, function()
+    if i.t then
+        if not l then l = os.clock() end
+        if os.clock() - l >= math.random(45, 55) then
+            i.u = ({"Head", "HumanoidRootPart"})[math.random(1, 2)]
+            l = os.clock()
+        end
     end
 end)
 
@@ -273,73 +310,11 @@ r(b.RenderStepped, function()
     end
 end)
 
-r(e.InputBegan, function(ca, cb)
-    if cb then return end
-    if ca.UserInputType == Enum.UserInputType.MouseButton2 and p(g) then
-        local ci = g.Character
-        local co = bf()
-        if co and ci:FindFirstChildOfClass("Tool") then
-            local cq = (h.CFrame.Position - co.Position).Magnitude
-            if cq <= i.r then
-                i.t = true
-                i.z = true
-            end
-        end
-    elseif ca.KeyCode == Enum.KeyCode.K then
-        i.w = not i.w
-    elseif ca.KeyCode == Enum.KeyCode.Z then
-        i.z = not i.z
-    end
-end)
-
-r(e.InputEnded, function(ca)
-    if ca.UserInputType == Enum.UserInputType.MouseButton2 then
-        i.t = false
-        i.z = false
-    end
-end)
-
-r(b.RenderStepped, aj)
-
-r(b.Heartbeat, function(cr)
-    if i.z and p(g) then
-        local cs = g.Character.HumanoidRootPart
-        local ct = g.Character.Humanoid
-        local cu = i.aa / 10
-        cs.CFrame = cs.CFrame + ct.MoveDirection * cu
-    end
-end)
-
-r(a.PlayerAdded, function(cx)
-    task.wait(math.random(2, 3))
-    if k[cx] then
-        pcall(function() k[cx].ah:Remove() k[cx].ai:Remove() end)
-        k[cx] = nil
-    end
-end)
-
-r(a.PlayerRemoving, function(cx)
-    if k[cx] then
-        pcall(function() k[cx].ah:Remove() k[cx].ai:Remove() end)
-        k[cx] = nil
-    end
-end)
-
-r(b.Heartbeat, function()
-    if i.t then
-        if not l then l = os.clock() end
-        if os.clock() - l >= math.random(45, 55) then
-            i.u = ({"Head", "HumanoidRootPart"})[math.random(1, 2)]
-            l = os.clock()
-        end
-    end
-end)
-
 local function cx()
     for _, cy in pairs(j) do pcall(function() cy:Disconnect() end) end
     for _, cz in pairs(k) do pcall(function() cz.ah:Remove() cz.ai:Remove() end) end
     pcall(function() bt:Destroy() end)
-    i.t, i.w, i.z = false, false, false
+    i.t, i.w = false, false
 end
 
 game:BindToClose(cx)
