@@ -3,6 +3,7 @@ local x7z = game:GetService("Lighting")
 local qw9 = game:GetService("TweenService")
 local k2p = game:GetService("RunService")
 local p1d = game.PlaceId
+local u1s = game:GetService("UserInputService") -- Thêm UserInputService
 local z3q = true
 local m9x = 1.13
 local v6t = 0.09
@@ -11,10 +12,12 @@ local n8b = 9998
 local y2f = Color3.fromRGB(255, 254, 253)
 local j5h = false
 
+-- Hàm tạo độ trễ ngẫu nhiên
 local function t8r()
     return math.random() * v6t
 end
 
+-- Hàm áp dụng Fullbright
 local function q9v()
     if not z3q then return end
     pcall(function()
@@ -30,6 +33,7 @@ local function q9v()
     end)
 end
 
+-- Hàm kiểm tra và duy trì Fullbright
 local function e6y()
     local function h4n()
         local c3t = false
@@ -46,6 +50,7 @@ local function e6y()
     end
 end
 
+-- Hàm khởi tạo Fullbright
 local function k7j()
     pcall(function()
         q9v()
@@ -59,19 +64,32 @@ local function k7j()
     end)
 end
 
+-- Xử lý phím B
+u1s.InputBegan:Connect(function(inp, gpe)
+    if gpe then return end
+    if inp.KeyCode == Enum.KeyCode.B then
+        z3q = not z3q
+        if z3q then
+            task.spawn(k7j)
+        end
+    end)
+end)
+
+-- Khởi tạo
 pcall(k7j)
 
+-- Tải script khác
 if p1d == 9872472334 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-elseif p1d == 10662542523 then 
+elseif p1d == 10662542523 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-elseif p1d == 10324347967 then 
+elseif p1d == 10324347967 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-elseif p1d == 10324346056 then 
+elseif p1d == 10324346056 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-elseif p1d == 10530697691 then 
+elseif p1d == 10530697691 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-elseif p1d == 10808838353 then 
+elseif p1d == 10808838353 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
 elseif p1d == 142823291 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2"))()
@@ -80,3 +98,8 @@ elseif p1d == 13772394625 then
 else
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"))()
 end
+
+game:BindToClose(function()
+    z3q = false
+    sg9:Destroy()
+end)
