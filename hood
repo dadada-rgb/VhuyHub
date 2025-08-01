@@ -6,7 +6,7 @@ local e = game:GetService("UserInputService")
 local f = game:GetService("VirtualInputManager")
 local g = a.LocalPlayer
 local h = d.CurrentCamera
-local i = { r = 150, t = false, u = "HumanoidRootPart", v = {}, w = false, ab = { ac = 0.14, ad = 0.08 }, ae = 15, af = 0 }
+local i = { r = 150, t = false, autoAim = false, u = "HumanoidRootPart", v = {}, w = false, ab = { ac = 0.14, ad = 0.08 }, ae = 15, af = 0 }
 local j = {}
 local k = {}
 local l = false
@@ -102,7 +102,7 @@ local function av(aw)
     local ax = aw.Parent
     local ay = ax:FindFirstChild("Humanoid")
     local az = a:GetPlayerFromCharacter(ax)
-    return ay and az and aw.Name == i.u
+    return ay and az
 end
 
 local function ba()
@@ -118,7 +118,7 @@ end
 local function bf()
     local bg, bh = nil, math.huge
     for _, bi in ipairs(a:GetPlayers()) do
-        if bi ~= g and p(bi) and i.v[bi.Name] then
+        if bi ~= g and p(bi) and (i.v[bi.Name] or i.autoAim) then
             local bj = bi.Character
             local bk = bj:FindFirstChild(i.u)
             local bl = bj:FindFirstChild("BodyEffects")
@@ -134,7 +134,7 @@ local function bf()
                         br.FilterType = Enum.RaycastFilterType.Blacklist
                         br.FilterDescendantsInstances = {g.Character}
                         local bs = d:Raycast(h.CFrame.Position, (bk.Position - h.CFrame.Position), br)
-                        if bs and bs.Instance:IsDescendantOf(bj) then
+                        if (i.autoAim and bs and bs.Instance:IsDescendantOf(bj)) or (not i.autoAim and i.v[bi.Name]) then
                             bg = bk
                             bh = bq
                         end
@@ -158,7 +158,6 @@ bt.Parent = g:WaitForChild("PlayerGui", 5)
 bt.Name = tostring(math.random(1e6, 1e7))
 bt.ResetOnSpawn = false
 bt.Enabled = false
-
 bu.Size = UDim2.new(0, 120, 0, 160)
 bu.Position = UDim2.new(0.1, 0, 0.3, 0)
 bu.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
@@ -166,10 +165,8 @@ bu.BackgroundTransparency = 1
 bu.Active = true
 bu.Draggable = true
 bu.Parent = bt
-
 bv.CornerRadius = UDim.new(0, 8)
 bv.Parent = bu
-
 bw.Size = UDim2.new(1, 0, 0, 18)
 bw.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
 bw.Text = ""
@@ -177,21 +174,17 @@ bw.TextColor3 = Color3.fromRGB(0, 0, 0)
 bw.Font = Enum.Font.SourceSans
 bw.TextSize = 12
 bw.Parent = bu
-
 bx.CornerRadius = UDim.new(0, 8)
 bx.Parent = bw
-
 by.Size = UDim2.new(1, -4, 1, -22)
 by.Position = UDim2.new(0, 2, 0, 20)
 by.CanvasSize = UDim2.new(0, 0, 0, 0)
 by.ScrollBarThickness = 3
 by.BackgroundTransparency = 1
 by.Parent = bu
-
 bz.SortOrder = Enum.SortOrder.LayoutOrder
 bz.Padding = UDim.new(0, 3)
 bz.Parent = by
-
 bz:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     by.CanvasSize = UDim2.new(0, 0, 0, bz.AbsoluteContentSize.Y)
 end)
@@ -200,6 +193,8 @@ r(e.InputBegan, function(ca, cb)
     if cb then return end
     if ca.KeyCode == Enum.KeyCode.RightShift then
         bt.Enabled = not bt.Enabled
+    elseif ca.KeyCode == Enum.KeyCode.T then
+        i.autoAim = not i.autoAim
     elseif ca.UserInputType == Enum.UserInputType.MouseButton2 and p(g) then
         local ci = g.Character
         local co = bf()
@@ -209,8 +204,19 @@ r(e.InputBegan, function(ca, cb)
                 i.t = true
             end
         end
-    elseif ca.KeyCode == Enum.KeyCode.K then
-        i.w = not i.w
+    elseif ca.UserInputType == Enum.UserInputType.MouseButton3 then
+        local mousePos = e:GetMouseLocation()
+        local ray = h:ScreenPointToRay(mousePos.X, mousePos.Y)
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+        raycastParams.FilterDescendantsInstances = {g.Character}
+        local rayResult = d:Raycast(ray.Origin, ray.Direction * 1000, raycastParams)
+        if rayResult and rayResult.Instance then
+            local targetPlayer = a:GetPlayerFromCharacter(rayResult.Instance.Parent)
+            if targetPlayer and targetPlayer ~= g then
+                i.v[targetPlayer.Name] = true
+            end
+        end
     end
 end)
 
@@ -238,7 +244,7 @@ r(a.PlayerRemoving, function(cx)
 end)
 
 r(b.Heartbeat, function()
-    if i.t then
+    if i.t or i.autoAim then
         if not l then l = os.clock() end
         if os.clock() - l >= math.random(45, 55) then
             i.u = ({"Head", "HumanoidRootPart"})[math.random(1, 2)]
@@ -290,17 +296,17 @@ task.spawn(function()
 end)
 
 r(b.RenderStepped, function()
-    if not i.t or not p(g) then return end
+    if not (i.t or i.autoAim) or not p(g) then return end
     local ci = g.Character
     local cj = ci:FindFirstChild("BodyEffects")
     local ck = cj and cj:FindFirstChild("K.O") and cj["K.O"].Value
     local cl = ci:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
-    if ck or cl then i.t = false return end
+    if ck or cl then i.t = false i.autoAim = false return end
     local cm = false
     for _, cn in pairs(ci:GetChildren()) do
         if cn:IsA("Tool") then cm = true break end
     end
-    if i.t and cm then
+    if (i.t or i.autoAim) and cm then
         local co = bf()
         if co then
             local cp = co.Position + (co.Parent:FindFirstChild(i.u).Velocity * Vector3.new(i.ab.ac, i.ab.ad, i.ab.ac))
@@ -314,7 +320,7 @@ local function cx()
     for _, cy in pairs(j) do pcall(function() cy:Disconnect() end) end
     for _, cz in pairs(k) do pcall(function() cz.ah:Remove() cz.ai:Remove() end) end
     pcall(function() bt:Destroy() end)
-    i.t, i.w = false, false
+    i.t, i.w, i.autoAim = false, false, false
 end
 
 game:BindToClose(cx)
