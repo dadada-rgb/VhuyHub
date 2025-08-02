@@ -304,3 +304,10 @@ ff.MouseButton1Click:Connect(function()
     getgenv().x3 = not getgenv().x3
     ff.Text = "Auto Bhop (" .. (getgenv().x3 and "On" or "Off") .. ")"
 end)
+
+d.InputBegan:Connect(function(input, gameProcessed)
+    if not gameProcessed and input.UserInputType == Enum.UserInputType.MouseButton3 then
+        getgenv().x3 = not getgenv().x3
+        ff.Text = "Auto Bhop (" .. (getgenv().x3 and "On" or "Off") .. ")"
+    end
+end)
