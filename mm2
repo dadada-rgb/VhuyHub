@@ -5,40 +5,38 @@ local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
-local localPlayer = Players.LocalPlayer
+local localplayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
 -- Configuration
-local CONFIG = {
-    ESP_ENABLED = false,
-    SHOOT_OFFSET = 2.8,
-    OFFSET_TO_PING_MULT = 1,
-    UPDATE_INTERVAL = 0.5,
-    RANDOM_DELAY = 0.1,
-    MAX_COIN_DISTANCE = 100,
-    MAX_GUN_DISTANCE = 500,
-    ANTI_CHEAT_DELAY = 0.07
-}
+local ESP_ENABLED = false
+local SHOOT_OFFSET = 2.8
+local OFFSET_TO_PING_MULT = 1
+local UPDATE_INTERVAL = 0.5
+local RANDOM_DELAY = 0.1
+local MAX_COIN_DISTANCE = 100
+local MAX_GUN_DISTANCE = 500
+local ANTI_CHEAT_DELAY = 0.05
 
 -- Variables
 local playerData = {}
 local espObjects = {}
 local isScriptRunning = false
-local espActive = CONFIG.ESP_ENABLED
-local autoFarm = false
+local espActive = ESP_ENABLED
 local lastUpdate = tick()
+local autoFarm = false
 local lastShot = tick()
-local autoFarmTask = nil
 
 -- Game checks
 local function isMurderMystery2()
-    return ReplicatedStorage:FindFirstChild("Remotes") and ReplicatedStorage.Remotes:FindFirstChild("Gameplay")
+    return ReplicatedStorage:FindFirstChild("Remotes") 
+        and ReplicatedStorage.Remotes:FindFirstChild("Gameplay")
 end
 
 local function getMap()
-    for _, obj in ipairs(Workspace:GetChildren()) do
-        if obj:GetAttribute("MapID") and obj:FindFirstChild("CoinContainer") and obj:FindFirstChild("Spawns") then
-            return obj
+    for _, o in ipairs(Workspace:GetChildren()) do
+        if o:GetAttribute("MapID") and o:FindFirstChild("CoinContainer") and o:FindFirstChild("Spawns") then
+            return o
         end
     end
     return nil
@@ -47,19 +45,19 @@ end
 -- Role detection
 local function findMurderer()
     if playerData then
-        for playerName, data in pairs(playerData) do
+        for player, data in pairs(playerData) do
             if data.Role == "Murderer" then
-                local player = Players:FindFirstChild(playerName)
-                if player and player.Character then
-                    return player
+                local plr = Players:FindFirstChild(player)
+                if plr and plr.Character then
+                    return plr
                 end
             end
         end
     end
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer and player.Character then
-            if player.Backpack:FindFirstChild("Knife") or (player.Character and player.Character:FindFirstChild("Knife")) then
-                return player
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= localplayer and plr.Character then
+            if plr.Backpack:FindFirstChild("Knife") or (plr.Character and plr.Character:FindFirstChild("Knife")) then
+                return plr
             end
         end
     end
@@ -67,17 +65,17 @@ local function findMurderer()
 end
 
 local function findSheriff()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player.Character and (player.Backpack:FindFirstChild("Gun") or (player.Character and player.Character:FindFirstChild("Gun"))) then
-            return player
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Character and (plr.Backpack:FindFirstChild("Gun") or (plr.Character and plr.Character:FindFirstChild("Gun"))) then
+            return plr
         end
     end
     if playerData then
-        for playerName, data in pairs(playerData) do
+        for player, data in pairs(playerData) do
             if data.Role == "Sheriff" then
-                local player = Players:FindFirstChild(playerName)
-                if player and player.Character then
-                    return player
+                local plr = Players:FindFirstChild(player)
+                if plr and plr.Character then
+                    return plr
                 end
             end
         end
@@ -85,18 +83,18 @@ local function findSheriff()
     return nil
 end
 
-local function findSheriffNotMe()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= localPlayer and player.Character and (player.Backpack:FindFirstChild("Gun") or (player.Character and player.Character:FindFirstChild("Gun"))) then
-            return player
+local function findSheriffThatsNotMe()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= localplayer and plr.Character and (plr.Backpack:FindFirstChild("Gun") or (plr.Character and plr.Character:FindFirstChild("Gun"))) then
+            return plr
         end
     end
     if playerData then
-        for playerName, data in pairs(playerData) do
-            if data.Role == "Sheriff" and Players:FindFirstChild(playerName) ~= localPlayer then
-                local player = Players:FindFirstChild(playerName)
-                if player and player.Character then
-                    return player
+        for player, data in pairs(playerData) do
+            if data.Role == "Sheriff" and Players:FindFirstChild(player) ~= localplayer then
+                local plr = Players:FindFirstChild(player)
+                if plr and plr.Character then
+                    return plr
                 end
             end
         end
@@ -133,143 +131,162 @@ local function clearESP()
 end
 
 local function reloadPlayerESP()
-    if not espActive or tick() - lastUpdate < CONFIG.UPDATE_INTERVAL then return end
+    if not espActive or tick() - lastUpdate < UPDATE_INTERVAL then return end
     lastUpdate = tick()
     clearESP()
     for _, player in ipairs(Players:GetPlayers()) do
-        if player.Character and player ~= localPlayer then
-            local color
+        if player.Character and player ~= localplayer then
             if player == findMurderer() then
-                color = Color3.fromRGB(255, 0, 0) -- Red for Murderer
+                createESP(player.Character, Color3.fromRGB(255, 0, 0))
             elseif player == findSheriff() then
-                color = Color3.fromRGB(0, 153, 255) -- Blue for Sheriff
+                createESP(player.Character, Color3.fromRGB(0, 153, 255))
             else
-                color = Color3.fromRGB(0, 255, 0) -- Green for others
+                createESP(player.Character, Color3.fromRGB(0, 255, 0))
             end
-            createESP(player.Character, color)
         end
     end
-    task.wait(math.random(0, CONFIG.RANDOM_DELAY))
+    task.wait(math.random(0, RANDOM_DELAY))
 end
 
 -- Predicted position
 local function getPredictedPosition(player, shootOffset)
     local success, result = pcall(function()
-        if not player.Character then return Vector3.zero end
-        local hrp = player.Character:FindFirstChild("UpperTorso")
-        local humanoid = player.Character:FindFirstChild("Humanoid")
-        if not hrp or not humanoid then return Vector3.zero end
-        local position = hrp.Position
-        local velocity = hrp.AssemblyLinearVelocity
-        local moveDirection = humanoid.MoveDirection
-        local predicted = position + (velocity * Vector3.new(0, 0.5, 0)) * (shootOffset / 15) + moveDirection * shootOffset
-        predicted = predicted * (((localPlayer:GetNetworkPing() * 1000) * ((CONFIG.OFFSET_TO_PING_MULT - 1) * 0.01)) + 1)
-        return predicted
+        if not player.Character then
+            return Vector3.new(0, 0, 0)
+        end
+        local playerHRP = player.Character:FindFirstChild("UpperTorso")
+        local playerHum = player.Character:FindFirstChild("Humanoid")
+        if not playerHRP or not playerHum then
+            return Vector3.new(0, 0, 0)
+        end
+        local playerPosition = playerHRP.Position
+        local velocity = playerHRP.AssemblyLinearVelocity
+        local playerMoveDirection = playerHum.MoveDirection
+        local predictedPosition = playerPosition + (velocity * Vector3.new(0, 0.5, 0)) * (shootOffset / 15) + playerMoveDirection * shootOffset
+        predictedPosition = predictedPosition * (((localplayer:GetNetworkPing() * 1000) * ((OFFSET_TO_PING_MULT - 1) * 0.01)) + 1)
+        return predictedPosition
     end)
-    return success and result or Vector3.zero
+    if not success then
+        return Vector3.new(0, 0, 0)
+    end
+    return result
 end
 
 -- Shoot Murderer
 local function shootMurderer()
-    if tick() - lastShot < 0.5 + math.random(0, CONFIG.ANTI_CHEAT_DELAY) then return end
+    if tick() - lastShot < 0.5 then return end 
     lastShot = tick()
-    if findSheriff() ~= localPlayer then return end
-    local target = findMurderer() or findSheriffNotMe()
-    if not target or not target.Character then return end
-    local gun = localPlayer.Character:FindFirstChild("Gun") or localPlayer.Backpack:FindFirstChild("Gun")
-    if not gun then return end
-    if gun.Parent == localPlayer.Backpack then
-        local humanoid = localPlayer.Character:FindFirstChild("Humanoid")
-        if humanoid then
-            humanoid:EquipTool(gun)
-            task.wait(math.random(0.05, 0.1) + CONFIG.ANTI_CHEAT_DELAY)
+    if findSheriff() ~= localplayer then
+        return
+    end
+    local murderer = findMurderer() or findSheriffThatsNotMe()
+    if not murderer then
+        return
+    end
+    if not localplayer.Character:FindFirstChild("Gun") then
+        local hum = localplayer.Character:FindFirstChild("Humanoid")
+        if localplayer.Backpack:FindFirstChild("Gun") then
+            hum:EquipTool(localplayer.Backpack:FindFirstChild("Gun"))
+            task.wait(math.random(0.05, 0.1) + ANTI_CHEAT_DELAY)
+        else
+            return
         end
     end
-    local targetHRP = target.Character:FindFirstChild("HumanoidRootPart")
-    if not targetHRP then return end
-    local predictedPos = getPredictedPosition(target, CONFIG.SHOOT_OFFSET)
-    if predictedPos == Vector3.zero then return end
-    if (localPlayer.Character.HumanoidRootPart.Position - predictedPos).Magnitude > CONFIG.MAX_GUN_DISTANCE then return end
+    local murdererHRP = murderer.Character:FindFirstChild("HumanoidRootPart")
+    if not murdererHRP then
+        return
+    end
+    local predictedPosition = getPredictedPosition(murderer, SHOOT_OFFSET)
+    if predictedPosition == Vector3.new(0, 0, 0) then return end
+    local args = {
+        [1] = 1,
+        [2] = predictedPosition,
+        [3] = "AH2"
+    }
     pcall(function()
-        local args = { [1] = 1, [2] = predictedPos, [3] = "AH2" }
-        local gunLocal = localPlayer.Character:FindFirstChild("Gun") and localPlayer.Character.Gun:FindFirstChild("KnifeLocal")
-        if gunLocal and gunLocal:FindFirstChild("CreateBeam") then
-            gunLocal.CreateBeam.RemoteFunction:InvokeServer(unpack(args))
-        end
+        localplayer.Character.Gun.KnifeLocal.CreateBeam.RemoteFunction:InvokeServer(unpack(args))
     end)
-    task.wait(math.random(0, CONFIG.ANTI_CHEAT_DELAY))
+    task.wait(math.random(0, ANTI_CHEAT_DELAY))
 end
 
 -- AutoFarm Coins
 local function autoFarmCoins()
-    local humanoidRootPart = localPlayer.Character and localPlayer.Character:WaitForChild("HumanoidRootPart", 5)
-    local humanoid = localPlayer.Character and localPlayer.Character:WaitForChild("Humanoid", 5)
-    if not humanoidRootPart or not humanoid then return end
-
+    local k = TweenService
+    local g = Players.LocalPlayer
+    local r = g.Character or g.CharacterAdded:Wait()
+    local A = r:WaitForChild("HumanoidRootPart", 5)
+    local a = r:WaitForChild("Humanoid", 5)
+    if not A or not a then
+        return
+    end
+    local function findMap()
+        for _, E in ipairs(Workspace:GetChildren()) do
+            if E:GetAttribute("MapID") and E:FindFirstChild("CoinContainer") then
+                return E
+            end
+        end
+        task.wait(0.5)
+        return nil
+    end
     local function findCoin()
-        local map = getMap()
-        if not map or not map:FindFirstChild("CoinContainer") then return nil end
-        local closestCoin, minDist = nil, math.huge
-        for _, coin in ipairs(map.CoinContainer:GetChildren()) do
-            local coinVisual = coin:FindFirstChild("CoinVisual")
-            if coinVisual and not coinVisual:GetAttribute("Collected") and coin.Parent then
-                local dist = (humanoidRootPart.Position - coin.Position).Magnitude
-                if dist < minDist and dist < CONFIG.MAX_COIN_DISTANCE then
-                    closestCoin = coin
-                    minDist = dist
+        local C = findMap()
+        if not C or not C:FindFirstChild("CoinContainer") then return nil end
+        local D, i = nil, math.huge
+        for _, l in ipairs(C.CoinContainer:GetChildren()) do
+            local q = l:FindFirstChild("CoinVisual")
+            if q and not q:GetAttribute("Collected") and l.Parent then
+                local dist = (A.Position - l.Position).Magnitude
+                if dist < i and dist < MAX_COIN_DISTANCE then
+                    D = l
+                    i = dist
                 end
             end
         end
-        return closestCoin
+        return D
     end
-
-    local function moveToCoin(coin)
-        if not coin or not coin.Parent then return end
-        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-        local distance = (humanoidRootPart.Position - coin.Position).Magnitude
-        if distance > CONFIG.MAX_COIN_DISTANCE then return end
+    local function moveToCoin(B)
+        if not B or not B.Parent then return end
+        a:ChangeState(11)
+        local t = (A.Position - B.Position).Magnitude
+        if t > MAX_COIN_DISTANCE then return end
         local offset = Vector3.new(math.random(-5, 5)/10, 0, math.random(-5, 5)/10)
-        local tween = TweenService:Create(
-            humanoidRootPart,
-            TweenInfo.new(distance / 25, Enum.EasingStyle.Linear),
-            {CFrame = coin.CFrame * CFrame.Angles(0, math.rad(math.random(-10, 10)), 0) + offset}
-        )
-        tween:Play()
-        tween.Completed:Wait()
+        local f = k:Create(A, TweenInfo.new(t / 25, Enum.EasingStyle.Linear), {CFrame = B.CFrame * CFrame.Angles(0, math.rad(math.random(-10, 10)), 0) + offset})
+        f:Play()
+        f.Completed:Wait()
     end
-
     while autoFarm do
-        local coin = findCoin()
-        if coin then
-            moveToCoin(coin)
-            local coinVisual = coin:FindFirstChild("CoinVisual")
-            while coinVisual and not coinVisual:GetAttribute("Collected") and coinVisual.Parent and autoFarm do
-                local newCoin = findCoin()
-                if newCoin and newCoin ~= coin then break end
-                task.wait(0.1 + math.random(0, CONFIG.ANTI_CHEAT_DELAY))
+        local z = findCoin()
+        if z then
+            moveToCoin(z)
+            local h = z:FindFirstChild("CoinVisual")
+            while h and not h:GetAttribute("Collected") and h.Parent and autoFarm do
+                local x = findCoin()
+                if x and x ~= z then
+                    break
+                end
+                task.wait(0.1 + math.random(0, ANTI_CHEAT_DELAY))
             end
         end
         task.wait(math.random(0.1, 0.3))
     end
 end
 
--- Line of Sight Check
+-- Auto-Shoot when Sheriff and Autofarm is Active
 local function checkLineOfSight(startPos, endPos)
     local raycastParams = RaycastParams.new()
-    raycastParams.FilterDescendantsInstances = {localPlayer.Character, Workspace:FindFirstChild("CoinContainer")}
+    raycastParams.FilterDescendantsInstances = {localplayer.Character, Workspace:FindFirstChild("CoinContainer")}
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
     raycastParams.IgnoreWater = true
     local raycastResult = Workspace:Raycast(startPos, (endPos - startPos).Unit * (endPos - startPos).Magnitude, raycastParams)
-    return not raycastResult or raycastResult.Instance:IsDescendantOf(findMurderer() and findMurderer().Character)
+    return not raycastResult or raycastResult.Instance:IsDescendantOf(findMurderer().Character)
 end
 
--- Auto-Shoot when Sheriff
 RunService.Heartbeat:Connect(function()
     if not autoFarm or not isScriptRunning then return end
-    if findSheriff() == localPlayer then
+    if findSheriff() == localplayer then
         local murderer = findMurderer()
-        if murderer and murderer.Character and murderer.Character:FindFirstChild("HumanoidRootPart") and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local startPos = localPlayer.Character.HumanoidRootPart.Position
+        if murderer and murderer.Character and murderer.Character:FindFirstChild("HumanoidRootPart") and localplayer.Character and localplayer.Character:FindFirstChild("HumanoidRootPart") then
+            local startPos = localplayer.Character.HumanoidRootPart.Position
             local endPos = murderer.Character.HumanoidRootPart.Position
             if checkLineOfSight(startPos, endPos) then
                 task.spawn(shootMurderer)
@@ -279,24 +296,23 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- Event connections
-Workspace.ChildAdded:Connect(function(child)
-    if child == getMap() and espActive then
+Workspace.ChildAdded:Connect(function(ch)
+    if ch == getMap() and espActive then
         task.wait(math.random(1, 2))
         reloadPlayerESP()
     end
 end)
 
-Workspace.ChildRemoved:Connect(function(child)
-    if child == getMap() and espActive then
+Workspace.ChildRemoved:Connect(function(ch)
+    if ch == getMap() and espActive then
         clearESP()
     end
 end)
 
-localPlayer.CharacterAdded:Connect(function()
-    task.wait(3) -- Increased delay to ensure roles are fully loaded
+localplayer.CharacterAdded:Connect(function()
+    task.wait(math.random(0.5, 1.5))
     if autoFarm then
-        if autoFarmTask then task.cancel(autoFarmTask) end
-        autoFarmTask = task.spawn(autoFarmCoins)
+        task.spawn(autoFarmCoins)
     end
     if espActive then
         reloadPlayerESP()
@@ -304,7 +320,7 @@ localPlayer.CharacterAdded:Connect(function()
 end)
 
 Players.PlayerAdded:Connect(function(player)
-    if player ~= localPlayer then
+    if player ~= localplayer then
         player.CharacterAdded:Connect(function()
             if espActive then
                 task.wait(math.random(0.5, 1.5))
@@ -322,69 +338,108 @@ Players.PlayerRemoving:Connect(function()
 end)
 
 -- GUI setup
-local screenGui = Instance.new("ScreenGui")
-screenGui.Parent = localPlayer:WaitForChild("PlayerGui", 5)
-screenGui.Name = "MurderMystery2GUI"
-screenGui.ResetOnSpawn = false
+local pq = Instance.new("ScreenGui")
+local rs = Instance.new("Frame")
+local tu = Instance.new("UICorner")
+local vw = Instance.new("TextButton") -- AutoFarm
+local mn = Instance.new("TextButton") -- Shoot
+local xy = Instance.new("TextButton") -- ESP
+local ag = Instance.new("TextButton") -- AutoGun (Not Working)
+local kl = Instance.new("UICorner")
+local ef = Instance.new("UICorner")
+local zq = Instance.new("UICorner")
+local wg = Instance.new("UICorner")
 
-local mainFrame = Instance.new("Frame")
-mainFrame.Parent = screenGui
-mainFrame.Position = UDim2.new(0.161, 0, 0.21, 0)
-mainFrame.Size = UDim2.new(0, 120, 0, 120)
-mainFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-mainFrame.Active = true
-mainFrame.Draggable = true
+pq.Parent = localplayer:WaitForChild("PlayerGui", 5)
+pq.Name = "zX9qW2"
+pq.ResetOnSpawn = false
 
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 8)
-corner.Parent = mainFrame
+rs.Parent = pq
+rs.Position = UDim2.new(0.161, 0, 0.21, 0)
+rs.Size = UDim2.new(0, 120, 0, 120)
+rs.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+rs.Active = true
+rs.Draggable = true
 
-local function createButton(name, position, text, active)
-    local button = Instance.new("TextButton")
-    button.Parent = mainFrame
-    button.Name = name
-    button.Position = position
-    button.Size = UDim2.new(0, 100, 0, 25)
-    button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    button.Text = text
-    button.Font = Enum.Font.SourceSansBold
-    button.TextColor3 = Color3.fromRGB(0, 0, 0)
-    button.TextSize = 12
-    button.Active = active
-    button.Selectable = active
-    local btnCorner = Instance.new("UICorner")
-    btnCorner.CornerRadius = UDim.new(0, 8)
-    btnCorner.Parent = button
-    return button
-end
+tu.CornerRadius = UDim.new(0, 8)
+tu.Parent = rs
 
-local autoFarmButton = createButton("AutoFarmBtn", UDim2.new(0.083, 0, 0.05, 0), "AutoFarm (Off)", true)
-local shootButton = createButton("ShootBtn", UDim2.new(0.083, 0, 0.283, 0), "Shoot", true)
-local espButton = createButton("ESPBtn", UDim2.new(0.083, 0, 0.517, 0), "ESP (Off)", true)
-local autoGunButton = createButton("AutoGunBtn", UDim2.new(0.083, 0, 0.75, 0), "AutoGun (Not Working)", false)
+vw.Parent = rs
+vw.Name = "jH4mP8"
+vw.Position = UDim2.new(0.083, 0, 0.05, 0)
+vw.Size = UDim2.new(0, 100, 0, 25)
+vw.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+vw.Text = "AutoFarm (Off)"
+vw.Font = Enum.Font.SourceSansBold
+vw.TextColor3 = Color3.fromRGB(0, 0, 0)
+vw.TextSize = 12
+vw.Active = true
+vw.Selectable = true
+
+kl.CornerRadius = UDim.new(0, 8)
+kl.Parent = vw
+
+mn.Parent = rs
+mn.Name = "tR7nY5"
+mn.Position = UDim2.new(0.083, 0, 0.283, 0)
+mn.Size = UDim2.new(0, 100, 0, 25)
+mn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+mn.Text = "Shoot"
+mn.Font = Enum.Font.SourceSansBold
+mn.TextColor3 = Color3.fromRGB(0, 0, 0)
+mn.TextSize = 12
+mn.Active = true
+mn.Selectable = true
+
+ef.CornerRadius = UDim.new(0, 8)
+ef.Parent = mn
+
+xy.Parent = rs
+xy.Name = "uP5kQ3"
+xy.Position = UDim2.new(0.083, 0, 0.517, 0)
+xy.Size = UDim2.new(0, 100, 0, 25)
+xy.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+xy.Text = "ESP (Off)"
+xy.Font = Enum.Font.SourceSansBold
+xy.TextColor3 = Color3.fromRGB(0, 0, 0)
+xy.TextSize = 12
+xy.Active = true
+xy.Selectable = true
+
+zq.CornerRadius = UDim.new(0, 8)
+zq.Parent = xy
+
+ag.Parent = rs
+ag.Name = "vQ2zW9"
+ag.Position = UDim2.new(0.083, 0, 0.75, 0)
+ag.Size = UDim2.new(0, 100, 0, 25)
+ag.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+ag.Text = "AutoGun (Not Working)"
+ag.Font = Enum.Font.SourceSansBold
+ag.TextColor3 = Color3.fromRGB(0, 0, 0)
+ag.TextSize = 12
+ag.Active = false
+ag.Selectable = false
+
+wg.CornerRadius = UDim.new(0, 8)
+wg.Parent = ag
 
 -- Button functionality
-autoFarmButton.MouseButton1Click:Connect(function()
+vw.MouseButton1Click:Connect(function()
     autoFarm = not autoFarm
-    autoFarmButton.Text = "AutoFarm (" .. (autoFarm and "On" or "Off") .. ")"
+    vw.Text = "AutoFarm (" .. (autoFarm and "On" or "Off") .. ")"
     if autoFarm then
-        if autoFarmTask then task.cancel(autoFarmTask) end
-        autoFarmTask = task.spawn(autoFarmCoins)
-    else
-        if autoFarmTask then
-            task.cancel(autoFarmTask)
-            autoFarmTask = nil
-        end
+        task.spawn(autoFarmCoins)
     end
 end)
 
-shootButton.MouseButton1Click:Connect(function()
+mn.MouseButton1Click:Connect(function()
     task.spawn(shootMurderer)
 end)
 
-espButton.MouseButton1Click:Connect(function()
+xy.MouseButton1Click:Connect(function()
     espActive = not espActive
-    espButton.Text = "ESP (" .. (espActive and "On" or "Off") .. ")"
+    xy.Text = "ESP (" .. (espActive and "On" or "Off") .. ")"
     if espActive then
         reloadPlayerESP()
     else
@@ -397,32 +452,30 @@ UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
     if gameProcessedEvent or not isScriptRunning then return end
     if input.KeyCode == Enum.KeyCode.T then
         espActive = not espActive
-        espButton.Text = "ESP (" .. (espActive and "On" or "Off") .. ")"
+        xy.Text = "ESP (" .. (espActive and "On" or "Off") .. ")"
         if espActive then
             reloadPlayerESP()
         else
             clearESP()
         end
-    elseif input.UserInputType == Enum.UserInputType.MouseButton3 then -- Changed to MouseButton2 (right-click)
+    elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
         task.spawn(shootMurderer)
-    end
-end)
-
--- Periodic ESP update
-RunService.Stepped:Connect(function()
-    if espActive and isScriptRunning then
-        reloadPlayerESP()
+    elseif input.KeyCode == Enum.KeyCode.C then
+        autoFarm = not autoFarm
+        vw.Text = "AutoFarm (" .. (autoFarm and "On" or "Off") .. ")"
+        if autoFarm then
+            task.spawn(autoFarmCoins)
+        end
     end
 end)
 
 -- Initialize
 local function initialize()
     local success = pcall(function()
-        localPlayer:WaitForChild("PlayerGui", 10)
+        localplayer:WaitForChild("PlayerGui", 10)
         ReplicatedStorage:WaitForChild("Remotes", 10):WaitForChild("Gameplay", 10):WaitForChild("PlayerDataChanged", 10)
     end)
     if not success or not isMurderMystery2() then
-        warn("Failed to initialize: Game is not Murder Mystery 2 or required objects not found.")
         return
     end
     isScriptRunning = true
@@ -431,29 +484,13 @@ local function initialize()
         gameplay.OnClientEvent:Connect(function(data)
             playerData = data
             if espActive then
-                task.wait(0.5) -- Ensure data is updated before reloading ESP
                 reloadPlayerESP()
             end
         end)
     end)
-    task.wait(3) -- Increased delay to ensure roles are loaded
     if espActive then
         reloadPlayerESP()
     end
 end
 
--- Cleanup
-local function cleanup()
-    if autoFarmTask then
-        task.cancel(autoFarmTask)
-        autoFarmTask = nil
-    end
-    clearESP()
-    autoFarm = false
-    espActive = false
-    isScriptRunning = false
-    screenGui:Destroy()
-end
-
-game:BindToClose(cleanup)
 pcall(initialize)
