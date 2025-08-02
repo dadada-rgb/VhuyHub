@@ -8,6 +8,35 @@ local function sendNotification(title, text)
     })
 end
 
+local a = game:GetService("Players").LocalPlayer
+local b = a.Character or a.CharacterAdded:Wait()
+local c = b:WaitForChild("Humanoid")
+local d = Instance.new("Animation")
+d.AnimationId = "http://www.roblox.com/asset/?id=15609995579"
+local e = nil
+local f = false
+
+game:GetService("RunService").RenderStepped:Connect(function()
+    if f and c.MoveDirection.Magnitude > 0 then
+        if e then e:Stop() end
+        f = false
+    end
+end)
+
+game:GetService("UserInputService").InputBegan:Connect(function(g,h)
+    if h then return end
+    if g.KeyCode == Enum.KeyCode.C then
+        if not f and c.MoveDirection.Magnitude == 0 then
+            e = c:LoadAnimation(d)
+            e:Play()
+            f = true
+        elseif f and e then
+            e:Stop()
+            f = false
+        end
+    end
+end)
+
 if p1d == 9872472334 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
     sendNotification("Script Loaded", "Đã load script Evade!")
