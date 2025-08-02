@@ -1,3 +1,68 @@
+-- Hàm xử lý nhân vật và animation
+local function setupCharacter(chr)
+    if not chr then return end
+    local hum = chr:WaitForChild("Humanoid", 5)
+    if not hum then return end
+
+    local anim = Instance.new("Animation")
+    anim.AnimationId = "rbxassetid://15609995579"
+    local animTrack = nil
+    local isPlaying = false
+    local cooldown = 1
+    local lastUsed = 0
+
+    -- Tải animation
+    local success, err = pcall(function()
+        animTrack = hum:LoadAnimation(anim)
+    end)
+    if not success then
+        warn("Lỗi tải animation: " .. tostring(err))
+        sendNotification("Lỗi", "Không thể tải animation")
+        return
+    end
+
+    -- Xử lý phím C
+    local inputConnection = inputService.InputBegan:Connect(function(input, isProcessed)
+        if isProcessed or hum.Health <= 0 or tick() - lastUsed < cooldown then return end
+        if input.KeyCode == Enum.KeyCode.C then
+            lastUsed = tick()
+            if not isPlaying and hum.MoveDirection.Magnitude == 0 then
+                if not animTrack then
+                    pcall(function() animTrack = hum:LoadAnimation(anim) end)
+                end
+                if animTrack then
+                    animTrack:Play()
+                    isPlaying = true
+                end
+            elseif isPlaying and animTrack then
+                animTrack:Stop()
+                isPlaying = false
+            end
+        end
+    end)
+
+    -- Dừng animation khi di chuyển
+    local moveConnection = runService.Heartbeat:Connect(function()
+        if hum.Health <= 0 then return end
+        if isPlaying and hum.MoveDirection.Magnitude > 0 and animTrack then
+            animTrack:Stop()
+            isPlaying = false
+        end
+    end)
+
+    -- Dọn dẹp khi nhân vật chết
+    hum.Died:Connect(function()
+        if animTrack then animTrack:Stop() end
+        isPlaying = false
+        inputConnection:Disconnect()
+        moveConnection:Disconnect()
+    end)
+end
+
+-- Gắn script cho nhân vật
+if plr.Character then setupCharacter(plr.Character) end
+plr.CharacterAdded:Connect(setupCharacter)
+
 local p1d = game.PlaceId
 
 local function sendNotification(title, text)
