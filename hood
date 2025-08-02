@@ -145,9 +145,8 @@ end
 local function ba()
     local bb, bc = pcall(function()
         local bd = e:GetMouseLocation()
-        local be = math.random(100, 450) / 1000
         f:SendMouseButtonEvent(bd.X, bd.Y, 0, true, game, 0)
-        task.wait(be)
+        task.wait(0.1)
         f:SendMouseButtonEvent(bd.X, bd.Y, 0, false, game, 0)
     end)
 end
