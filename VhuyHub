@@ -2,62 +2,84 @@ local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
 local lp = game.Players.LocalPlayer
 
-local animationId = "http://www.roblox.com/asset/?id=15609995579"
-local anim = Instance.new("Animation")
-anim.AnimationId = animationId
+-- Danh sách animation (URL đầy đủ)
+local animations = {
+	C = "http://www.roblox.com/asset/?id=15609995579",
+	V = "http://www.roblox.com/asset/?id=15517864808",
+	B = "http://www.roblox.com/asset/?id=10714089137",
+	N = "http://www.roblox.com/asset/?id=14352343065",
+	M = "http://www.roblox.com/asset/?id=14352340648",
+}
 
-local isPlaying = false
-local animTrack = nil
-local renderConnection = nil
+local animTracks = {}
+local playingStates = {}
+local renderConnections = {}
 local inputConnection = nil
 
 local function setup(char)
-	local hum = char:WaitForChild("Humanoid", 5) -- Thêm timeout để tránh lỗi
+	local hum = char:WaitForChild("Humanoid", 5)
 	if not hum then return end
 	
 	local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
 
-	-- Hủy kết nối cũ
-	if renderConnection then renderConnection:Disconnect() end
+	-- Ngắt kết nối cũ
+	for k, conn in pairs(renderConnections) do
+		if conn then conn:Disconnect() end
+	end
+	renderConnections = {}
+
 	if inputConnection then inputConnection:Disconnect() end
 
-	-- Dừng animation khi di chuyển
-	renderConnection = rs.RenderStepped:Connect(function()
-		if isPlaying and hum.MoveDirection.Magnitude > 0 then
-			if animTrack then
-				animTrack:Stop()
-				isPlaying = false
-			end
-		end
-	end)
+	-- RenderStep kiểm tra dừng khi di chuyển
+	for key, animId in pairs(animations) do
+		local anim = Instance.new("Animation")
+		anim.AnimationId = animId
+		animTracks[key] = anim
+		playingStates[key] = false
 
-	-- Toggle animation khi nhấn C
+		renderConnections[key] = rs.RenderStepped:Connect(function()
+			if playingStates[key] and hum.MoveDirection.Magnitude > 0 then
+				local track = animator:LoadAnimation(animTracks[key])
+				track:Stop()
+				playingStates[key] = false
+			end
+		end)
+	end
+
+	-- Phím nhấn để bật/tắt animation
 	inputConnection = uis.InputBegan:Connect(function(input, gp)
-		if gp or input.KeyCode ~= Enum.KeyCode.C then return end
-		if not isPlaying and hum.MoveDirection.Magnitude == 0 then
-			animTrack = animator:LoadAnimation(anim)
-			animTrack:Play()
-			isPlaying = true
-		elseif isPlaying and animTrack then
-			animTrack:Stop()
-			isPlaying = false
+		if gp then return end
+
+		local key = input.KeyCode.Name
+		if animations[key] then
+			if not playingStates[key] and hum.MoveDirection.Magnitude == 0 then
+				local track = animator:LoadAnimation(animTracks[key])
+				track:Play()
+				animTracks[key] = track
+				playingStates[key] = true
+			elseif playingStates[key] and typeof(animTracks[key]) == "Instance" then
+				animTracks[key]:Stop()
+				playingStates[key] = false
+			end
 		end
 	end)
 end
 
--- Khi character đã tồn tại
+-- Character hiện tại
 if lp.Character then
 	setup(lp.Character)
 end
 
 -- Khi respawn
 lp.CharacterAdded:Connect(function(char)
-	isPlaying = false
-	animTrack = nil
-	task.wait(0.2) -- Sử dụng task.wait thay vì wait
+	for k in pairs(playingStates) do
+		playingStates[k] = false
+	end
+	task.wait(0.2)
 	setup(char)
 end)
 
+-- Hiện thông báo
 local function sendNotification(title, text)
 	game:GetService("StarterGui"):SetCore("SendNotification", {
 		Title = title,
