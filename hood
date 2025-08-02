@@ -8,10 +8,17 @@ local g = a.LocalPlayer
 local h = d.CurrentCamera
 local i = { r = 400, t = false, u = "HumanoidRootPart", v = {}, w = false, ab = { ac = 0.165, ad = 0.1 }, ae = 15, af = 0 }
 local j = {}
-local k = {}
+local k = {} -- Lưu trữ TextLabel và Highlight
 local l = false
 local m = {}
 local isCameraToggled = false -- Biến mới cho camera toggle, không ghi đè d
+
+-- Khởi tạo ScreenGui cho ESP
+local espGui = Instance.new("ScreenGui")
+espGui.Name = "SafeESP"
+espGui.ResetOnSpawn = false
+espGui.IgnoreGuiInset = true
+espGui.Parent = g:WaitForChild("PlayerGui")
 
 -- Xử lý sự kiện InputBegan cho camera toggle
 e.InputBegan:Connect(function(e, f)
@@ -39,16 +46,6 @@ local function r(s, t)
     return u
 end
 
-local function v(w, x)
-    local y, z = pcall(function()
-        local aa = Drawing.new(w)
-        for ab, ac in pairs(x) do aa[ab] = ac end
-        return aa
-    end)
-    if not y then return nil end
-    return z
-end
-
 local function aa(ab)
     if not ab or not ab.Parent then return false end
     local ac = ab:FindFirstChild("BodyEffects")
@@ -57,61 +54,82 @@ local function aa(ab)
     return not (ad or ae)
 end
 
-local function af(ag)
-    if k[ag] then
+local function createESP(player)
+    if k[player] then return end
+    -- Tạo TextLabel
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(180, 180, 180) -- Mặc định trắng
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamBlack -- Phông chữ đẹp
+    label.Text = player.DisplayName
+    label.TextStrokeTransparency = 0.7 -- Viền chữ nhẹ
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.Size = UDim2.new(0, 200, 0, 20)
+    label.AnchorPoint = Vector2.new(0.5, 0.5)
+    label.Position = UDim2.new(0.5, 0, 0.5, 0)
+    label.Visible = false
+    label.Parent = espGui
+
+    -- Tạo Highlight
+    local highlight = Instance.new("Highlight")
+    highlight.Enabled = false
+    highlight.FillTransparency = 0.7
+    highlight.OutlineTransparency = 0.3
+    highlight.FillColor = Color3.fromRGB(180, 180, 180) -- Mặc định trắng
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.Adornee = player.Character
+    highlight.Parent = espGui
+
+    k[player] = { label = label, highlight = highlight }
+end
+
+local function removeESP(player)
+    if k[player] then
         pcall(function()
-            k[ag].ah:Remove()
-            k[ag].ai:Remove()
+            k[player].label:Destroy()
+            k[player].highlight:Destroy()
         end)
-        k[ag] = nil
+        k[player] = nil
     end
-    local ah = v("Square", { Visible = false, Color = Color3.fromRGB(180, 180, 180), Thickness = 1, Transparency = 0.8, Filled = false })
-    local ai = v("Text", { Visible = false, Color = Color3.fromRGB(180, 180, 180), Size = 12, Center = true, Outline = true, Font = Drawing.Fonts.UI, Text = ag.DisplayName })
-    if ah and ai then k[ag] = { ah = ah, ai = ai } end
 end
 
 local function aj()
     if not i.w then
-        for _, ak in pairs(k) do
-            pcall(function() ak.ah.Visible = false ak.ai.Visible = false end)
+        for _, v in pairs(k) do
+            v.label.Visible = false
+            v.highlight.Enabled = false
         end
         return
     end
-    for _, al in ipairs(a:GetPlayers()) do
-        if al ~= g and p(al) then
-            local am = al.Character
-            local an, ao = am:FindFirstChild("HumanoidRootPart"), am:FindFirstChild("Head")
-            if an and ao then
-                local ap, aq = h:WorldToViewportPoint(ao.Position)
-                local ar = h:WorldToViewportPoint(an.Position)
-                if not k[al] then af(al) end
-                if k[al] then
-                    local ak = k[al]
-                    local as = i.v[al.Name]
-                    -- Đặt màu hồng cho người chơi được chọn, màu trắng cho người chơi không được chọn
-                    ak.ah.Color = as and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(180, 180, 180)
-                    ak.ai.Color = as and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(180, 180, 180)
-                    if aq and aa(am) then
-                        local at = math.abs(ap.Y - ar.Y) * 1.1
-                        local au = at * 0.5
-                        ak.ah.Size = Vector2.new(au, at)
-                        ak.ah.Position = Vector2.new(ar.X - au / 2, ar.Y - at / 2)
-                        ak.ah.Visible = true
-                        ak.ai.Position = Vector2.new(ap.X, ap.Y - 20)
-                        ak.ai.Text = al.DisplayName -- Cập nhật tên hiển thị
-                        ak.ai.Visible = true
+    for _, player in ipairs(a:GetPlayers()) do
+        if player ~= g and p(player) then
+            local character = player.Character
+            local head = character:FindFirstChild("Head")
+            if head then
+                createESP(player)
+                local headPos = head.Position
+                local screenPos, onScreen = h:WorldToViewportPoint(headPos)
+                local esp = k[player]
+                if esp then
+                    -- Cập nhật màu dựa trên trạng thái chọn
+                    local isSelected = i.v[player.Name]
+                    esp.label.TextColor3 = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(180, 180, 180)
+                    esp.highlight.FillColor = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(180, 180, 180)
+                    if onScreen then
+                        esp.label.Visible = true
+                        esp.label.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y - 20)
+                        esp.highlight.Enabled = true
                     else
-                        ak.ah.Visible = false
-                        ak.ai.Visible = false
+                        esp.label.Visible = false
+                        esp.highlight.Enabled = false
                     end
                 end
-            elseif k[al] then
-                pcall(function() k[al].ah:Remove() k[al].ai:Remove() end)
-                k[al] = nil
+            else
+                removeESP(player)
             end
-        elseif k[al] then
-            pcall(function() k[al].ah:Remove() k[al].ai:Remove() end)
-            k[al] = nil
+        else
+            removeESP(player)
         end
     end
 end
@@ -227,7 +245,7 @@ r(e.InputBegan, function(ca, cb)
         local raycastParams = RaycastParams.new()
         raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
         raycastParams.FilterDescendantsInstances = {g.Character, d:FindFirstChild("Terrain") or {}}
-        local rayResult = d:Raycast(ray.Origin, ray.Direction * i.r, raycastParams) -- Thay 500 thành i.r
+        local rayResult = d:Raycast(ray.Origin, ray.Direction * i.r, raycastParams)
         if rayResult and rayResult.Instance then
             local instance = rayResult.Instance
             local maxDepth = 10
@@ -257,17 +275,11 @@ r(b.RenderStepped, aj)
 
 r(a.PlayerAdded, function(cx)
     task.wait(math.random(2, 3))
-    if k[cx] then
-        pcall(function() k[cx].ah:Remove() k[cx].ai:Remove() end)
-        k[cx] = nil
-    end
+    removeESP(cx)
 end)
 
 r(a.PlayerRemoving, function(cx)
-    if k[cx] then
-        pcall(function() k[cx].ah:Remove() k[cx].ai:Remove() end)
-        k[cx] = nil
-    end
+    removeESP(cx)
 end)
 
 -- Gộp Heartbeat cho camera toggle và logic gốc
@@ -361,8 +373,14 @@ end)
 
 local function cx()
     for _, cy in pairs(j) do pcall(function() cy:Disconnect() end) end
-    for _, cz in pairs(k) do pcall(function() cz.ah:Remove() cz.ai:Remove() end) end
+    for _, cz in pairs(k) do
+        pcall(function()
+            cz.label:Destroy()
+            cz.highlight:Destroy()
+        end)
+    end
     pcall(function() if bt and bt.Parent then bt:Destroy() end end)
+    pcall(function() if espGui and espGui.Parent then espGui:Destroy() end end)
     i.t, i.w = false, false
 end
 
