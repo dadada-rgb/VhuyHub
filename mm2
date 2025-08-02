@@ -17,7 +17,7 @@ local CONFIG = {
     RANDOM_DELAY = 0.1,
     MAX_COIN_DISTANCE = 100,
     MAX_GUN_DISTANCE = 500,
-    ANTI_CHEAT_DELAY = 0.05
+    ANTI_CHEAT_DELAY = 0.07
 }
 
 -- Variables
@@ -171,7 +171,7 @@ end
 
 -- Shoot Murderer
 local function shootMurderer()
-    if tick() - lastShot < 0.5 then return end
+    if tick() - lastShot < 0.5 + math.random(0, CONFIG.ANTI_CHEAT_DELAY) then return end
     lastShot = tick()
     if findSheriff() ~= localPlayer then return end
     local target = findMurderer() or findSheriffNotMe()
@@ -189,9 +189,13 @@ local function shootMurderer()
     if not targetHRP then return end
     local predictedPos = getPredictedPosition(target, CONFIG.SHOOT_OFFSET)
     if predictedPos == Vector3.zero then return end
+    if (localPlayer.Character.HumanoidRootPart.Position - predictedPos).Magnitude > CONFIG.MAX_GUN_DISTANCE then return end
     pcall(function()
         local args = { [1] = 1, [2] = predictedPos, [3] = "AH2" }
-        localPlayer.Character.Gun.KnifeLocal.CreateBeam.RemoteFunction:InvokeServer(unpack(args))
+        local gunLocal = localPlayer.Character:FindFirstChild("Gun") and localPlayer.Character.Gun:FindFirstChild("KnifeLocal")
+        if gunLocal and gunLocal:FindFirstChild("CreateBeam") then
+            gunLocal.CreateBeam.RemoteFunction:InvokeServer(unpack(args))
+        end
     end)
     task.wait(math.random(0, CONFIG.ANTI_CHEAT_DELAY))
 end
@@ -289,7 +293,7 @@ Workspace.ChildRemoved:Connect(function(child)
 end)
 
 localPlayer.CharacterAdded:Connect(function()
-    task.wait(2) -- Increased delay to ensure roles are loaded
+    task.wait(3) -- Increased delay to ensure roles are fully loaded
     if autoFarm then
         if autoFarmTask then task.cancel(autoFarmTask) end
         autoFarmTask = task.spawn(autoFarmCoins)
@@ -399,8 +403,15 @@ UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
         else
             clearESP()
         end
-    elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
+    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then -- Changed to MouseButton2 (right-click)
         task.spawn(shootMurderer)
+    end
+end)
+
+-- Periodic ESP update
+RunService.Stepped:Connect(function()
+    if espActive and isScriptRunning then
+        reloadPlayerESP()
     end
 end)
 
@@ -425,7 +436,7 @@ local function initialize()
             end
         end)
     end)
-    task.wait(2) -- Delay to ensure roles are loaded
+    task.wait(3) -- Increased delay to ensure roles are loaded
     if espActive then
         reloadPlayerESP()
     end
