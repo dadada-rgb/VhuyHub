@@ -1,4 +1,11 @@
 local p1d = game.PlaceId
+local a = game:GetService("Players").LocalPlayer
+local b = a.Character or a.CharacterAdded:Wait()
+local c = b:WaitForChild("Humanoid")
+local d = Instance.new("Animation")
+d.AnimationId = "http://www.roblox.com/asset/?id=15609995579"
+local e = nil
+local f = false
 
 local function sendNotification(title, text)
     game:GetService("StarterGui"):SetCore("SendNotification", {
@@ -7,14 +14,6 @@ local function sendNotification(title, text)
         Duration = 3
     })
 end
-
-local a = game:GetService("Players").LocalPlayer
-local b = a.Character or a.CharacterAdded:Wait()
-local c = b:WaitForChild("Humanoid")
-local d = Instance.new("Animation")
-d.AnimationId = "http://www.roblox.com/asset/?id=15609995579"
-local e = nil
-local f = false
 
 game:GetService("RunService").RenderStepped:Connect(function()
     if f and c.MoveDirection.Magnitude > 0 then
