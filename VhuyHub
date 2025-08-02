@@ -20,7 +20,7 @@ end)
 
 b.Heartbeat:Connect(function()
     if d then
-        local g = math.random(50, 200) / 1000 -- Delay ngẫu nhiên lớn hơn
+        local g = math.random(50, 200) / 1000
         c.CameraMinZoomDistance = 0.5
         c.CameraMode = Enum.CameraMode.LockFirstPerson
         task.wait(g)
@@ -32,18 +32,6 @@ b.Heartbeat:Connect(function()
         c.CameraMode = Enum.CameraMode.Classic
     end
 end)
-
--- Hook để che giấu giá trị
-local mt = getrawmetatable(game)
-local old_index = mt.__index
-setrawmetatable(game, {
-    __index = function(self, key)
-        if key == "CameraMinZoomDistance" then
-            return 0.5
-        end
-        return old_index(self, key)
-    end
-})
 
 local function sendNotification(title, text)
     game:GetService("StarterGui"):SetCore("SendNotification", {
