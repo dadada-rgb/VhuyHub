@@ -142,7 +142,7 @@ local function av(aw)
     return ay and az
 end
 
-local function ba(target)
+local function ba()
     local bb, bc = pcall(function()
         local bd = e:GetMouseLocation()
         local ray = h:ScreenPointToRay(bd.X, bd.Y)
@@ -151,10 +151,10 @@ local function ba(target)
         raycastParams.FilterDescendantsInstances = {g.Character, d:FindFirstChild("Terrain") or {}}
         local rayResult = d:Raycast(ray.Origin, ray.Direction * i.r, raycastParams)
         
-        -- Kiểm tra xem raycast có nhắm đúng vào hitpart của mục tiêu không
+        -- Kiểm tra xem raycast có nhắm đúng vào hitpart không
         if rayResult and rayResult.Instance and (rayResult.Instance.Name == "Head" or rayResult.Instance.Name == "HumanoidRootPart") then
             local targetPlayer = a:GetPlayerFromCharacter(rayResult.Instance.Parent)
-            if targetPlayer and targetPlayer ~= g and i.v[targetPlayer.Name] then
+            if targetPlayer and targetPlayer ~= g then
                 local be = math.random(100, 450) / 1000
                 f:SendMouseButtonEvent(bd.X, bd.Y, 0, true, game, 0)
                 task.wait(be)
@@ -166,24 +166,11 @@ end
 
 r(b.RenderStepped, function()
     if not i.t or not p(g) then return end
-    local ci = g.Character
-    local cj = ci and ci:FindFirstChild("BodyEffects")
-    local ck = cj and cj:FindFirstChild("K.O") and cj["K.O"].Value
-    local cl = ci and ci:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
-    if ck or cl then i.t = false return end
-    local cm = false
-    for _, cn in pairs(ci:GetChildren()) do
-        if cn:IsA("Tool") then cm = true break end
-    end
-    if i.t and cm then
-        local co = bf()
-        if co and co.Parent then
-            local cp = co.Position + (co.Parent:FindFirstChild(i.u) and co.Parent:FindFirstChild(i.u).Velocity * Vector3.new(i.ab.ac, i.ab.ad, i.ab.ac) or Vector3.zero)
-            h.CFrame = CFrame.new(h.CFrame.Position, cp) -- Aim vào mục tiêu
-            if av(co) then
-                ba(co) -- Gọi hàm ba() với kiểm tra raycast
-            end
-        end
+    local co = bf()
+    if co and co.Parent then
+        local cp = co.Position + (co.Parent:FindFirstChild(i.u) and co.Parent:FindFirstChild(i.u).Velocity * Vector3.new(i.ab.ac, i.ab.ad, i.ab.ac) or Vector3.zero)
+        h.CFrame = CFrame.new(h.CFrame.Position, cp) -- Aim vào mục tiêu
+        ba() -- Gọi hàm ba() để kiểm tra raycast và bắn
     end
 end)
 
