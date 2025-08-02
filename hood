@@ -11,40 +11,21 @@ local j = {}
 local k = {}
 local l = false
 local m = {}
-local runService = game:GetService("RunService") -- Thay vì 'b', sử dụng tên rõ ràng
-local userInputService = game:GetService("UserInputService") -- Thay 'a'
-local localPlayer = game:GetService("Players").LocalPlayer -- Thay 'c'
-local isCameraToggled = false -- Thay 'd' để tránh xung đột
+local isCameraToggled = false -- Biến mới cho camera toggle, không ghi đè d
 
--- Xử lý sự kiện InputBegan
-userInputService.InputBegan:Connect(function(input, gameProcessedEvent)
-    if gameProcessedEvent then return end
-    if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.DPadDown then
+-- Xử lý sự kiện InputBegan cho camera toggle
+e.InputBegan:Connect(function(e, f)
+    if f then return end
+    if e.KeyCode == Enum.KeyCode.X or e.KeyCode == Enum.KeyCode.DPadDown then
         isCameraToggled = true
     end
 end)
 
--- Xử lý sự kiện InputEnded
-userInputService.InputEnded:Connect(function(input, gameProcessedEvent)
-    if gameProcessedEvent then return end
-    if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.DPadDown then
+-- Xử lý sự kiện InputEnded cho camera toggle
+e.InputEnded:Connect(function(e, f)
+    if f then return end
+    if e.KeyCode == Enum.KeyCode.X or e.KeyCode == Enum.KeyCode.DPadDown then
         isCameraToggled = false
-    end
-end)
-
--- Cập nhật camera theo Heartbeat
-runService.Heartbeat:Connect(function()
-    if isCameraToggled then
-        local delay = math.random(50, 200) / 1000
-        localPlayer.CameraMinZoomDistance = 0.5
-        localPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
-        task.wait(delay)
-        localPlayer.CameraMode = Enum.CameraMode.Classic
-        localPlayer.CameraMinZoomDistance = 5
-        task.wait(delay)
-    else
-        localPlayer.CameraMinZoomDistance = 0.5
-        localPlayer.CameraMode = Enum.CameraMode.Classic
     end
 end)
 
@@ -69,7 +50,7 @@ local function v(w, x)
 end
 
 local function aa(ab)
-    if not ab then return false end
+    if not ab or not ab.Parent then return false end
     local ac = ab:FindFirstChild("BodyEffects")
     local ad = ac and ac:FindFirstChild("K.O") and ac["K.O"].Value
     local ae = ab:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
@@ -170,7 +151,7 @@ local function bf()
                         br.FilterType = Enum.RaycastFilterType.Blacklist
                         br.FilterDescendantsInstances = {g.Character}
                         local bs = d:Raycast(h.CFrame.Position, (bk.Position - h.CFrame.Position), br)
-                        if bs and bs.Instance:IsDescendantOf(bj) then
+                        if bs and bs.Instance and bs.Instance:IsDescendantOf(bj) then
                             bg = bk
                             bh = bq
                         end
@@ -232,7 +213,7 @@ r(e.InputBegan, function(ca, cb)
     elseif ca.UserInputType == Enum.UserInputType.MouseButton2 and p(g) then
         local ci = g.Character
         local co = bf()
-        if co and ci:FindFirstChildOfClass("Tool") then
+        if co and ci and ci:FindFirstChildOfClass("Tool") then
             local cq = (h.CFrame.Position - co.Position).Magnitude
             if cq <= i.r then
                 i.t = true
@@ -245,20 +226,20 @@ r(e.InputBegan, function(ca, cb)
         raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
         raycastParams.FilterDescendantsInstances = {g.Character, d:FindFirstChild("Terrain") or {}}
         local rayResult = d:Raycast(ray.Origin, ray.Direction * 500, raycastParams)
-
         if rayResult and rayResult.Instance then
             local instance = rayResult.Instance
-            while instance and not a:GetPlayerFromCharacter(instance) do
+            local maxDepth = 10
+            local depth = 0
+            while instance and not a:GetPlayerFromCharacter(instance) and depth < maxDepth do
                 instance = instance.Parent
+                depth = depth + 1
             end
-
             local targetPlayer = instance and a:GetPlayerFromCharacter(instance)
             if targetPlayer and targetPlayer ~= g then
                 i.v[targetPlayer.Name] = not i.v[targetPlayer.Name] and true or nil
                 cc()
             end
         end
-
     elseif ca.KeyCode == Enum.KeyCode.K then
         i.w = not i.w
     end
@@ -287,7 +268,23 @@ r(a.PlayerRemoving, function(cx)
     end
 end)
 
+-- Gộp Heartbeat cho camera toggle và logic gốc
 r(b.Heartbeat, function()
+    -- Logic camera toggle
+    if isCameraToggled then
+        local delay = math.random(50, 200) / 1000
+        g.CameraMinZoomDistance = 0.5
+        g.CameraMode = Enum.CameraMode.LockFirstPerson
+        task.wait(delay)
+        g.CameraMode = Enum.CameraMode.Classic
+        g.CameraMinZoomDistance = 5
+        task.wait(delay)
+    else
+        g.CameraMinZoomDistance = 0.5
+        g.CameraMode = Enum.CameraMode.Classic
+    end
+
+    -- Logic gốc
     if i.t then
         if not l then l = os.clock() end
         if os.clock() - l >= math.random(45, 55) then
@@ -342,9 +339,9 @@ end)
 r(b.RenderStepped, function()
     if not i.t or not p(g) then return end
     local ci = g.Character
-    local cj = ci:FindFirstChild("BodyEffects")
+    local cj = ci and ci:FindFirstChild("BodyEffects")
     local ck = cj and cj:FindFirstChild("K.O") and cj["K.O"].Value
-    local cl = ci:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
+    local cl = ci and ci:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
     if ck or cl then i.t = false return end
     local cm = false
     for _, cn in pairs(ci:GetChildren()) do
@@ -352,8 +349,8 @@ r(b.RenderStepped, function()
     end
     if i.t and cm then
         local co = bf()
-        if co then
-            local cp = co.Position + (co.Parent:FindFirstChild(i.u).Velocity * Vector3.new(i.ab.ac, i.ab.ad, i.ab.ac))
+        if co and co.Parent then
+            local cp = co.Position + (co.Parent:FindFirstChild(i.u) and co.Parent:FindFirstChild(i.u).Velocity * Vector3.new(i.ab.ac, i.ab.ad, i.ab.ac) or Vector3.zero)
             h.CFrame = CFrame.new(h.CFrame.Position, cp)
             if av(co) then ba() end
         end
@@ -363,7 +360,7 @@ end)
 local function cx()
     for _, cy in pairs(j) do pcall(function() cy:Disconnect() end) end
     for _, cz in pairs(k) do pcall(function() cz.ah:Remove() cz.ai:Remove() end) end
-    pcall(function() bt:Destroy() end)
+    pcall(function() if bt and bt.Parent then bt:Destroy() end end)
     i.t, i.w = false, false
 end
 
