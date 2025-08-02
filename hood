@@ -145,53 +145,12 @@ end
 local function ba()
     local bb, bc = pcall(function()
         local bd = e:GetMouseLocation()
-        local ray = h:ScreenPointToRay(bd.X, bd.Y)
-        local raycastParams = RaycastParams.new()
-        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-        raycastParams.FilterDescendantsInstances = {g.Character, d:FindFirstChild("Terrain") or {}}
-        local rayResult = d:Raycast(ray.Origin, ray.Direction * i.r, raycastParams)
-        
-        -- Debug: Kiểm tra xem raycast có trúng hitpart không
-        if rayResult and rayResult.Instance then
-            print("Raycast hit: " .. rayResult.Instance.Name) -- In tên phần trúng
-            if rayResult.Instance.Name == "Head" or rayResult.Instance.Name == "HumanoidRootPart" then
-                local targetPlayer = a:GetPlayerFromCharacter(rayResult.Instance.Parent)
-                if targetPlayer and targetPlayer ~= g then
-                    print("Shooting at: " .. targetPlayer.Name) -- Xác nhận bắn
-                    local be = math.random(100, 450) / 1000
-                    f:SendMouseButtonEvent(bd.X, bd.Y, 0, true, game, 0)
-                    task.wait(be)
-                    f:SendMouseButtonEvent(bd.X, bd.Y, 0, false, game, 0)
-                else
-                    print("No valid player found for raycast hit")
-                end
-            else
-                print("Raycast did not hit Head or HumanoidRootPart")
-            end
-        else
-            print("No raycast hit")
-        end
+        local be = math.random(100, 450) / 1000
+        f:SendMouseButtonEvent(bd.X, bd.Y, 0, true, game, 0)
+        task.wait(be)
+        f:SendMouseButtonEvent(bd.X, bd.Y, 0, false, game, 0)
     end)
-    if not bb then
-        print("Error in ba(): " .. tostring(bc)) -- In lỗi nếu có
-    end
 end
-
-r(b.RenderStepped, function()
-    if not i.t or not p(g) then
-        print("Triggerbot not active or player invalid: i.t = " .. tostring(i.t)) -- Debug
-        return
-    end
-    local co = bf()
-    if co and co.Parent then
-        print("Aiming at: " .. co.Parent.Name .. ", Hitpart: " .. i.u) -- Debug
-        local cp = co.Position + (co.Parent:FindFirstChild(i.u) and co.Parent:FindFirstChild(i.u).Velocity * Vector3.new(i.ab.ac, i.ab.ad, i.ab.ac) or Vector3.zero)
-        h.CFrame = CFrame.new(h.CFrame.Position, cp) -- Aim vào mục tiêu
-        ba() -- Gọi hàm ba() để kiểm tra raycast và bắn
-    else
-        print("No valid target found") -- Debug
-    end
-end)
 
 local function bf()
     local bg, bh = nil, math.huge
