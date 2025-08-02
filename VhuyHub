@@ -31,6 +31,15 @@ local function setupCharacter(chr)
         return
     end
 
+    -- Tải animation
+    local success, err = pcall(function()
+        animTrack = hum:LoadAnimation(anim)
+    end)
+    if not success then
+        warn("Không thể tải animation: " .. tostring(err))
+        return
+    end
+
     -- Dừng animation khi di chuyển
     local moveConnection = runService.Heartbeat:Connect(function()
         if isPlaying and hum.MoveDirection.Magnitude > 0 then
@@ -47,12 +56,22 @@ local function setupCharacter(chr)
         if input.KeyCode == Enum.KeyCode.C then
             lastUsed = tick()
             if not isPlaying and hum.MoveDirection.Magnitude == 0 then
-                animTrack = hum:LoadAnimation(anim)
-                animTrack:Play()
-                isPlaying = true
+                if animTrack then
+                    animTrack:Play()
+                    isPlaying = true
+                    print("Playing animation") -- Debug
+                else
+                    warn("animTrack is nil, trying to reload")
+                    pcall(function()
+                        animTrack = hum:LoadAnimation(anim)
+                        animTrack:Play()
+                        isPlaying = true
+                    end)
+                end
             elseif isPlaying and animTrack then
                 animTrack:Stop()
                 isPlaying = false
+                print("Stopped animation") -- Debug
             end
         end
     end)
@@ -61,13 +80,21 @@ local function setupCharacter(chr)
     chr.AncestryChanged:Connect(function()
         moveConnection:Disconnect()
         inputConnection:Disconnect()
-        if animTrack then animTrack:Stop() end
+        if animTrack then
+            animTrack:Stop()
+            animTrack = nil
+        end
+        isPlaying = false
+        print("Cleaned up character connections") -- Debug
     end)
 end
 
 -- Gắn script cho nhân vật hiện tại và khi tái tạo
 setupCharacter(plr.Character)
-plr.CharacterAdded:Connect(setupCharacter)
+plr.CharacterAdded:Connect(function(chr)
+    print("Character respawned, setting up") -- Debug
+    setupCharacter(chr)
+end)
 
 -- Tải script theo PlaceId
 local scripts = {
@@ -81,5 +108,5 @@ local scripts = {
     [13772394625] = "Bladeball",
 }
 local scriptName = scripts[game.PlaceId] or "hood"
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/" .. scriptName))()
+loadstring(game: kHttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/" .. scriptName))()
 sendNotification("Script Loaded", "Đã load script " .. scriptName .. "!")
