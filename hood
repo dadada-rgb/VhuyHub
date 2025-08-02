@@ -88,6 +88,7 @@ local function aj()
                 if k[al] then
                     local ak = k[al]
                     local as = i.v[al.Name]
+                    -- Đặt màu hồng cho người chơi được chọn, màu trắng cho người chơi không được chọn
                     ak.ah.Color = as and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(180, 180, 180)
                     ak.ai.Color = as and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(180, 180, 180)
                     if aq and aa(am) then
@@ -97,6 +98,7 @@ local function aj()
                         ak.ah.Position = Vector2.new(ar.X - au / 2, ar.Y - at / 2)
                         ak.ah.Visible = true
                         ak.ai.Position = Vector2.new(ap.X, ap.Y - 20)
+                        ak.ai.Text = al.DisplayName -- Cập nhật tên hiển thị
                         ak.ai.Visible = true
                     else
                         ak.ah.Visible = false
