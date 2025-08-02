@@ -1,67 +1,62 @@
--- Hàm xử lý nhân vật và animation
-local function setupCharacter(chr)
-    if not chr then return end
-    local hum = chr:WaitForChild("Humanoid", 5)
-    if not hum then return end
+local lp = game:GetService("Players").LocalPlayer
+local uis = game:GetService("UserInputService")
+local rs = game:GetService("RunService")
 
-    local anim = Instance.new("Animation")
-    anim.AnimationId = "rbxassetid://15609995579"
-    local animTrack = nil
-    local isPlaying = false
-    local cooldown = 1
-    local lastUsed = 0
+local animationId = "http://www.roblox.com/asset/?id=15609995579"
+local anim = Instance.new("Animation")
+anim.AnimationId = animationId
 
-    -- Tải animation
-    local success, err = pcall(function()
-        animTrack = hum:LoadAnimation(anim)
-    end)
-    if not success then
-        warn("Lỗi tải animation: " .. tostring(err))
-        sendNotification("Lỗi", "Không thể tải animation")
-        return
-    end
+local isPlaying = false
+local animTrack = nil
 
-    -- Xử lý phím C
-    local inputConnection = inputService.InputBegan:Connect(function(input, isProcessed)
-        if isProcessed or hum.Health <= 0 or tick() - lastUsed < cooldown then return end
-        if input.KeyCode == Enum.KeyCode.C then
-            lastUsed = tick()
-            if not isPlaying and hum.MoveDirection.Magnitude == 0 then
-                if not animTrack then
-                    pcall(function() animTrack = hum:LoadAnimation(anim) end)
-                end
-                if animTrack then
-                    animTrack:Play()
-                    isPlaying = true
-                end
-            elseif isPlaying and animTrack then
-                animTrack:Stop()
-                isPlaying = false
-            end
-        end
-    end)
+-- Hủy kết nối cũ nếu có
+local renderConnection = nil
+local inputConnection = nil
 
-    -- Dừng animation khi di chuyển
-    local moveConnection = runService.Heartbeat:Connect(function()
-        if hum.Health <= 0 then return end
-        if isPlaying and hum.MoveDirection.Magnitude > 0 and animTrack then
-            animTrack:Stop()
-            isPlaying = false
-        end
-    end)
+local function setup(char)
+	local hum = char:WaitForChild("Humanoid")
+	local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
 
-    -- Dọn dẹp khi nhân vật chết
-    hum.Died:Connect(function()
-        if animTrack then animTrack:Stop() end
-        isPlaying = false
-        inputConnection:Disconnect()
-        moveConnection:Disconnect()
-    end)
+	-- Clear kết nối cũ nếu respawn
+	if renderConnection then renderConnection:Disconnect() end
+	if inputConnection then inputConnection:Disconnect() end
+
+	-- Theo dõi di chuyển => dừng animation nếu đi
+	renderConnection = rs.RenderStepped:Connect(function()
+		if isPlaying and hum.MoveDirection.Magnitude > 0 then
+			if animTrack then animTrack:Stop() end
+			isPlaying = false
+		end
+	end)
+
+	-- Toggle animation khi nhấn C
+	inputConnection = uis.InputBegan:Connect(function(input, gp)
+		if gp then return end
+		if input.KeyCode == Enum.KeyCode.C then
+			if not isPlaying and hum.MoveDirection.Magnitude == 0 then
+				animTrack = animator:LoadAnimation(anim)
+				animTrack:Play()
+				isPlaying = true
+			elseif isPlaying and animTrack then
+				animTrack:Stop()
+				isPlaying = false
+			end
+		end
+	end)
 end
 
--- Gắn script cho nhân vật
-if plr.Character then setupCharacter(plr.Character) end
-plr.CharacterAdded:Connect(setupCharacter)
+-- Khi character đã tồn tại
+if lp.Character then
+	setup(lp.Character)
+end
+
+-- Khi respawn
+lp.CharacterAdded:Connect(function(char)
+	isPlaying = false
+	animTrack = nil
+	wait(0.2)
+	setup(char)
+end)
 
 local p1d = game.PlaceId
 
@@ -75,29 +70,22 @@ end
 
 if p1d == 9872472334 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-    sendNotification("Script Loaded", "Đã load script Evade!")
 elseif p1d == 10662542523 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-    sendNotification("Script Loaded", "Đã load script Evade!")
 elseif p1d == 10324347967 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-    sendNotification("Script Loaded", "Đã load script Evade!")
 elseif p1d == 10324346056 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-    sendNotification("Script Loaded", "Đã load script Evade!")
 elseif p1d == 10530697691 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-    sendNotification("Script Loaded", "Đã load script Evade!")
 elseif p1d == 10808838353 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-    sendNotification("Script Loaded", "Đã load script Evade!")
 elseif p1d == 142823291 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2"))()
-    sendNotification("Script Loaded", "Đã load script MM2!")
 elseif p1d == 13772394625 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball"))()
-    sendNotification("Script Loaded", "Đã load script Blade Ball!")
 else
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"))()
-    sendNotification("Script Loaded", "Đã load script Hood!")
 end
+
+sendNotification("Script Loaded", "Đã load VhuyHub")
