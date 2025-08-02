@@ -1,11 +1,49 @@
 local p1d = game.PlaceId
-local a = game:GetService("Players").LocalPlayer
-local b = a.Character or a.CharacterAdded:Wait()
-local c = b:WaitForChild("Humanoid")
-local d = Instance.new("Animation")
-d.AnimationId = "http://www.roblox.com/asset/?id=15609995579"
-local e = nil
-local f = false
+local a = game:GetService("UserInputService")
+local b = game:GetService("RunService")
+local c = game:GetService("Players").LocalPlayer
+local d = false
+
+a.InputBegan:Connect(function(e, f)
+    if f then return end
+    if e.KeyCode == Enum.KeyCode.X or e.KeyCode == Enum.KeyCode.DPadDown then
+        d = true
+    end
+end)
+
+a.InputEnded:Connect(function(e, f)
+    if f then return end
+    if e.KeyCode == Enum.KeyCode.X or e.KeyCode == Enum.KeyCode.DPadDown then
+        d = false
+    end
+end)
+
+b.Heartbeat:Connect(function()
+    if d then
+        local g = math.random(50, 200) / 1000 -- Delay ngẫu nhiên lớn hơn
+        c.CameraMinZoomDistance = 0.5
+        c.CameraMode = Enum.CameraMode.LockFirstPerson
+        task.wait(g)
+        c.CameraMode = Enum.CameraMode.Classic
+        c.CameraMinZoomDistance = 5
+        task.wait(g)
+    else
+        c.CameraMinZoomDistance = 0.5
+        c.CameraMode = Enum.CameraMode.Classic
+    end
+end)
+
+-- Hook để che giấu giá trị
+local mt = getrawmetatable(game)
+local old_index = mt.__index
+setrawmetatable(game, {
+    __index = function(self, key)
+        if key == "CameraMinZoomDistance" then
+            return 0.5
+        end
+        return old_index(self, key)
+    end
+})
 
 local function sendNotification(title, text)
     game:GetService("StarterGui"):SetCore("SendNotification", {
@@ -14,27 +52,6 @@ local function sendNotification(title, text)
         Duration = 3
     })
 end
-
-game:GetService("RunService").RenderStepped:Connect(function()
-    if f and c.MoveDirection.Magnitude > 0 then
-        if e then e:Stop() end
-        f = false
-    end
-end)
-
-game:GetService("UserInputService").InputBegan:Connect(function(g,h)
-    if h then return end
-    if g.KeyCode == Enum.KeyCode.C then
-        if not f and c.MoveDirection.Magnitude == 0 then
-            e = c:LoadAnimation(d)
-            e:Play()
-            f = true
-        elseif f and e then
-            e:Stop()
-            f = false
-        end
-    end
-end)
 
 if p1d == 9872472334 then
     loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
