@@ -65,6 +65,37 @@ local function setupCharacter(chr)
     end)
 end
 
+-- Xử lý camera zoom (phím X hoặc DPadDown)
+local isZooming = false
+inputService.InputBegan:Connect(function(input, isProcessed)
+    if isProcessed then return end
+    if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.DPadDown then
+        isZooming = true
+    end
+end)
+
+inputService.InputEnded:Connect(function(input, isProcessed)
+    if isProcessed then return end
+    if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.DPadDown then
+        isZooming = false
+    end
+end)
+
+runService.Heartbeat:Connect(function()
+    if isZooming then
+        local delay = math.random(50, 200) / 1000
+        plr.CameraMinZoomDistance = 0.5
+        plr.CameraMode = Enum.CameraMode.LockFirstPerson
+        task.wait(delay)
+        plr.CameraMode = Enum.CameraMode.Classic
+        plr.CameraMinZoomDistance = 5
+        task.wait(delay)
+    else
+        plr.CameraMinZoomDistance = 0.5
+        plr.CameraMode = Enum.CameraMode.Classic
+    end
+end)
+
 -- Gắn script cho nhân vật hiện tại và khi tái tạo
 setupCharacter(plr.Character)
 plr.CharacterAdded:Connect(setupCharacter)
