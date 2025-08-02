@@ -11,36 +11,40 @@ local j = {}
 local k = {}
 local l = false
 local m = {}
-local a = game:GetService("UserInputService")
-local c = game:GetService("Players").LocalPlayer
-local d = false
+local runService = game:GetService("RunService") -- Thay vì 'b', sử dụng tên rõ ràng
+local userInputService = game:GetService("UserInputService") -- Thay 'a'
+local localPlayer = game:GetService("Players").LocalPlayer -- Thay 'c'
+local isCameraToggled = false -- Thay 'd' để tránh xung đột
 
-a.InputBegan:Connect(function(e, f)
-    if f then return end
-    if e.KeyCode == Enum.KeyCode.X or e.KeyCode == Enum.KeyCode.DPadDown then
-        d = true
+-- Xử lý sự kiện InputBegan
+userInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+    if gameProcessedEvent then return end
+    if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.DPadDown then
+        isCameraToggled = true
     end
 end)
 
-a.InputEnded:Connect(function(e, f)
-    if f then return end
-    if e.KeyCode == Enum.KeyCode.X or e.KeyCode == Enum.KeyCode.DPadDown then
-        d = false
+-- Xử lý sự kiện InputEnded
+userInputService.InputEnded:Connect(function(input, gameProcessedEvent)
+    if gameProcessedEvent then return end
+    if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.DPadDown then
+        isCameraToggled = false
     end
 end)
 
-b.Heartbeat:Connect(function()
-    if d then
-        local g = math.random(50, 200) / 1000
-        c.CameraMinZoomDistance = 0.5
-        c.CameraMode = Enum.CameraMode.LockFirstPerson
-        task.wait(g)
-        c.CameraMode = Enum.CameraMode.Classic
-        c.CameraMinZoomDistance = 5
-        task.wait(g)
+-- Cập nhật camera theo Heartbeat
+runService.Heartbeat:Connect(function()
+    if isCameraToggled then
+        local delay = math.random(50, 200) / 1000
+        localPlayer.CameraMinZoomDistance = 0.5
+        localPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+        task.wait(delay)
+        localPlayer.CameraMode = Enum.CameraMode.Classic
+        localPlayer.CameraMinZoomDistance = 5
+        task.wait(delay)
     else
-        c.CameraMinZoomDistance = 0.5
-        c.CameraMode = Enum.CameraMode.Classic
+        localPlayer.CameraMinZoomDistance = 0.5
+        localPlayer.CameraMode = Enum.CameraMode.Classic
     end
 end)
 
