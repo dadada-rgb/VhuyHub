@@ -66,15 +66,52 @@ d.JumpRequest:Connect(function()
     end
 end)
 
--- Auto Bhop
+-- Auto Bhop với tốc độ > 30, trimp evade và antiban nâng cao
+local lastJumpTime = 0
+local jumpCooldown = 0.1 -- Giới hạn tần suất nhảy
+local lastSurfaceCheck = 0
+local cachedSurface = nil
+
 task.spawn(function()
     while true do
         if getgenv().x3 then
             local k = g.Character
             local r = k and k:FindFirstChildOfClass("Humanoid")
-            if r and r:GetState() == Enum.HumanoidStateType.Running and r.MoveDirection.Magnitude > 0 and r.FloorMaterial ~= Enum.Material.Air then
-                r:ChangeState("Jumping")
-                task.wait(math.random(0.05, 0.15))
+            local root = k and k:FindFirstChild("HumanoidRootPart")
+            if r and root and r:GetState() == Enum.HumanoidStateType.Running and r.FloorMaterial ~= Enum.Material.Air then
+                -- Kiểm tra tốc độ
+                local speed = (Vector3.new(root.Velocity.X, 0, root.Velocity.Z)).Magnitude
+                if speed > 30 and tick() - lastJumpTime > jumpCooldown then
+                    -- Kiểm tra bề mặt (trimp evade) với cache
+                    local angle = 0
+                    if tick() - lastSurfaceCheck > 0.2 or not cachedSurface then
+                        local ray = Ray.new(root.Position, Vector3.new(0, -3, 0))
+                        local hit, hitPos, normal = workspace:FindPartOnRay(ray, k)
+                        if hit and normal then
+                            angle = math.deg(math.acos(normal:Dot(Vector3.new(0, 1, 0))))
+                            cachedSurface = {angle = angle, normal = normal}
+                            lastSurfaceCheck = tick()
+                        else
+                            cachedSurface = nil
+                        end
+                    else
+                        angle = cachedSurface and cachedSurface.angle or 0
+                    end
+
+                    -- Trimp evade: Áp dụng boost ngẫu nhiên
+                    if angle > 15 and angle < 45 then
+                        local moveDir = r.MoveDirection
+                        if moveDir.Magnitude > 0 then
+                            local boost = (45 - angle) / 30 * (5 + math.random(0, 5)) -- Boost ngẫu nhiên 5-10
+                            root.Velocity = root.Velocity + moveDir * boost
+                        end
+                    end
+
+                    -- Thực hiện nhảy
+                    r:ChangeState(Enum.HumanoidStateType.Jumping)
+                    lastJumpTime = tick()
+                    task.wait(math.random(0.05, 0.15))
+                end
             end
         end
         task.wait(0.05)
