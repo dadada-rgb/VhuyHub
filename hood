@@ -108,6 +108,7 @@ end
 local function ba()
     local bb, bc = pcall(function()
         local bd = e:GetMouseLocation()
+        local be = math.random(350, 450) / 1000
         local be = math.random(100, 450) / 1000
         f:SendMouseButtonEvent(bd.X, bd.Y, 0, true, game, 0)
         task.wait(be)
@@ -209,13 +210,13 @@ r(e.InputBegan, function(ca, cb)
         raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
         raycastParams.FilterDescendantsInstances = {g.Character, d:FindFirstChild("Terrain") or {}}
         local rayResult = d:Raycast(ray.Origin, ray.Direction * 500, raycastParams)
-    
+
         if rayResult and rayResult.Instance then
             local instance = rayResult.Instance
             while instance and not a:GetPlayerFromCharacter(instance) do
                 instance = instance.Parent
             end
-        
+
             local targetPlayer = instance and a:GetPlayerFromCharacter(instance)
             if targetPlayer and targetPlayer ~= g then
                 i.v[targetPlayer.Name] = not i.v[targetPlayer.Name] and true or nil
