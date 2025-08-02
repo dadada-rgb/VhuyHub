@@ -493,4 +493,19 @@ local function initialize()
     end
 end
 
+-- Biến để theo dõi trạng thái hiển thị của GUI
+local guiVisible = true
+
+-- Đặt ban đầu trạng thái của GUI
+pq.Enabled = guiVisible
+
+-- Lắng nghe phím RightShift để bật/tắt GUI
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+    if gameProcessedEvent then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        guiVisible = not guiVisible
+        pq.Enabled = guiVisible
+    end
+end)
+
 pcall(initialize)
