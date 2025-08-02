@@ -224,16 +224,8 @@ r(e.InputBegan, function(ca, cb)
         local ray = h:ScreenPointToRay(mousePos.X, mousePos.Y)
         local raycastParams = RaycastParams.new()
         raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-        -- Loại trừ tất cả các vật thể không phải người chơi
-        local blacklist = {g.Character, d:FindFirstChild("Terrain") or {}}
-        for _, player in ipairs(a:GetPlayers()) do
-            if player ~= g and player.Character then
-                table.insert(blacklist, player.Character) -- Thêm Character vào blacklist tạm thời
-            end
-        end
-        raycastParams.FilterDescendantsInstances = blacklist
-        raycastParams.IgnoreWater = true -- Bỏ qua nước
-        local rayResult = d:Raycast(ray.Origin, ray.Direction * i.r, raycastParams)
+        raycastParams.FilterDescendantsInstances = {g.Character, d:FindFirstChild("Terrain") or {}}
+        local rayResult = d:Raycast(ray.Origin, ray.Direction * i.r, raycastParams) -- Thay 500 thành i.r
         if rayResult and rayResult.Instance then
             local instance = rayResult.Instance
             local maxDepth = 10
@@ -246,7 +238,6 @@ r(e.InputBegan, function(ca, cb)
             if targetPlayer and targetPlayer ~= g then
                 i.v[targetPlayer.Name] = not i.v[targetPlayer.Name] and true or nil
                 cc()
-                print("Selected player:", targetPlayer.Name, "Distance:", (h.CFrame.Position - targetPlayer.Character.HumanoidRootPart.Position).Magnitude)
             end
         end
     elseif ca.KeyCode == Enum.KeyCode.K then
