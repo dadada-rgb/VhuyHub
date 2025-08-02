@@ -6,7 +6,7 @@ local e = game:GetService("UserInputService")
 local f = game:GetService("VirtualInputManager")
 local g = a.LocalPlayer
 local h = d.CurrentCamera
-local i = { r = 400, t = false, u = "HumanoidRootPart", v = {}, w = false, ab = { ac = 0.165, ad = 0.1 }, ae = 15, af = 0 }
+local i = { r = 400, t = false, u = "HumanoidRootPart", v = {}, w = false, ab = { ac = 0.165, ad = 0 }, ae = 15, af = 0 }
 local j = {}
 local k = {} -- Lưu trữ TextLabel và Highlight
 local l = false
@@ -226,6 +226,24 @@ bz:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     by.CanvasSize = UDim2.new(0, 0, 0, bz.AbsoluteContentSize.Y)
 end)
 
+local function selectAllPlayers()
+    for _, player in ipairs(a:GetPlayers()) do
+        if player ~= g then
+            i.v[player.Name] = true
+        end
+    end
+    cc()
+end
+
+local function deselectAllPlayers()
+    for _, player in ipairs(a:GetPlayers()) do
+        if player ~= g then
+            i.v[player.Name] = nil
+        end
+    end
+    cc()
+end
+
 r(e.InputBegan, function(ca, cb)
     if cb then return end
     if ca.KeyCode == Enum.KeyCode.RightShift then
@@ -350,6 +368,45 @@ task.spawn(function()
     end
 end)
 
+local validParts = {
+    "Head",
+    "HumanoidRootPart",
+    "UpperTorso",
+    "LowerTorso",
+    "LeftUpperArm",
+    "LeftLowerArm",
+    "LeftHand",
+    "RightUpperArm",
+    "RightLowerArm",
+    "RightHand",
+    "LeftUpperLeg",
+    "LeftLowerLeg",
+    "LeftFoot",
+    "RightUpperLeg",
+    "RightLowerLeg",
+    "RightFoot"
+}
+local lastShot = 0
+local cooldown = 0.1
+
+-- Hàm kiểm tra bộ phận hợp lệ
+local function isValidPart(part)
+    if not part or not part.Parent or not part.Parent:FindFirstChild("Humanoid") then return false end
+    for _, name in ipairs(validParts) do
+        if part.Name:lower() == name:lower() then return true end
+    end
+    return false
+end
+
+-- Hàm kiểm tra khoảng cách từ con chuột đến bộ phận
+local function distToCursor(part)
+    local viewportPos, onScreen = h:WorldToViewportPoint(part.Position)
+    if not onScreen then return math.huge end
+    local mousePos = e:GetMouseLocation()
+    return (Vector2.new(viewportPos.X, viewportPos.Y) - Vector2.new(mousePos.X, mousePos.Y)).Magnitude
+end
+
+-- Thay thế logic RenderStepped
 r(b.RenderStepped, function()
     if not i.t or not p(g) then return end
     local ci = g.Character
@@ -361,12 +418,17 @@ r(b.RenderStepped, function()
     for _, cn in pairs(ci:GetChildren()) do
         if cn:IsA("Tool") then cm = true break end
     end
-    if i.t and cm then
-        local co = bf()
+    if not cm then return end -- Chỉ tiếp tục nếu đang cầm tool
+    local mouseTarget = g:GetMouse().Target
+    if mouseTarget and isValidPart(mouseTarget) and distToCursor(mouseTarget) <= i.r and os.clock() - lastShot >= cooldown then
+        local co = bf() -- Mục tiêu gần nhất từ hàm bf()
         if co and co.Parent then
             local cp = co.Position + (co.Parent:FindFirstChild(i.u) and co.Parent:FindFirstChild(i.u).Velocity * Vector3.new(i.ab.ac, i.ab.ad, i.ab.ac) or Vector3.zero)
             h.CFrame = CFrame.new(h.CFrame.Position, cp)
-            if av(co) then ba() end
+            if av(co) then
+                ba() -- Gọi hàm bắn
+                lastShot = os.clock()
+            end
         end
     end
 end)
