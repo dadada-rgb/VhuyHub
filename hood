@@ -6,8 +6,7 @@ local e = game:GetService("UserInputService")
 local f = game:GetService("VirtualInputManager")
 local g = a.LocalPlayer
 local h = d.CurrentCamera
-local i = { r = 400, t = false, u = "HumanoidRootPart", v = {}, w = false, ab = { ac = 0.165, ad = 0 }, ae = 15, af = 0 }
-getgenv().AutoPrediction = true
+local i = { r = 400, t = false, u = "HumanoidRootPart", v = {}, w = false, ab = { ac = 0, ad = 0 }, ae = 15, af = 0 }
 local j = {}
 local k = {} -- Lưu trữ TextLabel và Highlight
 local l = false
@@ -111,7 +110,7 @@ local function createESP(player)
     -- Tạo TextLabel
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(180, 180, 180) -- Mặc định trắng
+    label.TextColor3 = Color3.fromRGB(200, 200, 200) -- Mặc định trắng
     label.TextSize = 14
     label.Font = Enum.Font.GothamBlack -- Phông chữ đẹp
     label.Text = player.DisplayName
@@ -128,7 +127,7 @@ local function createESP(player)
     highlight.Enabled = false
     highlight.FillTransparency = 0.7
     highlight.OutlineTransparency = 0.3
-    highlight.FillColor = Color3.fromRGB(180, 180, 180) -- Mặc định trắng
+    highlight.FillColor = Color3.fromRGB(200, 200, 200) -- Mặc định trắng
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
     highlight.Adornee = player.Character
     highlight.Parent = espGui
@@ -166,8 +165,8 @@ local function aj()
                 if esp then
                     -- Cập nhật màu dựa trên trạng thái chọn
                     local isSelected = i.v[player.Name]
-                    esp.label.TextColor3 = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(180, 180, 180)
-                    esp.highlight.FillColor = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(180, 180, 180)
+                    esp.label.TextColor3 = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(200, 200, 200)
+                    esp.highlight.FillColor = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(200, 200, 200)
                     if onScreen then
                         esp.label.Visible = true
                         esp.label.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y - 20)
@@ -246,7 +245,7 @@ local bz = Instance.new("UIListLayout")
 bt.Parent = g:WaitForChild("PlayerGui", 5)
 bt.Name = tostring(math.random(1e6, 1e7))
 bt.ResetOnSpawn = false
-bt.Enabled = false
+bt.Enabled = true
 bu.Size = UDim2.new(0, 120, 0, 160)
 bu.Position = UDim2.new(0.1, 0, 0.3, 0)
 bu.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
@@ -416,7 +415,6 @@ r(b.RenderStepped, function()
         if co and co.Parent then
             local cp = co.Position + (co.Parent:FindFirstChild(i.u) and co.Parent:FindFirstChild(i.u).Velocity * Vector3.new(i.ab.ac, i.ab.ad, i.ab.ac) or Vector3.zero)
             h.CFrame = CFrame.new(h.CFrame.Position, cp)
-            if av(co) then ba() end
         end
     end
 end)
@@ -460,57 +458,6 @@ local function cx()
     pcall(function() if bt and bt.Parent then bt:Destroy() end end)
     pcall(function() if espGui and espGui.Parent then espGui:Destroy() end end)
     i.t, i.w = false, false
-end
-
-while wait() do
-    if getgenv().AutoPrediction == true then
-        local pingvalue = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString()
-        local split = string.split(pingvalue, '(')
-        local ping = tonumber(split[1])
-        if ping < 225 then
-            i.ab.ac = 1.4
-        elseif ping < 215 then
-            i.ab.ac = 1.2
-        elseif ping < 205 then
-            i.ab.ac = 1.0
-        elseif ping < 190 then
-            i.ab.ac = 0.10
-        elseif ping < 180 then
-            i.ab.ac = 0.12
-        elseif ping < 170 then
-            i.ab.ac = 0.15
-        elseif ping < 160 then
-            i.ab.ac = 0.18
-        elseif ping < 150 then
-            i.ab.ac = 0.110
-        elseif ping < 140 then
-            i.ab.ac = 0.113
-        elseif ping < 130 then
-            i.ab.ac = 0.116
-        elseif ping < 120 then
-            i.ab.ac = 0.120
-        elseif ping < 110 then
-            i.ab.ac = 0.124
-        elseif ping < 105 then
-            i.ab.ac = 0.127
-        elseif ping < 90 then
-            i.ab.ac = 0.130
-        elseif ping < 80 then
-            i.ab.ac = 0.133
-        elseif ping < 70 then
-            i.ab.ac = 0.136
-        elseif ping < 60 then
-            i.ab.ac = 0.15038
-        elseif ping < 50 then
-            i.ab.ac = 0.15038
-        elseif ping < 40 then
-            i.ab.ac = 0.145
-        elseif ping < 30 then
-            i.ab.ac = 0.155
-        elseif ping < 20 then
-            i.ab.ac = 0.157
-        end
-    end
 end
 
 game:BindToClose(cx)
