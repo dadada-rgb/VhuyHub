@@ -6,7 +6,7 @@ local e = game:GetService("UserInputService")
 local f = game:GetService("VirtualInputManager")
 local g = a.LocalPlayer
 local h = d.CurrentCamera
-local i = { r = 500, t = false, u = "HumanoidRootPart", v = {}, w = false, ab = { ac = 0.14, ad = 0.08 }, ae = 15, af = 0 }
+local i = { r = 1000, t = false, u = "HumanoidRootPart", v = {}, w = false, ab = { ac = 0.14, ad = 0.08 }, ae = 15, af = 0 }
 local j = {}
 local k = {}
 local l = false
@@ -225,7 +225,7 @@ r(e.InputBegan, function(ca, cb)
         local raycastParams = RaycastParams.new()
         raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
         raycastParams.FilterDescendantsInstances = {g.Character, d:FindFirstChild("Terrain") or {}}
-        local rayResult = d:Raycast(ray.Origin, ray.Direction * 500, raycastParams)
+        local rayResult = d:Raycast(ray.Origin, ray.Direction * i.r, raycastParams) -- Thay 500 thành i.r
         if rayResult and rayResult.Instance then
             local instance = rayResult.Instance
             local maxDepth = 10
