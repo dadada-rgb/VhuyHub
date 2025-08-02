@@ -11,70 +11,62 @@ local animations = {
 	M = "http://www.roblox.com/asset/?id=14352340648",
 }
 
-local animTracks = {}
-local playingStates = {}
-local renderConnections = {}
+local currentTrack = nil
+local currentKey = nil
+local renderConnection = nil
 local inputConnection = nil
 
 local function setup(char)
 	local hum = char:WaitForChild("Humanoid", 5)
 	if not hum then return end
-	
+
 	local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
 
 	-- Ngắt kết nối cũ
-	for k, conn in pairs(renderConnections) do
-		if conn then conn:Disconnect() end
-	end
-	renderConnections = {}
-
+	if renderConnection then renderConnection:Disconnect() end
 	if inputConnection then inputConnection:Disconnect() end
 
-	-- RenderStep kiểm tra dừng khi di chuyển
-	for key, animId in pairs(animations) do
-		local anim = Instance.new("Animation")
-		anim.AnimationId = animId
-		animTracks[key] = anim
-		playingStates[key] = false
+	-- Dừng animation nếu di chuyển
+	renderConnection = rs.RenderStepped:Connect(function()
+		if currentTrack and hum.MoveDirection.Magnitude > 0 then
+			currentTrack:Stop()
+			currentTrack = nil
+			currentKey = nil
+		end
+	end)
 
-		renderConnections[key] = rs.RenderStepped:Connect(function()
-			if playingStates[key] and hum.MoveDirection.Magnitude > 0 then
-				local track = animator:LoadAnimation(animTracks[key])
-				track:Stop()
-				playingStates[key] = false
-			end
-		end)
-	end
-
-	-- Phím nhấn để bật/tắt animation
+	-- Nhấn phím để phát lại animation
 	inputConnection = uis.InputBegan:Connect(function(input, gp)
 		if gp then return end
-
 		local key = input.KeyCode.Name
-		if animations[key] then
-			if not playingStates[key] and hum.MoveDirection.Magnitude == 0 then
-				local track = animator:LoadAnimation(animTracks[key])
-				track:Play()
-				animTracks[key] = track
-				playingStates[key] = true
-			elseif playingStates[key] and typeof(animTracks[key]) == "Instance" then
-				animTracks[key]:Stop()
-				playingStates[key] = false
+		local animId = animations[key]
+		if animId and hum.MoveDirection.Magnitude == 0 then
+			-- Dừng animation cũ nếu đang chạy
+			if currentTrack then
+				currentTrack:Stop()
+				currentTrack = nil
+				currentKey = nil
 			end
+			-- Phát animation mới
+			local anim = Instance.new("Animation")
+			anim.AnimationId = animId
+			local track = animator:LoadAnimation(anim)
+			track:Play()
+			currentTrack = track
+			currentKey = key
 		end
 	end)
 end
 
--- Character hiện tại
+-- Nếu đã có character
 if lp.Character then
 	setup(lp.Character)
 end
 
 -- Khi respawn
 lp.CharacterAdded:Connect(function(char)
-	for k in pairs(playingStates) do
-		playingStates[k] = false
-	end
+	currentTrack = nil
+	currentKey = nil
 	task.wait(0.2)
 	setup(char)
 end)
