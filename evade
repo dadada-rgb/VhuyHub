@@ -311,3 +311,12 @@ d.InputBegan:Connect(function(input, gameProcessed)
         ff.Text = "Auto Bhop (" .. (getgenv().x3 and "On" or "Off") .. ")" -- Cập nhật GUI
     end
 end)
+
+local guiVisible = true
+d.InputBegan:Connect(function(input, gameProcessed)
+	if not gameProcessed and input.KeyCode == Enum.KeyCode.RightShift then
+		guiVisible = not guiVisible
+		w.Enabled = guiVisible
+	end
+end)
+
