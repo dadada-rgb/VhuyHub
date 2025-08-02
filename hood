@@ -6,7 +6,8 @@ local e = game:GetService("UserInputService")
 local f = game:GetService("VirtualInputManager")
 local g = a.LocalPlayer
 local h = d.CurrentCamera
-local i = { r = 400, t = false, u = "HumanoidRootPart", v = {}, w = false, ab = { ac = 0.13, ad = 0 }, ae = 15, af = 0 }
+local i = { r = 400, t = false, u = "HumanoidRootPart", v = {}, w = false, ab = { ac = 0.15038, ad = 0 }, ae = 15, af = 0 }
+getgenv().AutoPrediction = true
 local j = {}
 local k = {} -- Lưu trữ TextLabel và Highlight
 local l = false
@@ -461,5 +462,55 @@ local function cx()
     i.t, i.w = false, false
 end
 
+while wait() do
+    if getgenv().AutoPrediction == true then
+        local pingvalue = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValueString()
+        local split = string.split(pingvalue, '(')
+        local ping = tonumber(split[1])
+        if ping < 225 then
+            i.ab.ac = 1.4
+        elseif ping < 215 then
+            i.ab.ac = 1.2
+        elseif ping < 205 then
+            i.ab.ac = 1.0
+        elseif ping < 190 then
+            i.ab.ac = 0.10
+        elseif ping < 180 then
+            i.ab.ac = 0.12
+        elseif ping < 170 then
+            i.ab.ac = 0.15
+        elseif ping < 160 then
+            i.ab.ac = 0.18
+        elseif ping < 150 then
+            i.ab.ac = 0.110
+        elseif ping < 140 then
+            i.ab.ac = 0.113
+        elseif ping < 130 then
+            i.ab.ac = 0.116
+        elseif ping < 120 then
+            i.ab.ac = 0.120
+        elseif ping < 110 then
+            i.ab.ac = 0.124
+        elseif ping < 105 then
+            i.ab.ac = 0.127
+        elseif ping < 90 then
+            i.ab.ac = 0.130
+        elseif ping < 80 then
+            i.ab.ac = 0.133
+        elseif ping < 70 then
+            i.ab.ac = 0.136
+        elseif ping < 60 then
+            i.ab.ac = 0.15038
+        elseif ping < 50 then
+            i.ab.ac = 0.15038
+        elseif ping < 40 then
+            i.ab.ac = 0.145
+        elseif ping < 30 then
+            i.ab.ac = 0.155
+        elseif ping < 20 then
+            i.ab.ac = 0.157
+        end
+    end
+end
 
 game:BindToClose(cx)
