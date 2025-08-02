@@ -1,102 +1,85 @@
-local p1d = game.PlaceId
-
-local function sendNotification(title, text)
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = title,
-        Text = text,
-        Duration = 3
-    })
-end
-
 local plr = game:GetService("Players").LocalPlayer
 if not plr then return end
 
-local chr = plr.Character or plr.CharacterAdded:Wait()
-if not chr then return end
-
-local hum = chr:WaitForChild("Humanoid", 5)
-if not hum then return end
-
--- Sử dụng AnimationId từ bên ngoài (Yungblud - Happier)
-local anim = Instance.new("Animation")
-anim.AnimationId = "http://www.roblox.com/asset/?id=15609995579" 
-local animTrack = nil
-local isPlaying = false
-local cooldown = 1 -- Thời gian chờ giữa các lần nhấn phím (giây)
-local lastUsed = 0
-
--- Kiểm tra AnimationId hợp lệ
-local success, _ = pcall(function()
-    return game:GetService("MarketplaceService"):GetProductInfo(15609995579)
-end)
-if not success then
-    warn("AnimationId không hợp lệ hoặc không thể tải!")
-    return
-end
-
--- Kiểm tra khi nhân vật di chuyển để dừng animation
-local connection = game:GetService("RunService").Heartbeat:Connect(function()
-    if isPlaying and hum and hum.MoveDirection.Magnitude > 0 then
-        if animTrack then
-            animTrack:Stop()
-            isPlaying = false
-        end
-    end
-end)
-
--- Xử lý input từ phím C
 local inputService = game:GetService("UserInputService")
-inputService.InputBegan:Connect(function(input, isProcessed)
-    if isProcessed or not hum or hum.Health <= 0 or tick() - lastUsed < cooldown then return end
-    if input.KeyCode == Enum.KeyCode.C then
-        lastUsed = tick()
-        if not isPlaying and hum.MoveDirection.Magnitude == 0 then
-            animTrack = hum:LoadAnimation(anim)
-            animTrack:Play()
-            isPlaying = true
-        elseif isPlaying and animTrack then
-            animTrack:Stop()
-            isPlaying = false
-        end
-    end
-end)
+local runService = game:GetService("RunService")
 
--- Dọn dẹp tài nguyên khi nhân vật rời đi
-plr.AncestryChanged:Connect(function()
-    if connection then
-        connection:Disconnect()
-    end
-    if animTrack then
-        animTrack:Stop()
-        animTrack = nil
-    end
-end)
-
-if p1d == 9872472334 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-    sendNotification("Script Loaded", "Đã load script Evade!")
-elseif p1d == 10662542523 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-    sendNotification("Script Loaded", "Đã load script Evade!")
-elseif p1d == 10324347967 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-    sendNotification("Script Loaded", "Đã load script Evade!")
-elseif p1d == 10324346056 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-    sendNotification("Script Loaded", "Đã load script Evade!")
-elseif p1d == 10530697691 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-    sendNotification("Script Loaded", "Đã load script Evade!")
-elseif p1d == 10808838353 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-    sendNotification("Script Loaded", "Đã load script Evade!")
-elseif p1d == 142823291 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2"))()
-    sendNotification("Script Loaded", "Đã load script MM2!")
-elseif p1d == 13772394625 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball"))()
-    sendNotification("Script Loaded", "Đã load script Blade Ball!")
-else
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"))()
-    sendNotification("Script Loaded", "Đã load script Hood!")
+-- Hàm gửi thông báo
+local function sendNotification(title, text)
+    game:GetService("StarterGui"):SetCore("SendNotification", {Title = title, Text = text, Duration = 3})
 end
+
+-- Hàm xử lý nhân vật và animation
+local function setupCharacter(chr)
+    if not chr then return end
+    local hum = chr:WaitForChild("Humanoid", 5)
+    if not hum then return end
+
+    local anim = Instance.new("Animation")
+    anim.AnimationId = "http://www.roblox.com/asset/?id=15609995579" -- ID của Yungblud - Happier
+    local animTrack = nil
+    local isPlaying = false
+    local cooldown = 1
+    local lastUsed = 0
+
+    -- Kiểm tra AnimationId hợp lệ
+    local success, _ = pcall(function()
+        return game:GetService("MarketplaceService"):GetProductInfo(15609995579)
+    end)
+    if not success then
+        warn("AnimationId không hợp lệ!")
+        return
+    end
+
+    -- Dừng animation khi di chuyển
+    local moveConnection = runService.Heartbeat:Connect(function()
+        if isPlaying and hum.MoveDirection.Magnitude > 0 then
+            if animTrack then
+                animTrack:Stop()
+                isPlaying = false
+            end
+        end
+    end)
+
+    -- Xử lý phím C
+    local inputConnection = inputService.InputBegan:Connect(function(input, isProcessed)
+        if isProcessed or hum.Health <= 0 or tick() - lastUsed < cooldown then return end
+        if input.KeyCode == Enum.KeyCode.C then
+            lastUsed = tick()
+            if not isPlaying and hum.MoveDirection.Magnitude == 0 then
+                animTrack = hum:LoadAnimation(anim)
+                animTrack:Play()
+                isPlaying = true
+            elseif isPlaying and animTrack then
+                animTrack:Stop()
+                isPlaying = false
+            end
+        end
+    end)
+
+    -- Dọn dẹp khi nhân vật bị hủy
+    chr.AncestryChanged:Connect(function()
+        moveConnection:Disconnect()
+        inputConnection:Disconnect()
+        if animTrack then animTrack:Stop() end
+    end)
+end
+
+-- Gắn script cho nhân vật hiện tại và khi tái tạo
+setupCharacter(plr.Character)
+plr.CharacterAdded:Connect(setupCharacter)
+
+-- Tải script theo PlaceId
+local scripts = {
+    [9872472334] = "evade",
+    [10662542523] = "evade",
+    [10324347967] = "evade",
+    [10324346056] = "evade",
+    [10530697691] = "evade",
+    [10808838353] = "evade",
+    [142823291] = "mm2",
+    [13772394625] = "Bladeball",
+}
+local scriptName = scripts[game.PlaceId] or "hood"
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/" .. scriptName))()
+sendNotification("Script Loaded", "Đã load script " .. scriptName .. "!")
