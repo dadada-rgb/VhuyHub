@@ -1,6 +1,6 @@
-local lp = game:GetService("Players").LocalPlayer
-local uis = game:GetService("UserInputService")
 local rs = game:GetService("RunService")
+local uis = game:GetService("UserInputService")
+local lp = game.Players.LocalPlayer
 
 local animationId = "http://www.roblox.com/asset/?id=15609995579"
 local anim = Instance.new("Animation")
@@ -8,39 +8,39 @@ anim.AnimationId = animationId
 
 local isPlaying = false
 local animTrack = nil
-
--- Hủy kết nối cũ nếu có
 local renderConnection = nil
 local inputConnection = nil
 
 local function setup(char)
-	local hum = char:WaitForChild("Humanoid")
+	local hum = char:WaitForChild("Humanoid", 5) -- Thêm timeout để tránh lỗi
+	if not hum then return end
+	
 	local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
 
-	-- Clear kết nối cũ nếu respawn
+	-- Hủy kết nối cũ
 	if renderConnection then renderConnection:Disconnect() end
 	if inputConnection then inputConnection:Disconnect() end
 
-	-- Theo dõi di chuyển => dừng animation nếu đi
+	-- Dừng animation khi di chuyển
 	renderConnection = rs.RenderStepped:Connect(function()
 		if isPlaying and hum.MoveDirection.Magnitude > 0 then
-			if animTrack then animTrack:Stop() end
-			isPlaying = false
+			if animTrack then
+				animTrack:Stop()
+				isPlaying = false
+			end
 		end
 	end)
 
 	-- Toggle animation khi nhấn C
 	inputConnection = uis.InputBegan:Connect(function(input, gp)
-		if gp then return end
-		if input.KeyCode == Enum.KeyCode.C then
-			if not isPlaying and hum.MoveDirection.Magnitude == 0 then
-				animTrack = animator:LoadAnimation(anim)
-				animTrack:Play()
-				isPlaying = true
-			elseif isPlaying and animTrack then
-				animTrack:Stop()
-				isPlaying = false
-			end
+		if gp or input.KeyCode ~= Enum.KeyCode.C then return end
+		if not isPlaying and hum.MoveDirection.Magnitude == 0 then
+			animTrack = animator:LoadAnimation(anim)
+			animTrack:Play()
+			isPlaying = true
+		elseif isPlaying and animTrack then
+			animTrack:Stop()
+			isPlaying = false
 		end
 	end)
 end
@@ -54,38 +54,31 @@ end
 lp.CharacterAdded:Connect(function(char)
 	isPlaying = false
 	animTrack = nil
-	wait(0.2)
+	task.wait(0.2) -- Sử dụng task.wait thay vì wait
 	setup(char)
 end)
 
-local p1d = game.PlaceId
-
 local function sendNotification(title, text)
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = title,
-        Text = text,
-        Duration = 3
-    })
+	game:GetService("StarterGui"):SetCore("SendNotification", {
+		Title = title,
+		Text = text,
+		Duration = 3
+	})
 end
 
-if p1d == 9872472334 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-elseif p1d == 10662542523 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-elseif p1d == 10324347967 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-elseif p1d == 10324346056 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-elseif p1d == 10530697691 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-elseif p1d == 10808838353 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade"))()
-elseif p1d == 142823291 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2"))()
-elseif p1d == 13772394625 then
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball"))()
-else
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"))()
-end
+-- Load script theo PlaceId
+local placeId = game.PlaceId
+local scriptUrls = {
+	[9872472334] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10662542523] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10324347967] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10324346056] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10530697691] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10808838353] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[142823291] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2",
+	[13772394625] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball",
+}
 
+local url = scriptUrls[placeId] or "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"
+loadstring(game:HttpGet(url))()
 sendNotification("Script Loaded", "Đã load VhuyHub")
