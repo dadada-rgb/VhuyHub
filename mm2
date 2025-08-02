@@ -460,7 +460,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
         end
     elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
         task.spawn(shootMurderer)
-    elseif input.KeyCode == Enum.KeyCode.C then
+    elseif input.KeyCode == Enum.KeyCode.Z then
         autoFarm = not autoFarm
         vw.Text = "AutoFarm (" .. (autoFarm and "On" or "Off") .. ")"
         if autoFarm then
