@@ -403,7 +403,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
         else
             clearESP()
         end
-    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then -- Changed to MouseButton2 (right-click)
+    elseif input.UserInputType == Enum.UserInputType.MouseButton3 then -- Changed to MouseButton2 (right-click)
         task.spawn(shootMurderer)
     end
 end)
