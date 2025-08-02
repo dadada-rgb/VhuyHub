@@ -9,6 +9,7 @@ local animations = {
 	B = "http://www.roblox.com/asset/?id=10714089137",
 	N = "http://www.roblox.com/asset/?id=14352343065",
 	M = "http://www.roblox.com/asset/?id=14352340648",
+        H = "http://www.roblox.com/asset/?id=15392759696",
 }
 
 local currentTrack = nil
