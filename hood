@@ -232,37 +232,26 @@ r(e.InputBegan, function(ca, cb)
         bt.Enabled = not bt.Enabled
     elseif ca.UserInputType == Enum.UserInputType.MouseButton2 and p(g) then
         local ci = g.Character
-        local mousePos = e:GetMouseLocation()
-        local ray = h:ScreenPointToRay(mousePos.X, mousePos.Y)
-        local raycastParams = RaycastParams.new()
-        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-        raycastParams.FilterDescendantsInstances = {g.Character, d:FindFirstChild("Terrain") or {}}
-        local rayResult = d:Raycast(ray.Origin, ray.Direction * i.r, raycastParams)
-        if rayResult and rayResult.Instance then
-            local instance = rayResult.Instance
-            local maxDepth = 10
-            local depth = 0
-            while instance and not a:GetPlayerFromCharacter(instance) and depth < maxDepth do
-                instance = instance.Parent
-                depth = depth + 1
-            end
-            local targetPlayer = instance and a:GetPlayerFromCharacter(instance)
-            if targetPlayer and targetPlayer ~= g then
-                local hitPart = rayResult.Instance
-                -- Kiểm tra xem con trỏ có nhắm vào hitpart (Head hoặc HumanoidRootPart) không
-                if hitPart and (hitPart.Name == "Head" or hitPart.Name == "HumanoidRootPart") then
-                    local co = targetPlayer.Character:FindFirstChild(i.u)
-                    if co then
-                        local cq = (h.CFrame.Position - co.Position).Magnitude
-                        if cq <= i.r then
-                            i.t = true
-                        end
+        local co = bf() -- Tìm mục tiêu gần nhất
+        if co and ci and ci:FindFirstChildOfClass("Tool") then
+            local cq = (h.CFrame.Position - co.Position).Magnitude
+            if cq <= i.r then
+                -- Kiểm tra con trỏ có nhắm đúng vào hitpart không
+                local mousePos = e:GetMouseLocation()
+                local ray = h:ScreenPointToRay(mousePos.X, mousePos.Y)
+                local raycastParams = RaycastParams.new()
+                raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+                raycastParams.FilterDescendantsInstances = {g.Character, d:FindFirstChild("Terrain") or {}}
+                local rayResult = d:Raycast(ray.Origin, ray.Direction * i.r, raycastParams)
+                if rayResult and rayResult.Instance and (rayResult.Instance.Name == "Head" or rayResult.Instance.Name == "HumanoidRootPart") then
+                    local targetPlayer = a:GetPlayerFromCharacter(rayResult.Instance.Parent)
+                    if targetPlayer and targetPlayer ~= g and i.v[targetPlayer.Name] then
+                        i.t = true -- Kích hoạt triggerbot chỉ khi nhắm đúng hitpart
                     end
                 end
             end
         end
     elseif ca.UserInputType == Enum.UserInputType.MouseButton3 then
-        -- (Giữ nguyên logic cho MouseButton3)
         local mousePos = e:GetMouseLocation()
         local ray = h:ScreenPointToRay(mousePos.X, mousePos.Y)
         local raycastParams = RaycastParams.new()
@@ -288,12 +277,18 @@ r(e.InputBegan, function(ca, cb)
     end
 end)
 
+r(e.InputEnded, function(ca)
+    if ca.UserInputType == Enum.UserInputType.MouseButton2 then
+        i.t = false -- Tắt triggerbot khi thả chuột phải
+    end
+end)
+
 local function bf()
     local bg, bh = nil, math.huge
     for _, bi in ipairs(a:GetPlayers()) do
         if bi ~= g and p(bi) and i.v[bi.Name] then
             local bj = bi.Character
-            local bk = bj:FindFirstChild(i.u)
+            local bk = bj:FindFirstChild(i.u) -- Hitpart (Head hoặc HumanoidRootPart)
             local bl = bj:FindFirstChild("BodyEffects")
             local bm = bl and bl:FindFirstChild("K.O") and bl["K.O"].Value
             local bn = bj:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
@@ -303,11 +298,12 @@ local function bf()
                 if bp then
                     local bq = (bp.Position - bk.Position).Magnitude
                     if bq < bh and bq <= i.r then
+                        -- Kiểm tra raycast từ con trỏ chuột tới hitpart
+                        local mousePos = e:GetMouseLocation()
+                        local ray = h:ScreenPointToRay(mousePos.X, mousePos.Y)
                         local br = RaycastParams.new()
                         br.FilterType = Enum.RaycastFilterType.Blacklist
                         br.FilterDescendantsInstances = {g.Character}
-                        local mousePos = e:GetMouseLocation()
-                        local ray = h:ScreenPointToRay(mousePos.X, mousePos.Y)
                         local bs = d:Raycast(ray.Origin, ray.Direction * i.r, br)
                         if bs and bs.Instance and bs.Instance:IsDescendantOf(bj) and (bs.Instance.Name == "Head" or bs.Instance.Name == "HumanoidRootPart") then
                             bg = bk
@@ -321,9 +317,35 @@ local function bf()
     return bg
 end
 
-r(e.InputEnded, function(ca)
-    if ca.UserInputType == Enum.UserInputType.MouseButton2 then
-        i.t = false
+r(b.RenderStepped, function()
+    if not i.t or not p(g) then return end
+    local ci = g.Character
+    local cj = ci and ci:FindFirstChild("BodyEffects")
+    local ck = cj and cj:FindFirstChild("K.O") and cj["K.O"].Value
+    local cl = ci and ci:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
+    if ck or cl then i.t = false return end
+    local cm = false
+    for _, cn in pairs(ci:GetChildren()) do
+        if cn:IsA("Tool") then cm = true break end
+    end
+    if i.t and cm then
+        local co = bf()
+        if co and co.Parent then
+            local cp = co.Position + (co.Parent:FindFirstChild(i.u) and co.Parent:FindFirstChild(i.u).Velocity * Vector3.new(i.ab.ac, i.ab.ad, i.ab.ac) or Vector3.zero)
+            h.CFrame = CFrame.new(h.CFrame.Position, cp) -- Aim vào mục tiêu
+            -- Kiểm tra lại con trỏ có nhắm đúng hitpart không trước khi bắn
+            local mousePos = e:GetMouseLocation()
+            local ray = h:ScreenPointToRay(mousePos.X, mousePos.Y)
+            local raycastParams = RaycastParams.new()
+            raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+            raycastParams.FilterDescendantsInstances = {g.Character, d:FindFirstChild("Terrain") or {}}
+            local rayResult = d:Raycast(ray.Origin, ray.Direction * i.r, raycastParams)
+            if rayResult and rayResult.Instance and (rayResult.Instance.Name == "Head" or rayResult.Instance.Name == "HumanoidRootPart") then
+                if av(co) then
+                    ba() -- Thực hiện bắn
+                end
+            end
+        end
     end
 end)
 
