@@ -6,13 +6,12 @@ local e = game:GetService("UserInputService")
 local f = game:GetService("VirtualInputManager")
 local g = a.LocalPlayer
 local h = d.CurrentCamera
-local i = { r = 800, t = false, u = "HumanoidRootPart", v = {}, w = true, ab = { ac = 0, ad = 0 }, ae = 15, af = 0 }
+local i = { r = 400, t = false, u = "HumanoidRootPart", v = {}, w = false, ab = { ac = 0, ad = 0.1 }, ae = 15, af = 0 }
 local j = {}
-local k = {}
+local k = {} -- Lưu trữ TextLabel và Highlight
 local l = false
 local m = {}
-local isCameraToggled = false
-local autoSelect = false
+local isCameraToggled = false -- Biến mới cho camera toggle, không ghi đè d
 
 -- Khởi tạo ScreenGui cho ESP
 local espGui = Instance.new("ScreenGui")
@@ -20,6 +19,73 @@ espGui.Name = "SafeESP"
 espGui.ResetOnSpawn = false
 espGui.IgnoreGuiInset = true
 espGui.Parent = g:WaitForChild("PlayerGui")
+
+local validParts = {
+    "Head",
+    "HumanoidRootPart",
+    "UpperTorso",
+    "LowerTorso",
+    "LeftUpperArm",
+    "LeftLowerArm",
+    "LeftHand",
+    "RightUpperArm",
+    "RightLowerArm",
+    "RightHand",
+    "LeftUpperLeg",
+    "LeftLowerLeg",
+    "LeftFoot",
+    "RightUpperLeg",
+    "RightLowerLeg",
+    "RightFoot"
+}
+
+local function isValidPart(part)
+    if not part or not part.Parent or not part.Parent:FindFirstChild("Humanoid") then return false end
+    for _, name in ipairs(validParts) do
+        if part.Name:lower() == name:lower() then return true end
+    end
+    return false
+end
+
+-- Xử lý sự kiện InputBegan
+e.InputBegan:Connect(function(e, f)
+    if f then return end
+    if e.KeyCode == Enum.KeyCode.X or e.KeyCode == Enum.KeyCode.DPadDown then
+        isCameraToggled = true
+    elseif e.KeyCode == Enum.KeyCode.T then
+        autoSelect = not autoSelect
+        if autoSelect then
+            selectAllPlayers()
+        else
+            deselectAllPlayers()
+        end
+    elseif e.UserInputType == Enum.UserInputType.MouseButton3 then
+        local mouseTarget = g:GetMouse().Target
+        if mouseTarget and isValidPart(mouseTarget) then
+            local targetPlayer = a:GetPlayerFromCharacter(mouseTarget.Parent)
+            if targetPlayer and targetPlayer ~= g then
+                i.v[targetPlayer.Name] = not i.v[targetPlayer.Name] and true or nil
+                cc()
+            end
+        end
+    end
+end)
+
+-- Xử lý sự kiện InputBegan cho camera toggle
+e.InputBegan:Connect(function(e, f)
+    if f then return end
+    if e.KeyCode == Enum.KeyCode.X or e.KeyCode == Enum.KeyCode.DPadDown then
+        isCameraToggled = true
+    end
+end)
+
+-- Xử lý sự kiện InputEnded cho camera toggle
+e.InputEnded:Connect(function(e, f)
+    if f then return end
+    if e.KeyCode == Enum.KeyCode.X or e.KeyCode == Enum.KeyCode.DPadDown then
+        isCameraToggled = false
+    end
+end)
 
 local function p(q)
     return q and q.Character and q.Character:FindFirstChild("Humanoid") and q.Character:FindFirstChild("HumanoidRootPart")
@@ -41,13 +107,14 @@ end
 
 local function createESP(player)
     if k[player] then return end
+    -- Tạo TextLabel
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    label.TextColor3 = Color3.fromRGB(200, 200, 200) -- Mặc định trắng
     label.TextSize = 14
-    label.Font = Enum.Font.GothamBlack
+    label.Font = Enum.Font.GothamBlack -- Phông chữ đẹp
     label.Text = player.DisplayName
-    label.TextStrokeTransparency = 0.7
+    label.TextStrokeTransparency = 0.7 -- Viền chữ nhẹ
     label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     label.Size = UDim2.new(0, 200, 0, 20)
     label.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -55,11 +122,12 @@ local function createESP(player)
     label.Visible = false
     label.Parent = espGui
 
+    -- Tạo Highlight
     local highlight = Instance.new("Highlight")
     highlight.Enabled = false
     highlight.FillTransparency = 0.7
     highlight.OutlineTransparency = 0.3
-    highlight.FillColor = Color3.fromRGB(200, 200, 200)
+    highlight.FillColor = Color3.fromRGB(200, 200, 200) -- Mặc định trắng
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
     highlight.Adornee = player.Character
     highlight.Parent = espGui
@@ -95,6 +163,7 @@ local function aj()
                 local screenPos, onScreen = h:WorldToViewportPoint(headPos)
                 local esp = k[player]
                 if esp then
+                    -- Cập nhật màu dựa trên trạng thái chọn
                     local isSelected = i.v[player.Name]
                     esp.label.TextColor3 = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(200, 200, 200)
                     esp.highlight.FillColor = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(200, 200, 200)
@@ -166,11 +235,17 @@ local function bf()
 end
 
 local bt = Instance.new("ScreenGui")
+local bu = Instance.new("Frame")
+local bv = Instance.new("UICorner")
+local bw = Instance.new("TextLabel")
+local bx = Instance.new("UICorner")
+local by = Instance.new("ScrollingFrame")
+local bz = Instance.new("UIListLayout")
+
 bt.Parent = g:WaitForChild("PlayerGui", 5)
 bt.Name = tostring(math.random(1e6, 1e7))
 bt.ResetOnSpawn = false
 bt.Enabled = true
-local bu = Instance.new("Frame")
 bu.Size = UDim2.new(0, 120, 0, 160)
 bu.Position = UDim2.new(0.1, 0, 0.3, 0)
 bu.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
@@ -178,10 +253,8 @@ bu.BackgroundTransparency = 0
 bu.Active = true
 bu.Draggable = true
 bu.Parent = bt
-local bv = Instance.new("UICorner")
 bv.CornerRadius = UDim.new(0, 8)
 bv.Parent = bu
-local bw = Instance.new("TextLabel")
 bw.Size = UDim2.new(1, 0, 0, 18)
 bw.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
 bw.Text = "VhuyHub"
@@ -189,17 +262,14 @@ bw.TextColor3 = Color3.fromRGB(0, 0, 0)
 bw.Font = Enum.Font.SourceSans
 bw.TextSize = 12
 bw.Parent = bu
-local bx = Instance.new("UICorner")
 bx.CornerRadius = UDim.new(0, 8)
 bx.Parent = bw
-local by = Instance.new("ScrollingFrame")
 by.Size = UDim2.new(1, -4, 1, -22)
 by.Position = UDim2.new(0, 2, 0, 20)
 by.CanvasSize = UDim2.new(0, 0, 0, 0)
 by.ScrollBarThickness = 3
 by.BackgroundTransparency = 1
 by.Parent = bu
-local bz = Instance.new("UIListLayout")
 bz.SortOrder = Enum.SortOrder.LayoutOrder
 bz.Padding = UDim.new(0, 3)
 bz.Parent = by
@@ -207,51 +277,42 @@ bz:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     by.CanvasSize = UDim2.new(0, 0, 0, bz.AbsoluteContentSize.Y)
 end)
 
-local function selectAllPlayers()
-    for _, player in ipairs(a:GetPlayers()) do
-        if player ~= g then
-            i.v[player.Name] = true
-        end
-    end
-    cc()
-end
-
-local function deselectAllPlayers()
-    for _, player in ipairs(a:GetPlayers()) do
-        if player ~= g then
-            i.v[player.Name] = nil
-        end
-    end
-    cc()
-end
-
 r(e.InputBegan, function(ca, cb)
     if cb then return end
     if ca.KeyCode == Enum.KeyCode.RightShift then
         bt.Enabled = not bt.Enabled
     elseif ca.UserInputType == Enum.UserInputType.MouseButton2 and p(g) then
         local ci = g.Character
-        if ci and ci:FindFirstChildOfClass("Tool") then
-            i.t = true
-        end
+        local co = bf()
+        if co and ci and ci:FindFirstChildOfClass("Tool") then
+            local cq = (h.CFrame.Position - co.Position).Magnitude
+            if cq <= i.r then
+                i.t = true
+            end
+        end bo co = bf()
     elseif ca.UserInputType == Enum.UserInputType.MouseButton3 then
-        local mouseTarget = g:GetMouse().Target
-        if mouseTarget and isValidPart(mouseTarget) then
-            local targetPlayer = a:GetPlayerFromCharacter(mouseTarget.Parent)
+        local mousePos = e:GetMouseLocation()
+        local ray = h:ScreenPointToRay(mousePos.X, mousePos.Y)
+        local raycastParams = RaycastParams.new()
+        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+        raycastParams.FilterDescendantsInstances = {g.Character, d:FindFirstChild("Terrain") or {}}
+        local rayResult = d:Raycast(ray.Origin, ray.Direction * i.r, raycastParams)
+        if rayResult and rayResult.Instance then
+            local instance = rayResult.Instance
+            local maxDepth = 10
+            local depth = 0
+            while instance and not a:GetPlayerFromCharacter(instance) and depth < maxDepth do
+                instance = instance.Parent
+                depth = depth + 1
+            end
+            local targetPlayer = instance and a:GetPlayerFromCharacter(instance)
             if targetPlayer and targetPlayer ~= g then
                 i.v[targetPlayer.Name] = not i.v[targetPlayer.Name] and true or nil
                 cc()
             end
         end
-    elseif ca.KeyCode == Enum.KeyCode.T then
+    elseif ca.KeyCode == Enum.KeyCode.K then
         i.w = not i.w
-    elseif ca.KeyCode == Enum.KeyCode.Y then
-        autoSelect = not autoSelect
-        if autoSelect then
-            selectAllPlayers()
-        else
-            deselectAllPlayers()
-        end
     end
 end)
 
@@ -266,19 +327,15 @@ r(b.RenderStepped, aj)
 r(a.PlayerAdded, function(cx)
     task.wait(math.random(2, 3))
     removeESP(cx)
-    if autoSelect then
-        i.v[cx.Name] = true
-        cc()
-    end
 end)
 
 r(a.PlayerRemoving, function(cx)
     removeESP(cx)
-    i.v[cx.Name] = nil
-    cc()
 end)
 
+-- Gộp Heartbeat cho camera toggle và logic gốc
 r(b.Heartbeat, function()
+    -- Logic camera toggle
     if isCameraToggled then
         local delay = math.random(50, 200) / 1000
         g.CameraMinZoomDistance = 0.5
@@ -291,16 +348,13 @@ r(b.Heartbeat, function()
         g.CameraMinZoomDistance = 0.5
         g.CameraMode = Enum.CameraMode.Classic
     end
+
+    -- Logic gốc
     if i.t then
         if not l then l = os.clock() end
         if os.clock() - l >= math.random(45, 55) then
             i.u = ({"Head", "HumanoidRootPart"})[math.random(1, 2)]
             l = os.clock()
-        end
-        local co = bf()
-        if co and co.Parent then
-            local cp = co.Position + (co.Parent:FindFirstChild(i.u) and co.Parent:FindFirstChild(i.u).Velocity * Vector3.new(i.ab.ac, i.ab.ad, i.ab.ac) or Vector3.zero)
-            h.CFrame = CFrame.new(h.CFrame.Position, cp)
         end
     end
 end)
@@ -347,32 +401,25 @@ task.spawn(function()
     end
 end)
 
-local validParts = {
-    "Head",
-    "HumanoidRootPart",
-    "UpperTorso",
-    "LowerTorso",
-    "LeftUpperArm",
-    "LeftLowerArm",
-    "LeftHand",
-    "RightUpperArm",
-    "RightLowerArm",
-    "RightHand",
-    "LeftUpperLeg",
-    "LeftLowerLeg",
-    "LeftFoot",
-    "RightUpperLeg",
-    "RightLowerLeg",
-    "RightFoot"
-}
-
-local function isValidPart(part)
-    if not part or not part.Parent or not part.Parent:FindFirstChild("Humanoid") then return false end
-    for _, name in ipairs(validParts) do
-        if part.Name:lower() == name:lower() then return true end
+r(b.RenderStepped, function()
+    if not i.t or not p(g) then return end
+    local ci = g.Character
+    local cj = ci and ci:FindFirstChild("BodyEffects")
+    local ck = cj and cj:FindFirstChild("K.O") and cj["K.O"].Value
+    local cl = ci and ci:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
+    if ck or cl then i.t = false return end
+    local cm = false
+    for _, cn in pairs(ci:GetChildren()) do
+        if cn:IsA("Tool") then cm = true break end
     end
-    return false
-end
+    if i.t and cm then
+        local co = bf()
+        if co and co.Parent then
+            local cp = co.Position + (co.Parent:FindFirstChild(i.u) and co.Parent:FindFirstChild(i.u).Velocity * Vector3.new(i.ab.ac, i.ab.ad, i.ab.ac) or Vector3.zero)
+            h.CFrame = CFrame.new(h.CFrame.Position, cp)
+        end
+    end
+end)
 
 local function distToCursor(part)
     local viewportPos, onScreen = h:WorldToViewportPoint(part.Position)
@@ -392,12 +439,18 @@ r(b.RenderStepped, function()
         if cn:IsA("Tool") then cm = true break end
     end
     if not cm then return end
-    local mouseTarget = g:GetMouse().Target
-    if mouseTarget and isValidPart(mouseTarget) and distToCursor(mouseTarget) <= i.r and os.clock() - lastShot >= cooldown then
-        local targetPlayer = a:GetPlayerFromCharacter(mouseTarget.Parent)
-        if targetPlayer and i.v[targetPlayer.Name] then
-            ba()
-            lastShot = os.clock()
+
+    for _, player in ipairs(a:GetPlayers()) do
+        if player ~= g and i.v[player.Name] and p(player) then
+            local char = player.Character
+            local targetPart = char:FindFirstChild(i.u)
+            if targetPart and isValidPart(targetPart) then
+                if distToCursor(targetPart) <= 50 and os.clock() - lastShot >= cooldown then
+                    ba()
+                    lastShot = os.clock()
+                    break -- Bắn 1 người mỗi frame thôi
+                end
+            end
         end
     end
 end)
@@ -414,5 +467,18 @@ local function cx()
     pcall(function() if espGui and espGui.Parent then espGui:Destroy() end end)
     i.t, i.w = false, false
 end
+
+local toggleAntilock = true -- Bật/tắt antilock
+local shiftAmount = 0.5     -- Mức độ lệch vị trí
+
+game:GetService("RunService").RenderStepped:Connect(function()
+    if toggleAntilock then
+        local character = game.Players.LocalPlayer.Character
+        if character and character:FindFirstChild("HumanoidRootPart") then
+            local root = character.HumanoidRootPart
+            root.CFrame = root.CFrame * CFrame.new(math.random(-shiftAmount, shiftAmount)/50, 0, math.random(-shiftAmount, shiftAmount)/50)
+        end
+    end
+end)
 
 game:BindToClose(cx)
