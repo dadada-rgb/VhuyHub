@@ -11,6 +11,38 @@ local j = {}
 local k = {}
 local l = false
 local m = {}
+local a = game:GetService("UserInputService")
+local c = game:GetService("Players").LocalPlayer
+local d = false
+
+a.InputBegan:Connect(function(e, f)
+    if f then return end
+    if e.KeyCode == Enum.KeyCode.X or e.KeyCode == Enum.KeyCode.DPadDown then
+        d = true
+    end
+end)
+
+a.InputEnded:Connect(function(e, f)
+    if f then return end
+    if e.KeyCode == Enum.KeyCode.X or e.KeyCode == Enum.KeyCode.DPadDown then
+        d = false
+    end
+end)
+
+b.Heartbeat:Connect(function()
+    if d then
+        local g = math.random(50, 200) / 1000
+        c.CameraMinZoomDistance = 0.5
+        c.CameraMode = Enum.CameraMode.LockFirstPerson
+        task.wait(g)
+        c.CameraMode = Enum.CameraMode.Classic
+        c.CameraMinZoomDistance = 5
+        task.wait(g)
+    else
+        c.CameraMinZoomDistance = 0.5
+        c.CameraMode = Enum.CameraMode.Classic
+    end
+end)
 
 local function p(q)
     return q and q.Character and q.Character:FindFirstChild("Humanoid") and q.Character:FindFirstChild("HumanoidRootPart")
