@@ -12,6 +12,7 @@ local k = {} -- Lưu trữ TextLabel và Highlight
 local l = false
 local m = {}
 local isCameraToggled = false -- Biến mới cho camera toggle, không ghi đè d
+local autoSelect = false
 
 -- Khởi tạo ScreenGui cho ESP
 local espGui = Instance.new("ScreenGui")
@@ -36,7 +37,7 @@ local validParts = {
     "LeftFoot",
     "RightUpperLeg",
     "RightLowerLeg",
-    "RightFoot"
+    "RightFoot",
     "Humanoid"
 }
 
@@ -469,9 +470,7 @@ game:GetService("RunService").RenderStepped:Connect(function()
     end
 end)
 
-local StarterGui = game:GetService("StarterGui")
-
-StarterGui:SetCore("SendNotification", {
+c:SetCore("SendNotification", {
 	Title = "VhuyHub",
 	Text = "Loaded",
 	Duration = 3
