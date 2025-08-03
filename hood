@@ -427,7 +427,7 @@ r(b.RenderStepped, function()
     end
 end)
 
-d.InputBegan:Connect(function(input, processed)
+e.InputBegan:Connect(function(input, processed)
 	if input.UserInputType == Enum.UserInputType.MouseButton3 and not processed then
 		local target = g:GetMouse().Target
 		if not isValidPart(target) then return end
@@ -439,6 +439,7 @@ d.InputBegan:Connect(function(input, processed)
 			else
 				i.v[targetPlayer.Name] = nil
 			end
+			cc()
 		end
 	end
 end)
