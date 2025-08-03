@@ -10,15 +10,10 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- Cấu hình
 local Config = {
-    CamlockRange = 500, -- Phạm vi camlock
-    CamlockPart = "HumanoidRootPart", -- Phần nhắm
-    CamlockEnabled = false, -- Trạng thái camlock
-    CamlockTarget = nil, -- Mục tiêu camlock
     ESPEnabled = true, -- Trạng thái ESP
     ZoomEnabled = false, -- Trạng thái zoom
     ShiftAmount = 0.5, -- Độ dịch chuyển antilock
-    SelectedPlayers = {}, -- Danh sách người chơi được chọn
-    Prediction = { X = 0.165, Y = 0.1 } -- Prediction cho camlock
+    SelectedPlayers = {} -- Danh sách người chơi được chọn
 }
 
 local autoSelect = false 
@@ -165,60 +160,6 @@ local function UpdateESP()
     end
 end
 
--- Kiểm tra xem có vật cản giữa camera và mục tiêu không
-local function IsVisibleWithRaycast(origin, target)
-    local rayParams = RaycastParams.new()
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-    rayParams.IgnoreWater = true
-
-    local direction = (target - origin)
-    local result = workspace:Raycast(origin, direction, rayParams)
-
-    if result then
-        local hitPart = result.Instance
-        if hitPart and hitPart:IsDescendantOf(workspace) and not hitPart:IsDescendantOf(LocalPlayer.Character) and not hitPart:IsDescendantOf(Config.CamlockTarget and Config.CamlockTarget.Character or nil) then
-            return false -- Có vật cản
-        end
-    end
-    return true -- Không bị cản
-end
-
--- Tìm mục tiêu camlock
-local function GetClosestPlayer()
-    local ClosestDistance, ClosestPlayer = 100000, nil
-    for _, player in pairs(Players:GetPlayers()) do
-        if player.Name ~= LocalPlayer.Name and IsValidTarget(player) and Config.SelectedPlayers[player.Name] then
-            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                local rootPos, visible = Camera:WorldToScreenPoint(root.Position)
-                if not visible then
-                    continue
-                end
-                local distance = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(rootPos.X, rootPos.Y)).Magnitude
-                if distance < ClosestDistance and IsVisibleWithRaycast(Camera.CFrame.Position, root.Position) then
-                    ClosestPlayer = player
-                    ClosestDistance = distance
-                end
-            end
-        end
-    end
-    return ClosestPlayer
-end
-
--- Camlock với prediction
-local function Camlock()
-    if not Config.CamlockEnabled or not Config.CamlockTarget then return end
-    local hitpart = Config.CamlockTarget.Character and Config.CamlockTarget.Character:FindFirstChild(Config.CamlockPart)
-    if not hitpart then
-        Config.CamlockTarget = nil
-        return
-    end
-    local predictedPos = hitpart.Position + hitpart.Velocity * Vector3.new(Config.Prediction.X, Config.Prediction.Y, Config.Prediction.X)
-    Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
-end
-
-
 -- Antilock (luôn hoạt động)
 local function UpdateAntilock()
     local character = LocalPlayer.Character
@@ -278,9 +219,6 @@ UserInputService.InputBegan:Connect(function(input, processed)
     elseif input.KeyCode == Enum.KeyCode.X then
         Config.ZoomEnabled = true
         UpdateZoom()
-    elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-        Config.CamlockEnabled = true
-        Config.CamlockTarget = GetClosestPlayer()
     elseif input.KeyCode == Enum.KeyCode.T then
         autoSelect = not autoSelect
         if autoSelect then
@@ -297,10 +235,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        Config.CamlockEnabled = false
-        Config.CamlockTarget = nil
-    elseif input.KeyCode == Enum.KeyCode.X then
+    if input.KeyCode == Enum.KeyCode.X then
         Config.ZoomEnabled = false
         UpdateZoom()
     end
@@ -323,10 +258,6 @@ end)
 Connect(Players.PlayerRemoving, function(player)
     RemoveESP(player)
     Config.SelectedPlayers[player.Name] = nil
-    if Config.CamlockTarget == player then
-        Config.CamlockTarget = nil
-        Config.CamlockEnabled = false
-    end
     UpdatePlayerList()
 end)
 
@@ -336,9 +267,6 @@ Connect(RunService.RenderStepped, UpdateESP)
 RunService.RenderStepped:Connect(function()
     UpdateAntilock()
     UpdateZoom()
-    if Config.CamlockEnabled then
-        Camlock()
-    end
 end)
 
 -- Cập nhật danh sách người chơi định kỳ
@@ -349,15 +277,15 @@ task.spawn(function()
     end
 end)
 
--- Antilock luôn hoạt động (dịch chuyển nhẹ HumanoidRootPart để tránh camlock từ người khác)
+-- Antilock luôn hoạt động
 local function AntilockStep()
-	local character = LocalPlayer.Character
-	if character and character:FindFirstChild("HumanoidRootPart") then
-		local root = character.HumanoidRootPart
-		local offsetX = math.random(-5, 5) / 100 -- Giảm/đổi độ dịch nếu cần
-		local offsetZ = math.random(-5, 5) / 100
-		root.CFrame = root.CFrame * CFrame.new(offsetX, 0, offsetZ)
-	end
+    local character = LocalPlayer.Character
+    if character and character:FindFirstChild("HumanoidRootPart") then
+        local root = character.HumanoidRootPart
+        local offsetX = math.random(-5, 5) / 100
+        local offsetZ = math.random(-5, 5) / 100
+        root.CFrame = root.CFrame * CFrame.new(offsetX, 0, offsetZ)
+    end
 end
 
 local Players, UIS, Run, VU = game:GetService("Players"), game:GetService("UserInputService"), game:GetService("RunService"), game:GetService("VirtualUser")
@@ -385,18 +313,18 @@ local hitParts = {
     "RightUpperLeg",
     "RightLowerLeg",
     "RightFoot",
-    "Torso", -- R6
-    "Left Arm", -- R6
-    "Right Arm", -- R6
-    "Left Leg", -- R6
-    "Right Leg" -- R6
+    "Torso",
+    "Left Arm",
+    "Right Arm",
+    "Left Leg",
+    "Right Leg"
 }
 
 -- Kiểm tra target có hợp lệ không
 local function validPart(p)
     if not p or not p.Parent or not p.Parent:FindFirstChild("Humanoid") then return false end
     local player = Players:GetPlayerFromCharacter(p.Parent)
-    if not player or not Config.SelectedPlayers[player.Name] then return false end -- Chỉ cho phép người chơi trong danh sách được chọn
+    if not player or not Config.SelectedPlayers[player.Name] then return false end
     for _, n in ipairs(hitParts) do
         if p.Name:lower() == n:lower() then return true end
     end
