@@ -10,14 +10,14 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 -- Cấu hình
 local Config = {
     AimlockRange = 400, -- Phạm vi aimlock
-    AimlockPart = "Head", -- Phần nhắm
+    AimlockPart = "Humanrootpart", -- Phần nhắm
     AimlockEnabled = false, -- Trạng thái aimlock
     ESPEnabled = false, -- Trạng thái ESP
     ZoomEnabled = false, -- Trạng thái zoom
     ShiftAmount = 0.5, -- Độ dịch chuyển antilock
     SelectedPlayers = {}, -- Danh sách người chơi được chọn
     TriggerbotEnabled = false, -- Trạng thái triggerbot
-    TriggerFOV = 100, -- Phạm vi FOV triggerbot
+    TriggerFOV = 20, -- Phạm vi FOV triggerbot
     PredictionTime = 0.05 -- Thời gian dự đoán
 }
 
