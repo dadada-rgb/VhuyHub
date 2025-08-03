@@ -6,10 +6,12 @@ local lp = game.Players.LocalPlayer
 local animations = {
 	C = "http://www.roblox.com/asset/?id=15609995579",
 	V = "http://www.roblox.com/asset/?id=15517864808",
-	B = "http://www.roblox.com/asset/?id=10714089137",
+	B = "http://www.roblox.com/asset/?id=10714349037",
 	N = "http://www.roblox.com/asset/?id=14352343065",
 	M = "http://www.roblox.com/asset/?id=14352340648",
         H = "http://www.roblox.com/asset/?id=15392759696",
+        J = "http://www.roblox.com/asset/?id=10714061912",
+        Z = "http://www.roblox.com/asset/?id=11394033602",
 }
 
 local currentTrack = nil
