@@ -5,20 +5,22 @@ local VirtualInputManager = game:GetService("VirtualInputManager")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- Cấu hình
 local Config = {
-    AimlockRange = 400, -- Phạm vi aimlock
-    AimlockPart = "Humanrootpart", -- Phần nhắm
-    AimlockEnabled = false, -- Trạng thái aimlock
+    CamlockRange = 500, -- Phạm vi camlock
+    CamlockPart = "HumanoidRootPart", -- Phần nhắm
+    CamlockEnabled = false, -- Trạng thái camlock
+    CamlockTarget = nil, -- Mục tiêu camlock
     ESPEnabled = false, -- Trạng thái ESP
     ZoomEnabled = false, -- Trạng thái zoom
     ShiftAmount = 0.5, -- Độ dịch chuyển antilock
     SelectedPlayers = {}, -- Danh sách người chơi được chọn
     TriggerbotEnabled = false, -- Trạng thái triggerbot
     TriggerFOV = 20, -- Phạm vi FOV triggerbot
-    PredictionTime = 0.05 -- Thời gian dự đoán
+    Prediction = { X = 0.165, Y = 0.1 } -- Prediction cho camlock
 }
 
 -- Danh sách phần hợp lệ
@@ -175,37 +177,37 @@ local function UpdateESP()
     end
 end
 
--- Tìm mục tiêu aimlock
-local function FindTarget()
-    local closestTarget, closestDistance = nil, math.huge
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and IsValidTarget(player) and Config.SelectedPlayers[player.Name] then
-            local root = player.Character:FindFirstChild(Config.AimlockPart)
+-- Tìm mục tiêu camlock
+local function GetClosestPlayer()
+    local ClosestDistance, ClosestPlayer = 100000, nil
+    for _, player in pairs(Players:GetPlayers()) do
+        if player.Name ~= LocalPlayer.Name and IsValidTarget(player) and Config.SelectedPlayers[player.Name] then
+            local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
             if root then
-                local playerRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if playerRoot then
-                    local distance = (playerRoot.Position - root.Position).Magnitude
-                    if distance < closestDistance and distance <= Config.AimlockRange then
-                        local raycastParams = RaycastParams.new()
-                        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-                        raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-                        local rayResult = Workspace:Raycast(Camera.CFrame.Position, (root.Position - Camera.CFrame.Position), raycastParams)
-                        if rayResult and rayResult.Instance and rayResult.Instance:IsDescendantOf(player.Character) then
-                            closestTarget = root
-                            closestDistance = distance
-                        end
-                    end
+                local rootPos, visible = Camera:WorldToScreenPoint(root.Position)
+                if not visible then
+                    continue
+                end
+                local distance = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(rootPos.X, rootPos.Y)).Magnitude
+                if distance < ClosestDistance then
+                    ClosestPlayer = player
+                    ClosestDistance = distance
                 end
             end
         end
     end
-    return closestTarget
+    return ClosestPlayer
 end
 
--- Aimlock với prediction, không smoothness
-local function Aimlock(target)
-    if not target then return end
-    local predictedPos = target.Position + (target.Velocity * Config.PredictionTime)
+-- Camlock với prediction
+local function Camlock()
+    if not Config.CamlockEnabled or not Config.CamlockTarget then return end
+    local hitpart = Config.CamlockTarget.Character and Config.CamlockTarget.Character:FindFirstChild(Config.CamlockPart)
+    if not hitpart then
+        Config.CamlockTarget = nil
+        return
+    end
+    local predictedPos = hitpart.Position + hitpart.Velocity * Vector3.new(Config.Prediction.X, Config.Prediction.Y, Config.Prediction.X)
     Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
 end
 
@@ -240,14 +242,10 @@ local function Triggerbot()
             local distance = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
             if distance <= Config.TriggerFOV then
                 task.spawn(function()
-                    local capturedTarget = target
-                    task.wait(Config.PredictionTime)
-                    if Config.TriggerbotEnabled and LocalPlayer:GetMouse().Target == capturedTarget then
-                        local mousePos = UserInputService:GetMouseLocation()
-                        VirtualInputManager:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, true, game, 0)
-                        task.wait(math.random(80, 120) / 1000)
-                        VirtualInputManager:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, false, game, 0)
-                    end
+                    local mousePos = UserInputService:GetMouseLocation()
+                    VirtualInputManager:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, true, game, 0)
+                    task.wait(math.random(80, 120) / 1000)
+                    VirtualInputManager:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, false, game, 0)
                 end)
             end
         end
@@ -294,7 +292,6 @@ UserInputService.InputBegan:Connect(function(input, processed)
         Config.ZoomEnabled = true
         UpdateZoom()
     elseif input.UserInputType == Enum.UserInputType.MouseButton2 then
-        Config.AimlockEnabled = true
         Config.TriggerbotEnabled = true
     elseif input.UserInputType == Enum.UserInputType.MouseButton3 then
         local target = LocalPlayer:GetMouse().Target
@@ -317,12 +314,14 @@ UserInputService.InputBegan:Connect(function(input, processed)
             Config.SelectedPlayers = {}
         end
         UpdatePlayerList()
+    elseif input.KeyCode == Enum.KeyCode.C then
+        Config.CamlockEnabled = not Config.CamlockEnabled
+        Config.CamlockTarget = Config.CamlockEnabled and GetClosestPlayer() or nil
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        Config.AimlockEnabled = false
         Config.TriggerbotEnabled = false
     elseif input.KeyCode == Enum.KeyCode.X then
         Config.ZoomEnabled = false
@@ -347,6 +346,10 @@ end)
 Connect(Players.PlayerRemoving, function(player)
     RemoveESP(player)
     Config.SelectedPlayers[player.Name] = nil
+    if Config.CamlockTarget == player then
+        Config.CamlockTarget = nil
+        Config.CamlockEnabled = false
+    end
     UpdatePlayerList()
 end)
 
@@ -356,9 +359,8 @@ Connect(RunService.RenderStepped, UpdateESP)
 RunService.RenderStepped:Connect(function()
     UpdateAntilock()
     UpdateZoom()
-    if Config.AimlockEnabled then
-        local target = FindTarget()
-        if target then Aimlock(target) end
+    if Config.CamlockEnabled then
+        Camlock()
     end
     if Config.TriggerbotEnabled then
         Triggerbot()
