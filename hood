@@ -18,9 +18,7 @@ local Config = {
     SelectedPlayers = {}, -- Danh sách người chơi được chọn
     TriggerbotEnabled = false, -- Trạng thái triggerbot
     TriggerFOV = 100, -- Phạm vi FOV triggerbot
-    PredictionTime = 0.05, -- Thời gian dự đoán
-    Cooldown = 0.1, -- Cooldown triggerbot
-    LastShot = 0 -- Thời điểm bắn cuối
+    PredictionTime = 0.05 -- Thời gian dự đoán
 }
 
 -- Danh sách phần hợp lệ
@@ -231,10 +229,10 @@ local function UpdateZoom()
     end
 end
 
--- Triggerbot
+-- Triggerbot (bắn liên tục, không cooldown)
 local function Triggerbot()
-    if not Config.TriggerbotEnabled or tick() - Config.LastShot < Config.Cooldown then return end
-    local target = LocalPlayer:GetMouse().Target
+    if not Config.TriggerbotEnabled then return end
+    local target = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool") and LocalPlayer:GetMouse().Target
     if target and IsValidPart(target) then
         local screenPos, onScreen = Camera:WorldToViewportPoint(target.Position)
         if onScreen then
@@ -249,7 +247,6 @@ local function Triggerbot()
                         VirtualInputManager:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, true, game, 0)
                         task.wait(math.random(80, 120) / 1000)
                         VirtualInputManager:SendMouseButtonEvent(mousePos.X, mousePos.Y, 0, false, game, 0)
-                        Config.LastShot = tick()
                     end
                 end)
             end
