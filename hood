@@ -7,6 +7,9 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local espGui = Instance.new("ScreenGui")
+espGui.Name = "ESPGui"
+espGui.Parent = PlayerGui
 
 -- Cấu hình
 local Config = {
@@ -17,12 +20,8 @@ local Config = {
 
 local autoSelect = false 
 
--- Khởi tạo ScreenGui cho ESP
-local espGui = Instance.new("ScreenGui")
-espGui.Name = "SafeESP"
-espGui.ResetOnSpawn = false
-espGui.IgnoreGuiInset = true
-espGui.Parent = PlayerGui
+local PlayerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+local getgenv = getgenv or _G
 
 -- Khởi tạo GUI
 local ScreenGui = Instance.new("ScreenGui")
@@ -41,40 +40,41 @@ MenuFrame.Draggable = true
 MenuFrame.Parent = ScreenGui
 Instance.new("UICorner", MenuFrame).CornerRadius = UDim.new(0, 8)
 
--- Prediction X Box
+-- Thanh tiêu đề (dùng làm nơi đặt ô nhập pred)
+local TitleFrame = Instance.new("Frame")
+TitleFrame.Size = UDim2.new(1, 0, 0, 24)
+TitleFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+TitleFrame.BorderSizePixel = 0
+TitleFrame.Parent = MenuFrame
+Instance.new("UICorner", TitleFrame).CornerRadius = UDim.new(0, 8)
+
+-- TextBox Pred X
 local predictionXBox = Instance.new("TextBox")
-predictionXBox.Parent = topBar
-predictionXBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-predictionXBox.Position = UDim2.new(0, 5, 0, 2)
-predictionXBox.Size = UDim2.new(0.5, -10, 1, -4)
+predictionXBox.Size = UDim2.new(0.5, -4, 1, -6)
+predictionXBox.Position = UDim2.new(0, 2, 0, 3)
+predictionXBox.BackgroundColor3 = Color3.fromRGB(200, 100, 100)
+predictionXBox.TextColor3 = Color3.new(1, 1, 1)
 predictionXBox.Font = Enum.Font.SourceSans
-predictionXBox.TextSize = 14
-predictionXBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-predictionXBox.Text = tostring(getgenv().Aimbot.Prediction.X or "0")
-predictionXBox.PlaceholderText = "Prediction X"
+predictionXBox.TextSize = 12
+predictionXBox.PlaceholderText = "Pred X"
+predictionXBox.Text = tostring(getgenv().Aimbot and getgenv().Aimbot.Prediction.X or "0.165")
 predictionXBox.ClearTextOnFocus = false
+predictionXBox.Parent = TitleFrame
 
--- Prediction Y Box
-local predictionYBox = Instance.new("TextBox")
-predictionYBox.Parent = topBar
-predictionYBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-predictionYBox.Position = UDim2.new(0.5, 5, 0, 2)
-predictionYBox.Size = UDim2.new(0.5, -10, 1, -4)
-predictionYBox.Font = Enum.Font.SourceSans
-predictionYBox.TextSize = 14
-predictionYBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-predictionYBox.Text = tostring(getgenv().Aimbot.Prediction.Y or "0")
-predictionYBox.PlaceholderText = "Prediction Y"
-predictionYBox.ClearTextOnFocus = false
+-- TextBox Pred Y
+local predictionYBox = predictionXBox:Clone()
+predictionYBox.Position = UDim2.new(0.5, 2, 0, 3)
+predictionYBox.PlaceholderText = "Pred Y"
+predictionYBox.Text = tostring(getgenv().Aimbot and getgenv().Aimbot.Prediction.Y or "0.1")
+predictionYBox.Parent = TitleFrame
 
--- Update prediction values on input
+-- Update pred value khi mất focus
 predictionXBox.FocusLost:Connect(function()
 	local val = tonumber(predictionXBox.Text)
 	if val then
 		getgenv().Aimbot.Prediction.X = val
 	end
 end)
-
 predictionYBox.FocusLost:Connect(function()
 	local val = tonumber(predictionYBox.Text)
 	if val then
@@ -82,9 +82,10 @@ predictionYBox.FocusLost:Connect(function()
 	end
 end)
 
+-- Danh sách người chơi
 local PlayerList = Instance.new("ScrollingFrame")
-PlayerList.Size = UDim2.new(1, -4, 1, -22)
-PlayerList.Position = UDim2.new(0, 2, 0, 20)
+PlayerList.Size = UDim2.new(1, -4, 1, -30)
+PlayerList.Position = UDim2.new(0, 2, 0, 26)
 PlayerList.CanvasSize = UDim2.new(0, 0, 0, 0)
 PlayerList.ScrollBarThickness = 3
 PlayerList.BackgroundTransparency = 1
@@ -95,8 +96,9 @@ UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Padding = UDim.new(0, 3)
 UIListLayout.Parent = PlayerList
 UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    PlayerList.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
+	PlayerList.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
 end)
+
 
 -- Danh sách ESP
 local ESPs = {}
@@ -111,8 +113,22 @@ local function IsValidTarget(player)
 end
 
 -- Tạo ESP
+-- Khởi tạo espGui (đảm bảo đã thêm ở đầu script)
+local espGui = Instance.new("ScreenGui")
+espGui.Name = "ESPGui"
+espGui.Parent = PlayerGui
+
+-- Tạo ESP
 local function CreateESP(player)
     if ESPs[player] or player == LocalPlayer then return end
+    local billboardGui = Instance.new("BillboardGui")
+    billboardGui.Name = player.Name .. "_ESP"
+    billboardGui.Adornee = player.Character:FindFirstChild("Head")
+    billboardGui.Size = UDim2.new(0, 200, 0, 50)
+    billboardGui.StudsOffset = Vector3.new(0, 2, 0) -- Đặt trên đầu 2 đơn vị
+    billboardGui.AlwaysOnTop = true
+    billboardGui.Parent = espGui
+
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
     label.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -121,11 +137,8 @@ local function CreateESP(player)
     label.Text = player.DisplayName
     label.TextStrokeTransparency = 0.7
     label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    label.Size = UDim2.new(0, 200, 0, 20)
-    label.AnchorPoint = Vector2.new(0.5, 0.5)
-    label.Position = UDim2.new(0.5, 0, 0.5, 0)
-    label.Visible = false
-    label.Parent = espGui
+    label.Size = UDim2.new(1, 0, 1, 0)
+    label.Parent = billboardGui
 
     local highlight = Instance.new("Highlight")
     highlight.Enabled = false
@@ -136,14 +149,14 @@ local function CreateESP(player)
     highlight.Adornee = player.Character
     highlight.Parent = espGui
 
-    ESPs[player] = { label = label, highlight = highlight }
+    ESPs[player] = { billboardGui = billboardGui, label = label, highlight = highlight }
 end
 
 -- Xóa ESP
 local function RemoveESP(player)
     if ESPs[player] then
         pcall(function()
-            ESPs[player].label:Destroy()
+            ESPs[player].billboardGui:Destroy()
             ESPs[player].highlight:Destroy()
         end)
         ESPs[player] = nil
@@ -153,8 +166,9 @@ end
 -- Cập nhật ESP
 local function UpdateESP()
     if not Config.ESPEnabled then
+        print("ESP is disabled")
         for _, v in pairs(ESPs) do
-            v.label.Visible = false
+            v.billboardGui.Enabled = false
             v.highlight.Enabled = false
         end
         return
@@ -164,24 +178,19 @@ local function UpdateESP()
             local character = player.Character
             local head = character:FindFirstChild("Head")
             if head then
+                print("Creating ESP for: ", player.Name)
                 CreateESP(player)
-                local headPos = head.Position
-                local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
                 local esp = ESPs[player]
                 if esp then
                     local isSelected = Config.SelectedPlayers[player.Name]
                     esp.label.TextColor3 = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(200, 200, 200)
                     esp.highlight.FillColor = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(200, 200, 200)
-                    if onScreen then
-                        esp.label.Visible = true
-                        esp.label.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y - 20)
-                        esp.highlight.Enabled = true
-                    else
-                        esp.label.Visible = false
-                        esp.highlight.Enabled = false
-                    end
+                    esp.billboardGui.Enabled = true
+                    esp.highlight.Enabled = true
+                    print("ESP enabled for: ", player.Name)
                 end
             else
+                print("No Head for: ", player.Name)
                 RemoveESP(player)
             end
         else
