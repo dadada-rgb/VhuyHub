@@ -457,8 +457,8 @@ local function cx()
     i.t, i.w = false, false
 end
 
-local toggleAntilock = true -- Bật/tắt antilock
-local shiftAmount = 0.5     -- Mức độ lệch vị trí
+local toggleAntilock = true 
+local shiftAmount = 0.5  
 
 game:GetService("RunService").RenderStepped:Connect(function()
     if toggleAntilock then
@@ -468,44 +468,6 @@ game:GetService("RunService").RenderStepped:Connect(function()
             root.CFrame = root.CFrame * CFrame.new(math.random(-shiftAmount, shiftAmount)/50, 0, math.random(-shiftAmount, shiftAmount)/50)
         end
     end
-end)
-
-c:SetCore("SendNotification", {
-	Title = "VhuyHub",
-	Text = "Loaded",
-	Duration = 3
-})
-
-local player = game:GetService("Players").LocalPlayer
-local lighting = game:GetService("Lighting")
-
--- 👁️‍🗨️ Thêm Blur hiệu ứng mềm
-local blur = Instance.new("BlurEffect")
-blur.Size = 24
-blur.Parent = lighting
-
--- 🎨 GUI chữ to giữa màn hình
-local gui = Instance.new("ScreenGui")
-gui.Name = "VhuyHubGUI"
-gui.IgnoreGuiInset = true
-gui.ResetOnSpawn = false
-gui.Parent = player:WaitForChild("PlayerGui")
-
-local label = Instance.new("TextLabel")
-label.Size = UDim2.new(1, 0, 1, 0)
-label.Position = UDim2.new(0, 0, 0, 0)
-label.BackgroundTransparency = 1
-label.Text = "VhuyHub"
-label.TextColor3 = Color3.fromRGB(255, 182, 193) -- Hồng pastel
-label.TextStrokeTransparency = 0.2 -- Viền nhẹ
-label.TextScaled = true
-label.Font = Enum.Font.GothamBlack
-label.Parent = gui
-
--- ⏳ Hiện trong 1 giây rồi tự xóa
-task.delay(1, function()
-	if blur then blur:Destroy() end
-	if gui then gui:Destroy() end
 end)
 
 game:BindToClose(cx)
