@@ -288,84 +288,128 @@ local function AntilockStep()
     end
 end
 
-local Players, UIS, Run, VU = game:GetService("Players"), game:GetService("UserInputService"), game:GetService("RunService"), game:GetService("VirtualUser")
-local LP, Mouse, Cam = Players.LocalPlayer, Players.LocalPlayer:GetMouse(), workspace.CurrentCamera
-
-local tbEnabled = true -- TriggerBot luôn hoạt động
-local predictionTime = 0
-local cooldown = 0
-local fovRadius = 20
-local lastShot = 0
-local hitParts = {
-    "Head",
-    "HumanoidRootPart",
-    "UpperTorso",
-    "LowerTorso",
-    "LeftUpperArm",
-    "LeftLowerArm",
-    "LeftHand",
-    "RightUpperArm",
-    "RightLowerArm",
-    "RightHand",
-    "LeftUpperLeg",
-    "LeftLowerLeg",
-    "LeftFoot",
-    "RightUpperLeg",
-    "RightLowerLeg",
-    "RightFoot",
-    "Torso",
-    "Left Arm",
-    "Right Arm",
-    "Left Leg",
-    "Right Leg"
+getgenv().Aimbot = {
+    Status = true,
+    Keybind  = 'C',
+    Hitpart = 'HumanoidRootPart',
+    ['Prediction'] = {
+        X = 0.165,
+        Y = 0.1,
+    },
 }
 
--- Kiểm tra target có hợp lệ không
-local function validPart(p)
-    if not p or not p.Parent or not p.Parent:FindFirstChild("Humanoid") then return false end
-    local player = Players:GetPlayerFromCharacter(p.Parent)
-    if not player or not Config.SelectedPlayers[player.Name] then return false end
-    for _, n in ipairs(hitParts) do
-        if p.Name:lower() == n:lower() then return true end
+if getgenv().AimbotRan then return else getgenv().AimbotRan = true end
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+
+local Target = nil
+local HoldingRightClick = false
+
+-- Nhận giữ chuột phải
+UserInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        HoldingRightClick = true
+    end
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        HoldingRightClick = false
+    end
+end)
+
+local function GetClosestPlayer()
+    local closestDist, closestPlr = math.huge, nil
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr == LocalPlayer then continue end
+        if not Config.SelectedPlayers or not Config.SelectedPlayers[plr.Name] then continue end
+
+        local char = plr.Character
+        if not char or not char:FindFirstChild("Humanoid") or not char:FindFirstChild("HumanoidRootPart") then continue end
+        if char:FindFirstChild("Humanoid").Health <= 0 then continue end
+
+        local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+        if not head then continue end
+
+        -- Kiểm tra bị cản bởi tường
+        local rayParams = RaycastParams.new()
+        rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+        rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+        local result = Workspace:Raycast(Camera.CFrame.Position, (head.Position - Camera.CFrame.Position).Unit * 999, rayParams)
+
+        if result and result.Instance and not head:IsDescendantOf(result.Instance.Parent) then
+            continue
+        end
+
+        -- Tính khoảng cách màn hình
+        local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+        if onScreen then
+            local dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
+            if dist < closestDist then
+                closestDist = dist
+                closestPlr = plr
+            end
+        end
+    end
+    return closestPlr
+end
+
+-- Keybind chọn người
+Mouse.KeyDown:Connect(function(key)
+    if key:lower() == Aimbot.Keybind:lower() then
+        Target = not Target and GetClosestPlayer() or nil
+    end
+end)
+
+-- Aimbot khi giữ chuột phải
+RunService.RenderStepped:Connect(function()
+    if not getgenv().Aimbot.Status then return end
+    if not HoldingRightClick then return end
+    if not Target then return end
+    local char = Target.Character
+    if not char then return end
+    local part = char:FindFirstChild(getgenv().Aimbot.Hitpart)
+    if not part then return end
+    local pred = part.Position + part.Velocity * Vector3.new(getgenv().Aimbot.Prediction.X, getgenv().Aimbot.Prediction.Y, getgenv().Aimbot.Prediction.X)
+    Camera.CFrame = CFrame.new(Camera.CFrame.Position, pred)
+end)
+
+-- ✅ TriggerBot luôn bật (mượt)
+local hitParts = {
+    "Head","HumanoidRootPart","UpperTorso","LowerTorso","LeftUpperArm","LeftLowerArm","LeftHand",
+    "RightUpperArm","RightLowerArm","RightHand","LeftUpperLeg","LeftLowerLeg","LeftFoot",
+    "RightUpperLeg","RightLowerLeg","RightFoot","Torso","Left Arm","Right Arm","Left Leg","Right Leg"
+}
+
+local function isValidPart(part)
+    if not part or not part.Parent then return false end
+    local plr = Players:GetPlayerFromCharacter(part.Parent)
+    if not plr or not Config.SelectedPlayers or not Config.SelectedPlayers[plr.Name] then return false end
+    for _, name in ipairs(hitParts) do
+        if part.Name:lower() == name:lower() then return true end
     end
     return false
 end
 
--- Tính khoảng cách từ chuột tới part
-local function distToCursor(part)
-    local v, vis = Cam:WorldToViewportPoint(part.Position)
-    if not vis then return math.huge end
-    local m = UIS:GetMouseLocation()
-    return (Vector2.new(v.X, v.Y) - Vector2.new(m.X, m.Y)).Magnitude
-end
-
--- Click chuột trái
-local function click()
-    if mouse1press then 
-        mouse1press() 
-        mouse1release()
-    elseif mouse1click then 
-        mouse1click()
+local function triggerClick()
+    if mouse1press then mouse1press() mouse1release()
+    elseif mouse1click then mouse1click()
     else
-        VU:Button1Down(Vector2.new(), Cam.CFrame)
-        task.wait()
-        VU:Button1Up(Vector2.new(), Cam.CFrame)
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+        VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
     end
 end
 
--- Loop TriggerBot
-Run.RenderStepped:Connect(function()
-    if not tbEnabled or tick() - lastShot < cooldown then return end
+RunService.RenderStepped:Connect(function()
     local part = Mouse.Target
-    if part and validPart(part) and distToCursor(part) <= fovRadius then
-        task.spawn(function()
-            local cap = part
-            task.wait(predictionTime)
-            if tbEnabled and Mouse.Target == cap and distToCursor(cap) <= fovRadius then
-                click()
-                lastShot = tick()
-            end
-        end)
+    if part and isValidPart(part) then
+        triggerClick()
     end
 end)
 
