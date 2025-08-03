@@ -37,6 +37,7 @@ local validParts = {
     "RightUpperLeg",
     "RightLowerLeg",
     "RightFoot"
+    "Humanoid"
 }
 
 local function isValidPart(part)
