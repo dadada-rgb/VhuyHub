@@ -8,10 +8,74 @@ local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
+-- Lưu đối tượng cần bảo vệ
+local ProtectedInstances = {
+    [LocalPlayer.PlayerGui] = true,
+    [LocalPlayer.PlayerGui:FindFirstChild("SafeESP")] = true,
+    [LocalPlayer.PlayerGui:FindFirstChild("VhuyHub")] = true
+}
+
+-- Hook Metamethods
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+
+local oldIndex = mt.__index
+local oldNamecall = mt.__namecall
+
+-- Hook __index (bảo vệ các object ESP/Highlight/PlayerGui...)
+mt.__index = newcclosure(function(self, key)
+    if self == LocalPlayer and key == "Kick" then
+        warn("[AntiKick] Blocked Kick call via __index")
+        return function() end
+    end
+
+    -- Chặn lấy thông tin các đối tượng được bảo vệ
+    if ProtectedInstances[self] then
+        if typeof(key) == "string" and (key:lower():find("child") or key:lower():find("highlight")) then
+            warn("[AntiInspect] Blocked access to protected instance: " .. tostring(key))
+            return nil
+        end
+    end
+
+    return oldIndex(self, key)
+end)
+
+-- Hook __namecall (chặn remote nguy hiểm + Kick + Raycast...)
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    local args = {...}
+
+    -- Chặn bị Kick
+    if method == "Kick" and tostring(self) == "Kick" then
+        warn("[AntiKick] Kick blocked via __namecall")
+        return
+    end
+
+    -- Chặn Remote nghi ngờ
+    if method == "FireServer" and typeof(self) == "Instance" then
+        local lowerName = self.Name:lower()
+        if lowerName:find("kick") or lowerName:find("ban") or lowerName:find("report") then
+            warn("[AntiRemote] Blocked suspicious FireServer: " .. self.Name)
+            return
+        end
+    end
+
+    -- Chặn Raycast từ bên ngoài đọc Camera
+    if self == Workspace and method == "Raycast" then
+        -- Fake raycast fail nếu ai đó cố check xuyên tường
+        if not checkcaller() then
+            return nil
+        end
+    end
+
+    return oldNamecall(self, ...)
+end)
+
+setreadonly(mt, true)
+
 -- Cấu hình
 local Config = {
     ESPEnabled = true, -- Trạng thái ESP
-    ZoomEnabled = false, -- Trạng thái zoom
     ShiftAmount = 0.5, -- Độ dịch chuyển antilock
     SelectedPlayers = {} -- Danh sách người chơi được chọn
 }
@@ -169,16 +233,37 @@ local function UpdateAntilock()
     end
 end
 
--- Zoom (chuyển đổi góc nhìn)
-local function UpdateZoom()
-    if Config.ZoomEnabled then
-        LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
-        LocalPlayer.CameraMinZoomDistance = 0.5
-    else
-        LocalPlayer.CameraMode = Enum.CameraMode.Classic
-        LocalPlayer.CameraMinZoomDistance = 0.5
-    end
-end
+-- Macro Zoom kiểu lock/unlock camera nhanh khi nhấn giữ phím X (hoặc DPadDown trên mobile gamepad)
+local macroEnabled = false
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.DPadDown then
+		macroEnabled = true
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.DPadDown then
+		macroEnabled = false
+	end
+end)
+
+RunService.Heartbeat:Connect(function()
+	local player = Players.LocalPlayer
+	if macroEnabled then
+		player.CameraMinZoomDistance = 0.5
+		player.CameraMode = Enum.CameraMode.LockFirstPerson
+		task.wait() -- nhanh như heartbeat
+		player.CameraMode = Enum.CameraMode.Classic
+		player.CameraMinZoomDistance = 5
+		task.wait()
+	else
+		player.CameraMinZoomDistance = 0.5
+		player.CameraMode = Enum.CameraMode.Classic
+	end
+end)
 
 -- Cập nhật danh sách người chơi
 local function UpdatePlayerList()
@@ -234,13 +319,6 @@ UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 
-UserInputService.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.X then
-        Config.ZoomEnabled = false
-        UpdateZoom()
-    end
-end)
-
 -- Xử lý sự kiện người chơi
 local Connections = {}
 local function Connect(event, callback)
@@ -288,120 +366,179 @@ local function AntilockStep()
     end
 end
 
--- ✅ Aimbot + TriggerBot (Tự động tìm target khi giữ chuột phải)
+local Players, UIS, Run, VU = game:GetService("Players"), game:GetService("UserInputService"), game:GetService("RunService"), game:GetService("VirtualUser")
+local LP, Mouse, Cam = Players.LocalPlayer, Players.LocalPlayer:GetMouse(), workspace.CurrentCamera
 
-getgenv().Aimbot = {
-	Status = true,
-	Hitpart = 'HumanoidRootPart',
-	Prediction = { X = 0.165, Y = 0.1 },
-}
-
-if getgenv().AimbotRan then return else getgenv().AimbotRan = true end
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local Workspace = game:GetService("Workspace")
-local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
-local Mouse = LocalPlayer:GetMouse()
-
-local HoldingRightClick = false
-local RaycastParams = RaycastParams.new()
-RaycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-RaycastParams.IgnoreWater = true
-
--- ✅ Danh sách part TriggerBot
+local tbEnabled = true -- TriggerBot luôn hoạt động
+local predictionTime = 0
+local fovRadius = 20
 local hitParts = {
-	"Head","HumanoidRootPart","UpperTorso","LowerTorso","LeftUpperArm","LeftLowerArm","LeftHand",
-	"RightUpperArm","RightLowerArm","RightHand","LeftUpperLeg","LeftLowerLeg","LeftFoot",
-	"RightUpperLeg","RightLowerLeg","RightFoot","Torso","Left Arm","Right Arm","Left Leg","Right Leg"
+    "Head",
+    "HumanoidRootPart",
+    "UpperTorso",
+    "LowerTorso",
+    "LeftUpperArm",
+    "LeftLowerArm",
+    "LeftHand",
+    "RightUpperArm",
+    "RightLowerArm",
+    "RightHand",
+    "LeftUpperLeg",
+    "LeftLowerLeg",
+    "LeftFoot",
+    "RightUpperLeg",
+    "RightLowerLeg",
+    "RightFoot",
+    "Torso",
+    "Left Arm",
+    "Right Arm",
+    "Left Leg",
+    "Right Leg"
 }
 
--- ✅ Kiểm tra part TriggerBot
-local function isValidPart(part)
-	if not part or not part.Parent then return false end
-	local plr = Players:GetPlayerFromCharacter(part.Parent)
-	if not plr or plr == LocalPlayer then return false end
-	if plr.Team == LocalPlayer.Team then return false end
-	if not plr.Character:FindFirstChild("Humanoid") or plr.Character.Humanoid.Health <= 0 then return false end
-	for _, name in ipairs(hitParts) do
-		if part.Name:lower() == name:lower() then return true end
+-- Kiểm tra target có hợp lệ không
+local function validPart(p)
+    if not p or not p.Parent or not p.Parent:FindFirstChild("Humanoid") then return false end
+    local player = Players:GetPlayerFromCharacter(p.Parent)
+    if not player or not Config.SelectedPlayers[player.Name] then return false end
+    for _, n in ipairs(hitParts) do
+        if p.Name:lower() == n:lower() then return true end
+    end
+    return false
+end
+
+-- Tính khoảng cách từ chuột tới part
+local function distToCursor(part)
+    local v, vis = Cam:WorldToViewportPoint(part.Position)
+    if not vis then return math.huge end
+    local m = UIS:GetMouseLocation()
+    return (Vector2.new(v.X, v.Y) - Vector2.new(m.X, m.Y)).Magnitude
+end
+
+-- Click chuột trái
+local function click()
+    if mouse1press then 
+        mouse1press() 
+        mouse1release()
+    elseif mouse1click then 
+        mouse1click()
+    else
+        VU:Button1Down(Vector2.new(), Cam.CFrame)
+        task.wait()
+        VU:Button1Up(Vector2.new(), Cam.CFrame)
+    end
+end
+
+-- Loop TriggerBot
+Run.RenderStepped:Connect(function()
+    if not tbEnabled then return end
+    local part = Mouse.Target
+    if part and validPart(part) and distToCursor(part) <= fovRadius then
+        task.spawn(function()
+            local cap = part
+            task.wait(predictionTime)
+            if tbEnabled and Mouse.Target == cap and distToCursor(cap) <= fovRadius then
+                click()
+            end
+        end)
+    end
+end)
+
+-- Aimlock đơn giản tích hợp vào script đã có
+local aimEnabled = false
+local predictionTime = 0.165
+local verticalOffset = 0.1
+
+-- Kiểm tra mục tiêu hợp lệ
+local function IsValidAimTarget(player)
+	if not player or player == LocalPlayer then return false end
+	if not player.Character then return false end
+	local hum = player.Character:FindFirstChildOfClass("Humanoid")
+	local root = player.Character:FindFirstChild("HumanoidRootPart")
+	if not hum or not root then return false end
+	if hum.Health <= 0 then return false end
+	local bodyEffects = player.Character:FindFirstChild("BodyEffects")
+	if bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value then
+		return false
+	end
+	return true
+end
+
+-- Kiểm tra vật cản
+local function IsObstructed(pos)
+	local origin = Camera.CFrame.Position
+	local direction = (pos - origin).Unit * 500
+	local rayParams = RaycastParams.new()
+	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+	rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+	rayParams.IgnoreWater = true
+
+	local result = Workspace:Raycast(origin, direction, rayParams)
+	if result and (result.Position - pos).Magnitude > 3 then
+		return true
 	end
 	return false
 end
 
--- ✅ TriggerBot: luôn hoạt động
-RunService.RenderStepped:Connect(function()
-	local part = Mouse.Target
-	if isValidPart(part) then
-		VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-		VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-	end
-end)
-
--- ✅ Chuột phải để Aimbot
-UserInputService.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton2 then
-		HoldingRightClick = true
-	end
-end)
-UserInputService.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton2 then
-		HoldingRightClick = false
-	end
-end)
-
--- ✅ Lấy player gần nhất không bị che
-local function GetClosestVisiblePlayer()
-	local closestDist = math.huge
-	local closestPlr = nil
-
-	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") and plr.Character:FindFirstChild("Humanoid") then
-			if plr.Team == LocalPlayer.Team or plr.Character.Humanoid.Health <= 0 then continue end
-
-			local head = plr.Character:FindFirstChild("HumanoidRootPart")
-			if not head then continue end
-
-			RaycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-			local result = Workspace:Raycast(Camera.CFrame.Position, (head.Position - Camera.CFrame.Position).Unit * 999, RaycastParams)
-			if result and result.Instance and not result.Instance:IsDescendantOf(plr.Character) then continue end
-
-			local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
-			if not onScreen then continue end
-
-			local dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(screenPos.X, screenPos.Y)).Magnitude
-			if dist < closestDist then
-				closestDist = dist
-				closestPlr = plr
+-- Lấy mục tiêu gần nhất trong danh sách
+local function GetClosestTarget()
+	local closest = nil
+	local shortestDist = math.huge
+	for _, player in pairs(Players:GetPlayers()) do
+		if Config.SelectedPlayers[player.Name] and IsValidAimTarget(player) then
+			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+			if root then
+				local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+				if onScreen then
+					local dist = (Vector2.new(screenPos.X, screenPos.Y) - UserInputService:GetMouseLocation()).Magnitude
+					if dist < shortestDist then
+						closest = player
+						shortestDist = dist
+					end
+				end
 			end
 		end
 	end
-
-	return closestPlr
+	return closest
 end
 
--- ✅ Aimbot khi giữ chuột phải (auto chọn target gần nhất)
-RunService.RenderStepped:Connect(function()
-	if not getgenv().Aimbot.Status then return end
-	if not HoldingRightClick then return end
+-- Aim đến mục tiêu
+local function AimAt(target)
+	local root = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
 
-	local target = GetClosestVisiblePlayer()
-	if not target or not target.Character then return end
+	local velocity = root.Velocity
+	local predictedPos = root.Position + velocity * predictionTime + Vector3.new(0, verticalOffset, 0)
+	if IsObstructed(predictedPos) then return end
 
-	local part = target.Character:FindFirstChild(getgenv().Aimbot.Hitpart)
-	if not part then return end
+	Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
+end
 
-	local predicted = part.Position + part.Velocity * Vector3.new(
-		getgenv().Aimbot.Prediction.X,
-		getgenv().Aimbot.Prediction.Y,
-		getgenv().Aimbot.Prediction.X
-	)
-
-	Camera.CFrame = CFrame.new(Camera.CFrame.Position, predicted)
+-- Kích hoạt bằng giữ chuột phải
+UserInputService.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		aimEnabled = true
+	end
 end)
+
+UserInputService.InputEnded:Connect(function(input, gpe)
+	if gpe then return end
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		aimEnabled = false
+	end
+end)
+
+-- Vòng lặp aim
+RunService.RenderStepped:Connect(function()
+	if aimEnabled then
+		local target = GetClosestTarget()
+		if target then
+			AimAt(target)
+		end
+	end
+end)
+
 
 -- Dọn dẹp khi thoát
 game:BindToClose(function()
