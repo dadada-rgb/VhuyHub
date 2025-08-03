@@ -60,15 +60,6 @@ e.InputBegan:Connect(function(e, f)
         else
             deselectAllPlayers()
         end
-    elseif e.UserInputType == Enum.UserInputType.MouseButton3 then
-        local mouseTarget = g:GetMouse().Target
-        if mouseTarget and isValidPart(mouseTarget) then
-            local targetPlayer = a:GetPlayerFromCharacter(mouseTarget.Parent)
-            if targetPlayer and targetPlayer ~= g then
-                i.v[targetPlayer.Name] = not i.v[targetPlayer.Name] and true or nil
-                cc()
-            end
-        end
     end
 end)
 
@@ -291,27 +282,6 @@ r(e.InputBegan, function(ca, cb)
                 i.t = true
             end
         end bo co = bf()
-    elseif ca.UserInputType == Enum.UserInputType.MouseButton3 then
-        local mousePos = e:GetMouseLocation()
-        local ray = h:ScreenPointToRay(mousePos.X, mousePos.Y)
-        local raycastParams = RaycastParams.new()
-        raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-        raycastParams.FilterDescendantsInstances = {g.Character, d:FindFirstChild("Terrain") or {}}
-        local rayResult = d:Raycast(ray.Origin, ray.Direction * i.r, raycastParams)
-        if rayResult and rayResult.Instance then
-            local instance = rayResult.Instance
-            local maxDepth = 10
-            local depth = 0
-            while instance and not a:GetPlayerFromCharacter(instance) and depth < maxDepth do
-                instance = instance.Parent
-                depth = depth + 1
-            end
-            local targetPlayer = instance and a:GetPlayerFromCharacter(instance)
-            if targetPlayer and targetPlayer ~= g then
-                i.v[targetPlayer.Name] = not i.v[targetPlayer.Name] and true or nil
-                cc()
-            end
-        end
     elseif ca.KeyCode == Enum.KeyCode.K then
         i.w = not i.w
     end
@@ -456,6 +426,23 @@ r(b.RenderStepped, function()
     end
 end)
 
+d.InputBegan:Connect(function(input, processed)
+	if input.UserInputType == Enum.UserInputType.MouseButton3 and not processed then
+		local target = g:GetMouse().Target
+		if not isValidPart(target) then return end
+
+		local targetPlayer = target and a:GetPlayerFromCharacter(target.Parent)
+		if targetPlayer and targetPlayer ~= g then
+			if not i.v[targetPlayer.Name] then
+				i.v[targetPlayer.Name] = true
+			else
+				i.v[targetPlayer.Name] = nil
+			end
+		end
+	end
+end)
+
+
 local function cx()
     for _, cy in pairs(j) do pcall(function() cy:Disconnect() end) end
     for _, cz in pairs(k) do
@@ -480,6 +467,46 @@ game:GetService("RunService").RenderStepped:Connect(function()
             root.CFrame = root.CFrame * CFrame.new(math.random(-shiftAmount, shiftAmount)/50, 0, math.random(-shiftAmount, shiftAmount)/50)
         end
     end
+end)
+
+local StarterGui = game:GetService("StarterGui")
+
+StarterGui:SetCore("SendNotification", {
+	Title = "VhuyHub",
+	Text = "Loaded",
+	Duration = 3
+})
+
+local player = game:GetService("Players").LocalPlayer
+local lighting = game:GetService("Lighting")
+
+-- 👁️‍🗨️ Thêm Blur hiệu ứng mềm
+local blur = Instance.new("BlurEffect")
+blur.Size = 24
+blur.Parent = lighting
+
+-- 🎨 GUI chữ to giữa màn hình
+local gui = Instance.new("ScreenGui")
+gui.Name = "VhuyHubGUI"
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, 0, 1, 0)
+label.Position = UDim2.new(0, 0, 0, 0)
+label.BackgroundTransparency = 1
+label.Text = "VhuyHub"
+label.TextColor3 = Color3.fromRGB(255, 182, 193) -- Hồng pastel
+label.TextStrokeTransparency = 0.2 -- Viền nhẹ
+label.TextScaled = true
+label.Font = Enum.Font.GothamBlack
+label.Parent = gui
+
+-- ⏳ Hiện trong 1 giây rồi tự xóa
+task.delay(1, function()
+	if blur then blur:Destroy() end
+	if gui then gui:Destroy() end
 end)
 
 game:BindToClose(cx)
