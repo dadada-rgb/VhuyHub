@@ -288,10 +288,10 @@ local function AntilockStep()
     end
 end
 
--- ✅ Aimbot + TriggerBot fix hoạt động chuẩn
+-- ✅ Aimbot + TriggerBot (Tự động tìm target khi giữ chuột phải)
+
 getgenv().Aimbot = {
 	Status = true,
-	Keybind = 'C',
 	Hitpart = 'HumanoidRootPart',
 	Prediction = { X = 0.165, Y = 0.1 },
 }
@@ -307,20 +307,19 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 
-local Target = nil
 local HoldingRightClick = false
 local RaycastParams = RaycastParams.new()
 RaycastParams.FilterType = Enum.RaycastFilterType.Blacklist
 RaycastParams.IgnoreWater = true
 
--- ✅ Danh sách part được bắn trigger
+-- ✅ Danh sách part TriggerBot
 local hitParts = {
 	"Head","HumanoidRootPart","UpperTorso","LowerTorso","LeftUpperArm","LeftLowerArm","LeftHand",
 	"RightUpperArm","RightLowerArm","RightHand","LeftUpperLeg","LeftLowerLeg","LeftFoot",
 	"RightUpperLeg","RightLowerLeg","RightFoot","Torso","Left Arm","Right Arm","Left Leg","Right Leg"
 }
 
--- ✅ Kiểm tra part có hợp lệ không
+-- ✅ Kiểm tra part TriggerBot
 local function isValidPart(part)
 	if not part or not part.Parent then return false end
 	local plr = Players:GetPlayerFromCharacter(part.Parent)
@@ -333,7 +332,7 @@ local function isValidPart(part)
 	return false
 end
 
--- ✅ TriggerBot: luôn hoạt động khi trỏ vào đúng part
+-- ✅ TriggerBot: luôn hoạt động
 RunService.RenderStepped:Connect(function()
 	local part = Mouse.Target
 	if isValidPart(part) then
@@ -342,7 +341,7 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
--- ✅ Nhận giữ chuột phải để bật Aimbot
+-- ✅ Chuột phải để Aimbot
 UserInputService.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		HoldingRightClick = true
@@ -354,7 +353,7 @@ UserInputService.InputEnded:Connect(function(input)
 	end
 end)
 
--- ✅ Lấy player gần nhất có thể thấy và không bị che
+-- ✅ Lấy player gần nhất không bị che
 local function GetClosestVisiblePlayer()
 	local closestDist = math.huge
 	local closestPlr = nil
@@ -366,7 +365,6 @@ local function GetClosestVisiblePlayer()
 			local head = plr.Character:FindFirstChild("HumanoidRootPart")
 			if not head then continue end
 
-			-- Raycast check
 			RaycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
 			local result = Workspace:Raycast(Camera.CFrame.Position, (head.Position - Camera.CFrame.Position).Unit * 999, RaycastParams)
 			if result and result.Instance and not result.Instance:IsDescendantOf(plr.Character) then continue end
@@ -385,24 +383,23 @@ local function GetClosestVisiblePlayer()
 	return closestPlr
 end
 
--- ✅ Ấn Keybind (mặc định C) để chọn mục tiêu gần nhất
-Mouse.KeyDown:Connect(function(key)
-	if key:lower() == getgenv().Aimbot.Keybind:lower() then
-		Target = GetClosestVisiblePlayer()
-	end
-end)
-
--- ✅ Aimbot khi giữ chuột phải
+-- ✅ Aimbot khi giữ chuột phải (auto chọn target gần nhất)
 RunService.RenderStepped:Connect(function()
 	if not getgenv().Aimbot.Status then return end
 	if not HoldingRightClick then return end
-	if not Target or not Target.Character then return end
 
-	local part = Target.Character:FindFirstChild(getgenv().Aimbot.Hitpart)
+	local target = GetClosestVisiblePlayer()
+	if not target or not target.Character then return end
+
+	local part = target.Character:FindFirstChild(getgenv().Aimbot.Hitpart)
 	if not part then return end
 
-	local velocity = part.Velocity
-	local predicted = part.Position + velocity * Vector3.new(getgenv().Aimbot.Prediction.X, getgenv().Aimbot.Prediction.Y, getgenv().Aimbot.Prediction.X)
+	local predicted = part.Position + part.Velocity * Vector3.new(
+		getgenv().Aimbot.Prediction.X,
+		getgenv().Aimbot.Prediction.Y,
+		getgenv().Aimbot.Prediction.X
+	)
+
 	Camera.CFrame = CFrame.new(Camera.CFrame.Position, predicted)
 end)
 
