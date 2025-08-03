@@ -96,6 +96,63 @@ UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 	PlayerList.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
 end)
 
+-- Tự động chỉnh prediction theo ping
+local function getPing()
+    local stats = LocalPlayer:FindFirstChild("NetworkClient"):FindFirstChild("Ping")
+    if stats then
+        return stats:GetValue()
+    else
+        local pingStat = LocalPlayer:FindFirstChild("PlayerScripts"):FindFirstChild("PerformanceStats")
+        if pingStat then
+            return tonumber(pingStat:FindFirstChild("Ping"):GetValue())
+        end
+    end
+    return 60 -- fallback
+end
+
+local function autoPrediction(ping)
+	if ping < 20 then
+		return 0.09, 0.07
+	elseif ping < 40 then
+		return 0.11, 0.08
+	elseif ping < 60 then
+		return 0.13, 0.09
+	elseif ping < 80 then
+		return 0.15, 0.10
+	elseif ping < 100 then
+		return 0.17, 0.10
+	elseif ping < 120 then
+		return 0.18, 0.11
+	elseif ping < 140 then
+		return 0.20, 0.12
+	elseif ping < 160 then
+		return 0.22, 0.13
+	elseif ping < 180 then
+		return 0.23, 0.13
+	else
+		return 0.25, 0.14
+	end
+end
+
+-- Cập nhật prediction mỗi vài giây
+task.spawn(function()
+    while true do
+        local ping = getPing()
+        local x, y = autoPrediction(ping)
+        PredX.Text = tostring(x)
+        PredY.Text = tostring(y)
+
+        -- Nếu đang dùng getgenv().Aimbot thì cập nhật luôn
+        if getgenv().Aimbot then
+            getgenv().Aimbot.Prediction.X = x
+            getgenv().Aimbot.Prediction.Y = y
+        end
+
+        task.wait(5) -- Cập nhật mỗi 5 giây
+    end
+end)
+
+
 
 -- Danh sách ESP
 local ESPs = {}
