@@ -363,6 +363,90 @@ local function AntilockStep()
 	end
 end
 
+local Players, UIS, Run, VU = game:GetService("Players"), game:GetService("UserInputService"), game:GetService("RunService"), game:GetService("VirtualUser")
+local LP, Mouse, Cam = Players.LocalPlayer, Players.LocalPlayer:GetMouse(), workspace.CurrentCamera
+
+-- Trigger-Bot Settings
+local tbEnabled = false
+local knifeCheck = true
+local predictionTime = 0
+local cooldown = 0.1
+local fovRadius = 20
+local lastShot = 0
+local hitParts = {"humanoidrootpart", "head"}
+local meleeWords = {"knife","dagger","katana","sword","saber"}
+
+-- Check cầm vũ khí cận chiến
+local function holdingKnife()
+    if not knifeCheck then return false end
+    local tool = LP.Character and LP.Character:FindFirstChildOfClass("Tool")
+    if not tool then return false end
+    local n = tool.Name:lower()
+    for _,w in ipairs(meleeWords) do
+        if n:find(w) then return true end
+    end
+    return false
+end
+
+-- Kiểm tra target có hợp lệ không
+local function validPart(p)
+    if not p or not p.Parent or not p.Parent:FindFirstChild("Humanoid") then return false end
+    for _,n in ipairs(hitParts) do
+        if p.Name:lower() == n then return true end
+    end
+    return false
+end
+
+-- Tính khoảng cách từ chuột tới part
+local function distToCursor(part)
+    local v, vis = Cam:WorldToViewportPoint(part.Position)
+    if not vis then return math.huge end
+    local m = UIS:GetMouseLocation()
+    return (Vector2.new(v.X,v.Y) - Vector2.new(m.X,m.Y)).Magnitude
+end
+
+-- Click chuột trái
+local function click()
+    if mouse1press then mouse1press() mouse1release()
+    elseif mouse1click then mouse1click()
+    else
+        VU:Button1Down(Vector2.new(), Cam.CFrame)
+        task.wait()
+        VU:Button1Up(Vector2.new(), Cam.CFrame)
+    end
+end
+
+-- Bắt sự kiện giữ/thả chuột phải để bật/tắt TriggerBot
+UIS.InputBegan:Connect(function(io, gp)
+    if gp then return end
+    if io.UserInputType == Enum.UserInputType.MouseButton2 then
+        tbEnabled = true
+    end
+end)
+
+UIS.InputEnded:Connect(function(io, gp)
+    if gp then return end
+    if io.UserInputType == Enum.UserInputType.MouseButton2 then
+        tbEnabled = false
+    end
+end)
+
+-- Loop TriggerBot
+Run.RenderStepped:Connect(function()
+    if not tbEnabled or holdingKnife() or tick() - lastShot < cooldown then return end
+    local part = Mouse.Target
+    if part and validPart(part) and distToCursor(part) <= fovRadius then
+        task.spawn(function()
+            local cap = part
+            task.wait(predictionTime)
+            if tbEnabled and Mouse.Target == cap and distToCursor(cap) <= fovRadius and not holdingKnife() then
+                click()
+                lastShot = tick()
+            end
+        end)
+    end
+end)
+
 -- Dọn dẹp khi thoát
 game:BindToClose(function()
     for _, connection in pairs(Connections) do
