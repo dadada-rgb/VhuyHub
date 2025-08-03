@@ -119,7 +119,6 @@ local function CreateESP(player)
     if ESPs[player] or player == LocalPlayer then return end
     local billboardGui = Instance.new("BillboardGui")
     billboardGui.Name = player.Name .. "_ESP"
-    billboardGui.Adornee = player.Character and player.Character:FindFirstChild("Head")
     billboardGui.Size = UDim2.new(0, 200, 0, 50)
     billboardGui.StudsOffset = Vector3.new(0, 2, 0) -- Đặt trên đầu 2 đơn vị
     billboardGui.AlwaysOnTop = true
@@ -142,7 +141,6 @@ local function CreateESP(player)
     highlight.OutlineTransparency = 0.3
     highlight.FillColor = Color3.fromRGB(200, 200, 200)
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-    highlight.Adornee = player.Character
     highlight.Parent = espGui
 
     ESPs[player] = { billboardGui = billboardGui, label = label, highlight = highlight }
@@ -203,9 +201,11 @@ end
 for _, player in ipairs(Players:GetPlayers()) do
     Connect(player.CharacterAdded, function(character)
         print("Character respawned for: ", player.Name)
+        task.wait(1) -- Đợi nhân vật tải hoàn toàn
         RemoveESP(player)
         if player ~= LocalPlayer and IsValidTarget(player) then
             CreateESP(player)
+            UpdateESP()
         end
         UpdatePlayerList()
     end)
@@ -214,7 +214,7 @@ end
 -- Xử lý respawn của LocalPlayer
 Connect(LocalPlayer.CharacterAdded, function(character)
     print("LocalPlayer respawned")
-    -- Làm mới ESP cho tất cả người chơi
+    task.wait(1) -- Đợi nhân vật tải hoàn toàn
     for _, player in ipairs(Players:GetPlayers()) do
         RemoveESP(player)
     end
@@ -226,12 +226,13 @@ Connect(Players.PlayerAdded, function(player)
     task.wait(math.random(2, 3))
     RemoveESP(player)
     UpdatePlayerList()
-    -- Thêm sự kiện CharacterAdded cho người chơi mới
     player.CharacterAdded:Connect(function(character)
         print("Character added for: ", player.Name)
+        task.wait(1) -- Đợi nhân vật tải hoàn toàn
         RemoveESP(player)
         if player ~= LocalPlayer and IsValidTarget(player) then
             CreateESP(player)
+            UpdateESP()
         end
         UpdatePlayerList()
     end)
