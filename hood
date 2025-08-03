@@ -17,8 +17,12 @@ local Config = {
 
 local autoSelect = false 
 
-local PlayerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
-local getgenv = getgenv or _G
+-- Khởi tạo ScreenGui cho ESP
+local espGui = Instance.new("ScreenGui")
+espGui.Name = "SafeESP"
+espGui.ResetOnSpawn = false
+espGui.IgnoreGuiInset = true
+espGui.Parent = PlayerGui
 
 -- Khởi tạo GUI
 local ScreenGui = Instance.new("ScreenGui")
@@ -37,52 +41,19 @@ MenuFrame.Draggable = true
 MenuFrame.Parent = ScreenGui
 Instance.new("UICorner", MenuFrame).CornerRadius = UDim.new(0, 8)
 
--- Thanh tiêu đề (dùng làm nơi đặt ô nhập pred)
-local TitleFrame = Instance.new("Frame")
-TitleFrame.Size = UDim2.new(1, 0, 0, 24)
-TitleFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-TitleFrame.BorderSizePixel = 0
-TitleFrame.Parent = MenuFrame
-Instance.new("UICorner", TitleFrame).CornerRadius = UDim.new(0, 8)
+local MenuTitle = Instance.new("TextLabel")
+MenuTitle.Size = UDim2.new(1, 0, 0, 18)
+MenuTitle.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+MenuTitle.Text = "VhuyHub"
+MenuTitle.TextColor3 = Color3.fromRGB(0, 0, 0)
+MenuTitle.Font = Enum.Font.SourceSans
+MenuTitle.TextSize = 12
+MenuTitle.Parent = MenuFrame
+Instance.new("UICorner", MenuTitle).CornerRadius = UDim.new(0, 8)
 
--- TextBox Pred X
-local predictionXBox = Instance.new("TextBox")
-predictionXBox.Size = UDim2.new(0.5, -4, 1, -6)
-predictionXBox.Position = UDim2.new(0, 2, 0, 3)
-predictionXBox.BackgroundColor3 = Color3.fromRGB(200, 100, 100)
-predictionXBox.TextColor3 = Color3.new(1, 1, 1)
-predictionXBox.Font = Enum.Font.SourceSans
-predictionXBox.TextSize = 12
-predictionXBox.PlaceholderText = "Pred X"
-predictionXBox.Text = tostring(getgenv().Aimbot and getgenv().Aimbot.Prediction.X or "0.165")
-predictionXBox.ClearTextOnFocus = false
-predictionXBox.Parent = TitleFrame
-
--- TextBox Pred Y
-local predictionYBox = predictionXBox:Clone()
-predictionYBox.Position = UDim2.new(0.5, 2, 0, 3)
-predictionYBox.PlaceholderText = "Pred Y"
-predictionYBox.Text = tostring(getgenv().Aimbot and getgenv().Aimbot.Prediction.Y or "0.1")
-predictionYBox.Parent = TitleFrame
-
--- Update pred value khi mất focus
-predictionXBox.FocusLost:Connect(function()
-	local val = tonumber(predictionXBox.Text)
-	if val then
-		getgenv().Aimbot.Prediction.X = val
-	end
-end)
-predictionYBox.FocusLost:Connect(function()
-	local val = tonumber(predictionYBox.Text)
-	if val then
-		getgenv().Aimbot.Prediction.Y = val
-	end
-end)
-
--- Danh sách người chơi
 local PlayerList = Instance.new("ScrollingFrame")
-PlayerList.Size = UDim2.new(1, -4, 1, -30)
-PlayerList.Position = UDim2.new(0, 2, 0, 26)
+PlayerList.Size = UDim2.new(1, -4, 1, -22)
+PlayerList.Position = UDim2.new(0, 2, 0, 20)
 PlayerList.CanvasSize = UDim2.new(0, 0, 0, 0)
 PlayerList.ScrollBarThickness = 3
 PlayerList.BackgroundTransparency = 1
@@ -93,19 +64,8 @@ UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 UIListLayout.Padding = UDim.new(0, 3)
 UIListLayout.Parent = PlayerList
 UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-	PlayerList.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
+    PlayerList.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
 end)
-
-local function CalculatePrediction(ping, targetVelocity)
-    local delay = ping / 1000
-    return targetVelocity * delay
-end
-
--- Ví dụ sử dụng:
-local Ping = game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue()
-local Target = selectedTarget.Character
-local velocity = Target and Target:FindFirstChild("HumanoidRootPart") and Target.HumanoidRootPart.Velocity or Vector3.zero
-local predictionVector = CalculatePrediction(Ping, velocity)
 
 -- Danh sách ESP
 local ESPs = {}
@@ -119,21 +79,9 @@ local function IsValidTarget(player)
     return not (isKO or isGrabbed)
 end
 
--- Đảm bảo espGui được khởi tạo
-local espGui = Instance.new("ScreenGui")
-espGui.Name = "ESPGui"
-espGui.Parent = PlayerGui
-
 -- Tạo ESP
 local function CreateESP(player)
     if ESPs[player] or player == LocalPlayer then return end
-    local billboardGui = Instance.new("BillboardGui")
-    billboardGui.Name = player.Name .. "_ESP"
-    billboardGui.Size = UDim2.new(0, 200, 0, 50)
-    billboardGui.StudsOffset = Vector3.new(0, 2, 0) -- Đặt trên đầu 2 đơn vị
-    billboardGui.AlwaysOnTop = true
-    billboardGui.Parent = espGui
-
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
     label.TextColor3 = Color3.fromRGB(200, 200, 200)
@@ -142,8 +90,11 @@ local function CreateESP(player)
     label.Text = player.DisplayName
     label.TextStrokeTransparency = 0.7
     label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    label.Size = UDim2.new(1, 0, 1, 0)
-    label.Parent = billboardGui
+    label.Size = UDim2.new(0, 200, 0, 20)
+    label.AnchorPoint = Vector2.new(0.5, 0.5)
+    label.Position = UDim2.new(0.5, 0, 0.5, 0)
+    label.Visible = false
+    label.Parent = espGui
 
     local highlight = Instance.new("Highlight")
     highlight.Enabled = false
@@ -151,16 +102,17 @@ local function CreateESP(player)
     highlight.OutlineTransparency = 0.3
     highlight.FillColor = Color3.fromRGB(200, 200, 200)
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.Adornee = player.Character
     highlight.Parent = espGui
 
-    ESPs[player] = { billboardGui = billboardGui, label = label, highlight = highlight }
+    ESPs[player] = { label = label, highlight = highlight }
 end
 
 -- Xóa ESP
 local function RemoveESP(player)
     if ESPs[player] then
         pcall(function()
-            ESPs[player].billboardGui:Destroy()
+            ESPs[player].label:Destroy()
             ESPs[player].highlight:Destroy()
         end)
         ESPs[player] = nil
@@ -170,9 +122,8 @@ end
 -- Cập nhật ESP
 local function UpdateESP()
     if not Config.ESPEnabled then
-        print("ESP is disabled")
         for _, v in pairs(ESPs) do
-            v.billboardGui.Enabled = false
+            v.label.Visible = false
             v.highlight.Enabled = false
         end
         return
@@ -180,25 +131,26 @@ local function UpdateESP()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and IsValidTarget(player) then
             local character = player.Character
-            local head = character and character:FindFirstChild("Head")
+            local head = character:FindFirstChild("Head")
             if head then
-                if not ESPs[player] then
-                    print("Creating ESP for: ", player.Name)
-                    CreateESP(player)
-                end
+                CreateESP(player)
+                local headPos = head.Position
+                local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
                 local esp = ESPs[player]
                 if esp then
                     local isSelected = Config.SelectedPlayers[player.Name]
                     esp.label.TextColor3 = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(200, 200, 200)
                     esp.highlight.FillColor = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(200, 200, 200)
-                    esp.billboardGui.Adornee = head -- Cập nhật Adornee
-                    esp.highlight.Adornee = character -- Cập nhật Adornee cho highlight
-                    esp.billboardGui.Enabled = true
-                    esp.highlight.Enabled = true
-                    print("ESP enabled for: ", player.Name)
+                    if onScreen then
+                        esp.label.Visible = true
+                        esp.label.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y - 20)
+                        esp.highlight.Enabled = true
+                    else
+                        esp.label.Visible = false
+                        esp.highlight.Enabled = false
+                    end
                 end
             else
-                print("No Head for: ", player.Name)
                 RemoveESP(player)
             end
         else
@@ -206,47 +158,6 @@ local function UpdateESP()
         end
     end
 end
-
--- Xử lý respawn cho người chơi
-for _, player in ipairs(Players:GetPlayers()) do
-    Connect(player.CharacterAdded, function(character)
-        print("Character respawned for: ", player.Name)
-        task.wait(1) -- Đợi nhân vật tải hoàn toàn
-        RemoveESP(player)
-        if player ~= LocalPlayer and IsValidTarget(player) then
-            CreateESP(player)
-            UpdateESP()
-        end
-        UpdatePlayerList()
-    end)
-end
-
--- Xử lý respawn của LocalPlayer
-Connect(LocalPlayer.CharacterAdded, function(character)
-    print("LocalPlayer respawned")
-    task.wait(1) -- Đợi nhân vật tải hoàn toàn
-    for _, player in ipairs(Players:GetPlayers()) do
-        RemoveESP(player)
-    end
-    UpdateESP()
-end)
-
--- Cập nhật sự kiện PlayerAdded
-Connect(Players.PlayerAdded, function(player)
-    task.wait(math.random(2, 3))
-    RemoveESP(player)
-    UpdatePlayerList()
-    player.CharacterAdded:Connect(function(character)
-        print("Character added for: ", player.Name)
-        task.wait(1) -- Đợi nhân vật tải hoàn toàn
-        RemoveESP(player)
-        if player ~= LocalPlayer and IsValidTarget(player) then
-            CreateESP(player)
-            UpdateESP()
-        end
-        UpdatePlayerList()
-    end)
-end)
 
 -- Antilock (luôn hoạt động)
 local function UpdateAntilock()
@@ -561,6 +472,90 @@ RunService.RenderStepped:Connect(function()
 	if IsObstructed(Camera.CFrame.Position, predictedPos) then return end
 
 	Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
+end)
+
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
+
+-- Hàm lấy ping hiện tại
+local function GetPing()
+	local pingStat = Stats.Network.ServerStatsItem["Data Ping"]
+	if pingStat then
+		return pingStat:GetValue() or 0
+	end
+	return 0
+end
+
+-- Hàm tính Prediction Vector dựa trên ping và tốc độ mục tiêu
+local function CalculatePrediction(ping, targetVelocity)
+	local delay = ping / 1000
+	return targetVelocity * delay
+end
+
+-- Hàm cập nhật giá trị Prediction X và Y theo mục tiêu
+local function UpdatePrediction(selectedTarget)
+	if selectedTarget and selectedTarget.Character then
+		local hrp = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			local velocity = hrp.Velocity
+			local ping = GetPing()
+			local predictionVector = CalculatePrediction(ping, velocity)
+
+			-- Gán vào biến Prediction toàn cục (nếu dùng getgenv())
+			getgenv().Aimbot.Prediction.X = predictionVector.X
+			getgenv().Aimbot.Prediction.Y = predictionVector.Y
+
+			-- Debug log nếu cần
+			print("[AutoPrediction] Ping:", ping, "Velocity:", velocity, "→ Prediction:", predictionVector)
+		end
+	end
+end
+
+-- Ví dụ: Gọi định kỳ mỗi khung hình hoặc mỗi nửa giây
+RunService.RenderStepped:Connect(function()
+	local target = getgenv().Aimbot.Target -- hoặc selectedTarget nếu bạn đặt ở nơi khác
+	if target then
+		UpdatePrediction(target)
+	end
+end)
+
+local player = game.Players.LocalPlayer
+local playerGui = player:WaitForChild("PlayerGui")
+
+-- Tạo ScreenGui
+local gui = Instance.new("ScreenGui")
+gui.Name = "PredictionDisplay"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = playerGui
+
+-- Tạo Frame nhỏ có thể kéo
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 120, 0, 40)
+frame.Position = UDim2.new(0, 10, 1, -50) -- Góc dưới bên trái
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+frame.BackgroundTransparency = 0.3
+frame.Active = true
+frame.Draggable = true
+frame.Parent = gui
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
+
+-- Tạo TextLabel để hiện X/Y
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, 0, 1, 0)
+label.BackgroundTransparency = 1
+label.TextColor3 = Color3.fromRGB(255, 255, 255)
+label.TextScaled = true
+label.Font = Enum.Font.Code
+label.Text = "X: 0.00\nY: 0.00"
+label.Parent = frame
+
+-- Cập nhật liên tục giá trị từ getgenv().Aimbot.Prediction
+game:GetService("RunService").RenderStepped:Connect(function()
+	local pred = getgenv().Aimbot and getgenv().Aimbot.Prediction
+	if pred then
+		label.Text = string.format("X: %.2f\nY: %.2f", pred.X or 0, pred.Y or 0)
+	end
 end)
 
 -- Dọn dẹp khi thoát
