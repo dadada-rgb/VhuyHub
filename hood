@@ -381,7 +381,6 @@ end)
 
 getgenv().Aimbot = {
     Status = true,
-    Keybind = 'C', -- hiện tại không dùng nữa vì đã thay bằng chuột phải
     Hitpart = 'HumanoidRootPart',
     ['Prediction'] = {
         X = 0.165,
@@ -454,6 +453,9 @@ RunService.RenderStepped:Connect(function()
 	if IsObstructed(Camera.CFrame.Position, predictedPos) then return end
 
 	Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
+        if tbEnabled and Mouse.Target == cap and distToCursor(cap) <= fovRadius then
+            click()
+        end
 end)
 
 -- Dọn dẹp khi thoát
