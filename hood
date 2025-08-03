@@ -379,107 +379,81 @@ Run.RenderStepped:Connect(function()
     end
 end)
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Workspace = game:GetService("Workspace")
-local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
-local VirtualInputManager = game:GetService("VirtualInputManager")
-
-local Config = {
-    aimEnabled = false,
-    aimRadius = 800,
-    predictionTime = 0.165,
-    verticalOffset = 0.1,
-    aimPart = "HumanoidRootPart",
-    selectedPlayers = {},
+getgenv().Aimbot = {
+    Status = true,
+    Keybind = 'C', -- hiện tại không dùng nữa vì đã thay bằng chuột phải
+    Hitpart = 'HumanoidRootPart',
+    ['Prediction'] = {
+        X = 0.165,
+        Y = 0.1,
+    },
 }
 
-local function IsValidAimTarget(player)
-    if not player or player == LocalPlayer then return false end
-    if not player.Character then return false end
-    local hum = player.Character:FindFirstChild("Humanoid")
-    local root = player.Character:FindFirstChild("HumanoidRootPart")
-    if not hum or not root or hum.Health <= 0 then return false end
-    local bodyEffects = player.Character:FindFirstChild("BodyEffects")
-    if bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value then return false end
-    if player.Character:FindFirstChild("GRABBING_CONSTRAINT") then return false end
-    return true
+if getgenv().AimbotRan then return else getgenv().AimbotRan = true end
+
+local Player = nil
+local HoldingRightClick = false
+
+-- Kiểm tra xem có vật cản không
+local function IsObstructed(origin, targetPos)
+	local raycastParams = RaycastParams.new()
+	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+	raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+	local result = Workspace:Raycast(origin, (targetPos - origin), raycastParams)
+	if result and result.Instance and not result.Instance:IsDescendantOf(Player.Character) then
+		return true
+	end
+	return false
 end
 
-local function IsObstructed(pos)
-    local origin = Camera.CFrame.Position
-    local direction = (pos - origin).Unit * 500
-    local rayParams = RaycastParams.new()
-    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-    rayParams.IgnoreWater = true
-    local result = Workspace:Raycast(origin, direction, rayParams)
-    return result and (result.Position - pos).Magnitude > 3
+-- Lấy player gần nhất hợp lệ
+local function GetClosestValidPlayer()
+	local closestPlayer = nil
+	local shortestDistance = math.huge
+
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and IsValidTarget(plr) and plr.Character and plr.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
+			local pos, visible = Camera:WorldToViewportPoint(plr.Character[getgenv().Aimbot.Hitpart].Position)
+			if visible then
+				local dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
+				if dist < shortestDistance then
+					closestPlayer = plr
+					shortestDistance = dist
+				end
+			end
+		end
+	end
+
+	return closestPlayer
 end
 
-local function GetClosestTarget()
-    local closest, shortestDist = nil, math.huge
-    for _, player in ipairs(Players:GetPlayers()) do
-        if Config.selectedPlayers[player.Name] and IsValidAimTarget(player) then
-            local root = player.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                local dist = (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude
-                if dist < shortestDist and dist <= Config.aimRadius then
-                    local rayParams = RaycastParams.new()
-                    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-                    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-                    local ray = Workspace:Raycast(Camera.CFrame.Position, (root.Position - Camera.CFrame.Position), rayParams)
-                    if ray and ray.Instance and ray.Instance:IsDescendantOf(player.Character) then
-                        closest = root
-                        shortestDist = dist
-                    end
-                end
-            end
-        end
-    end
-    return closest
-end
-
-local lastSwitch = 0
-UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        local character = LocalPlayer.Character
-        if character and character:FindFirstChildOfClass("Tool") then
-            Config.aimEnabled = true
-        end
-    end
+-- Bật tắt bằng chuột phải
+Mouse.Button2Down:Connect(function()
+	HoldingRightClick = true
+	Player = GetClosestValidPlayer()
 end)
 
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        Config.aimEnabled = false
-    end
+Mouse.Button2Up:Connect(function()
+	HoldingRightClick = false
+	Player = nil
 end)
 
-RunService.Heartbeat:Connect(function()
-    if not Config.aimEnabled or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
-    local character = LocalPlayer.Character
-    local bodyEffects = character:FindFirstChild("BodyEffects")
-    local isKO = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
-    local isGrabbed = character:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
-    if isKO or isGrabbed then Config.aimEnabled = false return end
+-- Aimbot logic
+RunService.RenderStepped:Connect(function()
+	if not HoldingRightClick or not getgenv().Aimbot.Status or not Player then return end
 
-    local hasTool = false
-    for _, child in pairs(character:GetChildren()) do
-        if child:IsA("Tool") then hasTool = true break end
-    end
-    if not hasTool then return end
+	if not IsValidTarget(Player) then
+		Player = nil
+		return
+	end
 
-    local target = GetClosestTarget()
-    if target and target.Parent then
-        local aimPos = target.Position + (target.Parent:FindFirstChild(Config.aimPart) and target.Parent:FindFirstChild(Config.aimPart).Velocity * Vector3.new(Config.predictionTime, Config.verticalOffset, Config.predictionTime) or Vector3.zero)
-        if not IsObstructed(aimPos) then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, aimPos)
-        end
-    end
+	local part = Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart)
+	if not part then return end
+
+	local predictedPos = part.Position + part.Velocity * Vector3.new(getgenv().Aimbot.Prediction.X, getgenv().Aimbot.Prediction.Y, getgenv().Aimbot.Prediction.X)
+	if IsObstructed(Camera.CFrame.Position, predictedPos) then return end
+
+	Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
 end)
 
 -- Dọn dẹp khi thoát
