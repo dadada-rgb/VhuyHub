@@ -379,101 +379,108 @@ Run.RenderStepped:Connect(function()
     end
 end)
 
--- Aimlock đơn giản tích hợp vào script đã có
-local aimEnabled = false
-local predictionTime = 0.165
-local verticalOffset = 0.1
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
--- Kiểm tra mục tiêu hợp lệ
+local Config = {
+    aimEnabled = false,
+    aimRadius = 800,
+    predictionTime = 0.165,
+    verticalOffset = 0.1,
+    aimPart = "HumanoidRootPart",
+    selectedPlayers = {},
+}
+
 local function IsValidAimTarget(player)
-	if not player or player == LocalPlayer then return false end
-	if not player.Character then return false end
-	local hum = player.Character:FindFirstChildOfClass("Humanoid")
-	local root = player.Character:FindFirstChild("HumanoidRootPart")
-	if not hum or not root then return false end
-	if hum.Health <= 0 then return false end
-	local bodyEffects = player.Character:FindFirstChild("BodyEffects")
-	if bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value then
-		return false
-	end
-	return true
+    if not player or player == LocalPlayer then return false end
+    if not player.Character then return false end
+    local hum = player.Character:FindFirstChild("Humanoid")
+    local root = player.Character:FindFirstChild("HumanoidRootPart")
+    if not hum or not root or hum.Health <= 0 then return false end
+    local bodyEffects = player.Character:FindFirstChild("BodyEffects")
+    if bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value then return false end
+    if player.Character:FindFirstChild("GRABBING_CONSTRAINT") then return false end
+    return true
 end
 
--- Kiểm tra vật cản
 local function IsObstructed(pos)
-	local origin = Camera.CFrame.Position
-	local direction = (pos - origin).Unit * 500
-	local rayParams = RaycastParams.new()
-	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-	rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
-	rayParams.IgnoreWater = true
-
-	local result = Workspace:Raycast(origin, direction, rayParams)
-	if result and (result.Position - pos).Magnitude > 3 then
-		return true
-	end
-	return false
+    local origin = Camera.CFrame.Position
+    local direction = (pos - origin).Unit * 500
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    rayParams.IgnoreWater = true
+    local result = Workspace:Raycast(origin, direction, rayParams)
+    return result and (result.Position - pos).Magnitude > 3
 end
 
--- Lấy mục tiêu gần nhất trong danh sách
 local function GetClosestTarget()
-	local closest = nil
-	local shortestDist = math.huge
-	for _, player in pairs(Players:GetPlayers()) do
-		if Config.SelectedPlayers[player.Name] and IsValidAimTarget(player) then
-			local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-			if root then
-				local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
-				if onScreen then
-					local dist = (Vector2.new(screenPos.X, screenPos.Y) - UserInputService:GetMouseLocation()).Magnitude
-					if dist < shortestDist then
-						closest = player
-						shortestDist = dist
-					end
-				end
-			end
-		end
-	end
-	return closest
+    local closest, shortestDist = nil, math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if Config.selectedPlayers[player.Name] and IsValidAimTarget(player) then
+            local root = player.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                local dist = (LocalPlayer.Character.HumanoidRootPart.Position - root.Position).Magnitude
+                if dist < shortestDist and dist <= Config.aimRadius then
+                    local rayParams = RaycastParams.new()
+                    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+                    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                    local ray = Workspace:Raycast(Camera.CFrame.Position, (root.Position - Camera.CFrame.Position), rayParams)
+                    if ray and ray.Instance and ray.Instance:IsDescendantOf(player.Character) then
+                        closest = root
+                        shortestDist = dist
+                    end
+                end
+            end
+        end
+    end
+    return closest
 end
 
--- Aim đến mục tiêu
-local function AimAt(target)
-	local root = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
-	if not root then return end
-
-	local velocity = root.Velocity
-	local predictedPos = root.Position + velocity * predictionTime + Vector3.new(0, verticalOffset, 0)
-	if IsObstructed(predictedPos) then return end
-
-	Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
-end
-
--- Kích hoạt bằng giữ chuột phải
-UserInputService.InputBegan:Connect(function(input, gpe)
-	if gpe then return end
-	if input.UserInputType == Enum.UserInputType.MouseButton2 then
-		aimEnabled = true
-	end
+local lastSwitch = 0
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChildOfClass("Tool") then
+            Config.aimEnabled = true
+        end
+    end
 end)
 
-UserInputService.InputEnded:Connect(function(input, gpe)
-	if gpe then return end
-	if input.UserInputType == Enum.UserInputType.MouseButton2 then
-		aimEnabled = false
-	end
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        Config.aimEnabled = false
+    end
 end)
 
--- Vòng lặp aim
-RunService.RenderStepped:Connect(function()
-	if aimEnabled then
-		local target = GetClosestTarget()
-		if target then
-			AimAt(target)
-		end
-	end
-end)
+RunService.Heartbeat:Connect(function()
+    if not Config.aimEnabled or not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return end
+    local character = LocalPlayer.Character
+    local bodyEffects = character:FindFirstChild("BodyEffects")
+    local isKO = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
+    local isGrabbed = character:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
+    if isKO or isGrabbed then Config.aimEnabled = false return end
 
+    local hasTool = false
+    for _, child in pairs(character:GetChildren()) do
+        if child:IsA("Tool") then hasTool = true break end
+    end
+    if not hasTool then return end
+
+    local target = GetClosestTarget()
+    if target and target.Parent then
+        local aimPos = target.Position + (target.Parent:FindFirstChild(Config.aimPart) and target.Parent:FindFirstChild(Config.aimPart).Velocity * Vector3.new(Config.predictionTime, Config.verticalOffset, Config.predictionTime) or Vector3.zero)
+        if not IsObstructed(aimPos) then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, aimPos)
+        end
+    end
+end)
 
 -- Dọn dẹp khi thoát
 game:BindToClose(function()
