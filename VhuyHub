@@ -98,7 +98,7 @@ local scriptUrls = {
 
 local url = scriptUrls[placeId] or "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"
 loadstring(game:HttpGet(url))()
-sendNotification("Script Loaded", "Đã load VhuyHub")
+sendNotification("Script Loaded", "Đã load DhuyXDtuyen")
 
 -- Tạo hiệu ứng mở đầu VhuyHub
 local blur = Instance.new("BlurEffect")
@@ -161,97 +161,6 @@ task.delay(3, function()
 	tweenOut.Completed:Wait()
 	gui:Destroy()
 	blur:Destroy()
-end)
-
-----------------------------
--- Tạo bảng Animation nhỏ --
-----------------------------
-local animGui = Instance.new("ScreenGui")
-animGui.Name = "AnimGui"
-animGui.ResetOnSpawn = false
-animGui.IgnoreGuiInset = true
-animGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
-
-local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 200, 0, 30)
-mainFrame.Position = UDim2.new(0, 20, 0.5, -100)
-mainFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-mainFrame.BorderSizePixel = 0
-mainFrame.Draggable = true
-mainFrame.Active = true
-mainFrame.Parent = animGui
-
--- Gắn bo góc
-local corner = Instance.new("UICorner", mainFrame)
-corner.CornerRadius = UDim.new(0, 8)
-
--- Nút toggle bảng
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(1, 0, 1, 0)
-toggleBtn.BackgroundTransparency = 1
-toggleBtn.Text = "🎵 Emote ▼"
-toggleBtn.TextColor3 = Color3.new(1, 1, 1)
-toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.TextScaled = true
-toggleBtn.Parent = mainFrame
-
--- Frame chứa các nút animation
-local scrollFrame = Instance.new("ScrollingFrame")
-scrollFrame.Size = UDim2.new(0, 200, 0, 150)
-scrollFrame.Position = UDim2.new(0, 0, 1, 0)
-scrollFrame.CanvasSize = UDim2.new(0, 0, 0, #animations * 35)
-scrollFrame.ScrollBarThickness = 4
-scrollFrame.BackgroundColor3 = Color3.fromRGB(255, 240, 240)
-scrollFrame.Visible = false
-scrollFrame.BorderSizePixel = 0
-scrollFrame.Parent = mainFrame
-
-local scrollCorner = Instance.new("UICorner", scrollFrame)
-scrollCorner.CornerRadius = UDim.new(0, 8)
-
--- Tạo nút cho mỗi animation
-local index = 0
-for key, animUrl in pairs(animations) do
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(1, -10, 0, 30)
-	btn.Position = UDim2.new(0, 5, 0, index * 35)
-	btn.BackgroundColor3 = Color3.new(1, 1, 1)
-	btn.Text = "Phím: " .. key
-	btn.TextColor3 = Color3.fromRGB(100, 100, 100)
-	btn.Font = Enum.Font.Gotham
-	btn.TextScaled = true
-	btn.Parent = scrollFrame
-
-	local btnCorner = Instance.new("UICorner", btn)
-	btnCorner.CornerRadius = UDim.new(0, 6)
-
-	btn.MouseButton1Click:Connect(function()
-		local char = lp.Character
-		if not char then return end
-		local hum = char:FindFirstChildOfClass("Humanoid")
-		if not hum or hum.MoveDirection.Magnitude > 0 then return end
-		if currentTrack then
-			currentTrack:Stop()
-			currentTrack = nil
-			currentKey = nil
-		end
-		local anim = Instance.new("Animation")
-		anim.AnimationId = animUrl
-		local track = hum:FindFirstChildOfClass("Animator"):LoadAnimation(anim)
-		track:Play()
-		currentTrack = track
-		currentKey = key
-	end)
-
-	index += 1
-end
-
--- Toggle hiện/ẩn
-local expanded = false
-toggleBtn.MouseButton1Click:Connect(function()
-	expanded = not expanded
-	scrollFrame.Visible = expanded
-	toggleBtn.Text = expanded and "🎵 Emote ▲" or "🎵 Emote ▼"
 end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote"))()
