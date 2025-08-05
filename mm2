@@ -102,51 +102,60 @@ local function findSheriffThatsNotMe()
     return nil
 end
 
--- ESP functions
-local function createESP(object, color)
-    if not espActive or not object then return end
-    pcall(function()
-        if espObjects[object] then
-            espObjects[object].highlight:Destroy()
-            espObjects[object] = nil
-        end
-        local highlight = Instance.new("Highlight")
-        highlight.Parent = object
-        highlight.FillColor = color
-        highlight.OutlineColor = color
-        highlight.FillTransparency = 0.6
-        highlight.OutlineTransparency = 0.2
-        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-        espObjects[object] = { highlight = highlight }
-    end)
-end
-
-local function clearESP()
-    for object, esp in pairs(espObjects) do
+local espcontainer = {
+    objects = {},
+    Add = function(self, object, config)
+        if not espActive then return end
         pcall(function()
-            esp.highlight:Destroy()
+            if self.objects[object] then
+                self.objects[object].highlight:Destroy()
+                self.objects[object] = nil
+            end
+            local highlight = Instance.new("Highlight")
+            highlight.Parent = object
+            highlight.FillColor = config.AccentColor
+            highlight.OutlineColor = config.AccentColor
+            highlight.FillTransparency = 0.5
+            highlight.OutlineTransparency = 0
+            highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+            self.objects[object] = { highlight = highlight }
+            if config.ShowLabel then
+                local billboard = Instance.new("BillboardGui")
+                billboard.Parent = object
+                billboard.Size = UDim2.new(0, 100, 0, 30)
+                billboard.StudsOffset = Vector3.new(0, 3, 0)
+                billboard.AlwaysOnTop = true
+                local textLabel = Instance.new("TextLabel")
+                textLabel.Parent = billboard
+                textLabel.Size = UDim2.new(1, 0, 1, 0)
+                textLabel.BackgroundTransparency = 1
+                textLabel.Text = config.LabelText
+                textLabel.TextColor3 = config.AccentColor
+                textLabel.TextScaled = true
+            end
         end)
-    end
-    espObjects = {}
-end
-
-local function reloadPlayerESP()
-    if not espActive or tick() - lastUpdate < UPDATE_INTERVAL then return end
-    lastUpdate = tick()
-    clearESP()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player.Character and player ~= localplayer then
-            if player == findMurderer() then
-                createESP(player.Character, Color3.fromRGB(255, 0, 0))
-            elseif player == findSheriff() then
-                createESP(player.Character, Color3.fromRGB(0, 153, 255))
-            else
-                createESP(player.Character, Color3.fromRGB(0, 255, 0))
+    end,
+    RemoveGroup = function(self, groupName)
+        for object, data in pairs(self.objects) do
+            if data.group == groupName then
+                pcall(function()
+                    data.highlight:Destroy()
+                    if data.billboard then data.billboard:Destroy() end
+                end)
+                self.objects[object] = nil
             end
         end
+    end,
+    ClearAllGroups = function(self)
+        for object, data in pairs(self.objects) do
+            pcall(function()
+                data.highlight:Destroy()
+                if data.billboard then data.billboard:Destroy() end
+            end)
+        end
+        self.objects = {}
     end
-    task.wait(math.random(0, RANDOM_DELAY))
-end
+}
 
 -- Predicted position
 local function getPredictedPosition(player, shootOffset)
@@ -295,17 +304,21 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Event connections
 Workspace.ChildAdded:Connect(function(ch)
     if ch == getMap() and espActive then
-        task.wait(math.random(1, 2))
-        reloadPlayerESP()
+        task.spawn(function()
+            task.wait(math.random(1, 2))
+            if findMurderer() then
+                reloadESP()
+            end
+        end)
     end
 end)
 
 Workspace.ChildRemoved:Connect(function(ch)
     if ch == getMap() and espActive then
-        clearESP()
+        playerData = {}
+        espcontainer:ClearAllGroups()
     end
 end)
 
@@ -315,7 +328,7 @@ localplayer.CharacterAdded:Connect(function()
         task.spawn(autoFarmCoins)
     end
     if espActive then
-        reloadPlayerESP()
+        reloadESP()
     end
 end)
 
@@ -324,7 +337,7 @@ Players.PlayerAdded:Connect(function(player)
         player.CharacterAdded:Connect(function()
             if espActive then
                 task.wait(math.random(0.5, 1.5))
-                reloadPlayerESP()
+                reloadESP()
             end
         end)
     end
@@ -333,7 +346,7 @@ end)
 Players.PlayerRemoving:Connect(function()
     if espActive then
         task.wait(math.random(0.5, 1.5))
-        reloadPlayerESP()
+        reloadESP()
     end
 end)
 
@@ -432,14 +445,13 @@ shootBtn.MouseButton1Click:Connect(function()
     task.spawn(shootMurderer)
 end)
 
--- Toggle ESP
 espBtn.MouseButton1Click:Connect(function()
     espActive = not espActive
     espBtn.Text = "ESP (" .. (espActive and "On" or "Off") .. ")"
     if espActive then
-        reloadPlayerESP()
+        reloadESP()
     else
-        clearESP()
+        espcontainer:ClearAllGroups()
     end
 end)
 
@@ -505,66 +517,89 @@ killAllBtn.MouseButton1Click:Connect(function()
 end)
 
 function miniFling(playerToFling)
-	local character = localplayer.Character
-	local humanoid = character:FindFirstChildOfClass("Humanoid")
-	local rootPart = humanoid and humanoid.RootPart
-	local targetCharacter = playerToFling.Character
+    local character = localplayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    local rootPart = humanoid and humanoid.RootPart
+    local targetCharacter = playerToFling.Character
+    if not character or not humanoid or not rootPart or not targetCharacter then
+        fu.notification("No valid character of said target player. May have died.")
+        return
+    end
 
-	-- tìm parts để fling
-	local targetHumanoid = targetCharacter:FindFirstChildOfClass("Humanoid")
-	local targetRoot = targetHumanoid and targetHumanoid.RootPart
-	local targetHead = targetCharacter:FindFirstChild("Head")
-	local accessory = targetCharacter:FindFirstChildOfClass("Accessory")
-	local handle = accessory and accessory:FindFirstChild("Handle")
+    local targetHumanoid = targetCharacter:FindFirstChildOfClass("Humanoid")
+    local targetRoot = targetHumanoid and targetHumanoid.RootPart
+    local targetHead = targetCharacter:FindFirstChild("Head")
+    local accessory = targetCharacter:FindFirstChildOfClass("Accessory")
+    local handle = accessory and accessory:FindFirstChild("Handle")
 
-	-- lưu vị trí gốc
-	if rootPart and rootPart.Velocity.Magnitude < 50 then
-		getgenv().OldPos = rootPart.CFrame
-	end
+    if rootPart and rootPart.Velocity.Magnitude < 50 then
+        getgenv().OldPos = rootPart.CFrame
+    end
 
-	-- Xác định phần nào sẽ là đối tượng camera
-	if targetHead then
-		workspace.CurrentCamera.CameraSubject = targetHead
-	elseif handle then
-		workspace.CurrentCamera.CameraSubject = handle
-	elseif targetHumanoid and targetRoot then
-		workspace.CurrentCamera.CameraSubject = targetHumanoid
-	end
+    local function flingPart(part)
+        local duration = 2
+        local startTime = tick()
+        local angle = 0
+        repeat
+            if rootPart and targetHumanoid and part then
+                if part.Velocity.Magnitude < 50 then
+                    angle = angle + 100
+                    rootPart.CFrame = CFrame.new(part.Position) * CFrame.new(0, 1.5, 0) * CFrame.Angles(math.rad(angle), 0, 0)
+                    character:SetPrimaryPartCFrame(rootPart.CFrame)
+                    rootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
+                    rootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+                    task.wait()
+                else
+                    rootPart.CFrame = CFrame.new(part.Position) * CFrame.new(0, 1.5, targetHumanoid.WalkSpeed) * CFrame.Angles(math.rad(90), 0, 0)
+                    character:SetPrimaryPartCFrame(rootPart.CFrame)
+                    task.wait()
+                end
+            else
+                break
+            end
+        until part.Velocity.Magnitude > 500 or not part.Parent or not targetCharacter or targetHumanoid.Sit or humanoid.Health <= 0 or tick() > startTime + duration
+    end
 
-	-- Dùng vị trí để tạo lực
-	local function flingPart(part)
-		local angle = 0
-		repeat
-			if part.Velocity.Magnitude < 50 then
-				angle += 100
-				rootPart.CFrame = part.CFrame * CFrame.new(0, 1.5, 0) * CFrame.Angles(math.rad(angle), 0, 0)
-				character:SetPrimaryPartCFrame(rootPart.CFrame)
-				rootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
-				rootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
-				task.wait()
-			end
-		until part.Velocity.Magnitude > 500
-	end
+    workspace.FallenPartsDestroyHeight = 0/0
+    local bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.Name = "EpixVel"
+    bodyVelocity.Parent = rootPart
+    bodyVelocity.Velocity = Vector3.new(9e8, 9e8, 9e8)
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
 
-	if targetRoot and targetHead then
-		if (targetRoot.Position - targetHead.Position).Magnitude > 5 then
-			flingPart(targetHead)
-		else
-			flingPart(targetRoot)
-		end
-	elseif targetRoot then
-		flingPart(targetRoot)
-	elseif targetHead then
-		flingPart(targetHead)
-	elseif handle then
-		flingPart(handle)
-	else
-		fu.notification("Can't find a proper part of target player to fling.")
-	end
+    if targetRoot and targetHead then
+        if (targetRoot.CFrame.p - targetHead.CFrame.p).Magnitude > 5 then
+            flingPart(targetHead)
+        else
+            flingPart(targetRoot)
+        end
+    elseif targetRoot then
+        flingPart(targetRoot)
+    elseif targetHead then
+        flingPart(targetHead)
+    elseif handle then
+        flingPart(handle)
+    else
+        fu.notification("Can't find a proper part of target player to fling.")
+    end
 
-	-- Reset lại camera và vị trí gốc
-	rootPart.CFrame = getgenv().OldPos
-	character:SetPrimaryPartCFrame(getgenv().OldPos)
+    bodyVelocity:Destroy()
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+    workspace.CurrentCamera.CameraSubject = humanoid
+    repeat
+        rootPart.CFrame = getgenv().OldPos * CFrame.new(0, 0.5, 0)
+        character:SetPrimaryPartCFrame(rootPart.CFrame)
+        humanoid:ChangeState("GettingUp")
+        for _, part in ipairs(character:GetChildren()) do
+            if part:IsA("BasePart") then
+                part.Velocity = Vector3.new()
+                part.RotVelocity = Vector3.new()
+            end
+        end
+        task.wait()
+    until (rootPart.Position - getgenv().OldPos.p).Magnitude < 25
+    workspace.FallenPartsDestroyHeight = getgenv().FPDH or -500
 end
 
 -- Input bindings
@@ -588,6 +623,42 @@ UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
         end
     end
 end)
+
+local function reloadESP()
+    if not espActive then return end
+    espcontainer:RemoveGroup("players")
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player.Character and player ~= localplayer then
+            task.spawn(function()
+                if player == findMurderer() then
+                    espcontainer:Add(player.Character, {
+                        AccentColor = Color3.new(1, 0, 0.0156863),
+                        ArrowShow = true,
+                        ArrowMinDistance = 999999,
+                        ArrowSize = UDim2.new(0, 40, 0, 40),
+                        LabelText = "Murderer",
+                        ShowLabel = true,
+                        GroupName = "players"
+                    })
+                elseif player == findSheriff() then
+                    espcontainer:Add(player.Character, {
+                        AccentColor = Color3.new(0, 0.6, 1),
+                        ArrowShow = false,
+                        ShowLabel = false,
+                        GroupName = "players"
+                    })
+                else
+                    espcontainer:Add(player.Character, {
+                        AccentColor = Color3.new(0, 1, 0.0313725),
+                        ArrowShow = false,
+                        ShowLabel = false,
+                        GroupName = "players"
+                    })
+                end
+            end)
+        end
+    end
+end
 
 -- Initialize
 local function initialize()
@@ -617,23 +688,14 @@ end
 local guiVisible = true
 
 -- Đặt ban đầu trạng thái của GUI
-pq.Enabled = guiVisible
-
--- Lắng nghe phím RightShift để bật/tắt GUI
-UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
-    if gameProcessedEvent then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        gui.Enabled = guiVisible
-        buttonFrame.Visible = not collapsed
-    end
-end)
+gui.Enabled = guiVisible
 
 local collapsed = false
 
 topBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         collapsed = not collapsed
-        rs.Visible = not collapsed
+        buttonFrame.Visible = not collapsed
     end
 end)
 
