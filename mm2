@@ -345,18 +345,40 @@ local vw = Instance.new("TextButton") -- AutoFarm
 local mn = Instance.new("TextButton") -- Shoot
 local xy = Instance.new("TextButton") -- ESP
 local ag = Instance.new("TextButton") -- AutoGun (Not Working)
+local flingMurderer = Instance.new("TextButton")
+local flingSheriff = Instance.new("TextButton")
+local killAll = Instance.new("TextButton")
 local kl = Instance.new("UICorner")
 local ef = Instance.new("UICorner")
 local zq = Instance.new("UICorner")
 local wg = Instance.new("UICorner")
+local gk = Instance.new("UICorner")
 
 pq.Parent = localplayer:WaitForChild("PlayerGui", 5)
 pq.Name = "zX9qW2"
 pq.ResetOnSpawn = false
 
+local topBar = Instance.new("Frame")
+topBar.Name = "TopBar"
+topBar.Size = UDim2.new(0, 120, 0, 20)
+topBar.Position = UDim2.new(0.161, 0, 0.19, 0)
+topBar.BackgroundColor3 = Color3.fromRGB(200, 200, 255)
+topBar.Parent = pq
+topBar.Active = true
+topBar.Draggable = true
+
+local title = Instance.new("TextLabel")
+title.Parent = topBar
+title.Size = UDim2.new(1, 0, 1, 0)
+title.BackgroundTransparency = 1
+title.Text = "DhuyxDtuyen"
+title.Font = Enum.Font.SourceSansBold
+title.TextColor3 = Color3.fromRGB(0, 0, 0)
+title.TextSize = 14
+
 rs.Parent = pq
 rs.Position = UDim2.new(0.161, 0, 0.21, 0)
-rs.Size = UDim2.new(0, 120, 0, 120)
+rs.Size = UDim2.new(0, 120, 0, 200)
 rs.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
 rs.Active = true
 rs.Draggable = true
@@ -421,6 +443,48 @@ ag.TextSize = 12
 ag.Active = false
 ag.Selectable = false
 
+local flingMurderer = Instance.new("TextButton")
+flingMurderer.Parent = rs
+flingMurderer.Name = "flingMurderer"
+flingMurderer.Position = UDim2.new(0.083, 0, 0.983, 0)
+flingMurderer.Size = UDim2.new(0, 100, 0, 25)
+flingMurderer.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+flingMurderer.Text = "Fling Murderer"
+flingMurderer.Font = Enum.Font.SourceSansBold
+flingMurderer.TextColor3 = Color3.fromRGB(0, 0, 0)
+flingMurderer.TextSize = 12
+
+local killAll = Instance.new("TextButton")
+killAll.Parent = rs
+killAll.Name = "killAll"
+killAll.Position = UDim2.new(0.083, 0, 1.216, 0)
+killAll.Size = UDim2.new(0, 100, 0, 25)
+killAll.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+killAll.Text = "Kill All"
+killAll.Font = Enum.Font.SourceSansBold
+killAll.TextColor3 = Color3.fromRGB(0, 0, 0)
+killAll.TextSize = 12
+
+wg.CornerRadius = UDim.new(0, 8)
+wg.Parent = killAll
+
+local flingSheriff = Instance.new("TextButton")
+flingSheriff.Parent = rs
+flingSheriff.Name = "flingSheriff"
+flingSheriff.Position = UDim2.new(0.083, 0, 1.216, 0)
+flingSheriff.Size = UDim2.new(0, 100, 0, 25)
+flingSheriff.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+flingSheriff.Text = "Fling Sheriff"
+flingSheriff.Font = Enum.Font.SourceSansBold
+flingSheriff.TextColor3 = Color3.fromRGB(0, 0, 0)
+flingSheriff.TextSize = 12
+
+wg.CornerRadius = UDim.new(0, 8)
+wg.Parent = flingMurderer
+
+gk.CornerRadius = UDim.new(0, 8)
+gk.Parent = flingSheriff
+
 wg.CornerRadius = UDim.new(0, 8)
 wg.Parent = ag
 
@@ -445,6 +509,83 @@ xy.MouseButton1Click:Connect(function()
     else
         clearESP()
     end
+end)
+
+flingMurderer.MouseButton1Click:Connect(function()
+    local target = findMurderer()
+    if target and target.Character then
+        local hrp = localplayer.Character and localplayer.Character:FindFirstChild("HumanoidRootPart")
+        local targetHRP = target.Character:FindFirstChild("HumanoidRootPart")
+        if hrp and targetHRP then
+            hrp.CFrame = targetHRP.CFrame * CFrame.new(0, 2, 0)
+            local bv = Instance.new("BodyVelocity", hrp)
+            bv.Velocity = Vector3.new(9999, 9999, 9999)
+            bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+            task.delay(0.2, function() bv:Destroy() end)
+        end
+    end
+end)
+
+ag.MouseButton1Click:Connect(function()
+    for _, item in ipairs(workspace:GetDescendants()) do
+        if item:IsA("Tool") and item.Name == "GunDrop" then
+            local hrp = localplayer.Character and localplayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.CFrame = item.Handle.CFrame + Vector3.new(0, 2, 0)
+            end
+        end
+    end
+end)
+ag.Text = "AutoGun"
+ag.Active = true
+ag.Selectable = true
+
+local function flingPlayer(plr)
+    local hrp = localplayer.Character and localplayer.Character:FindFirstChild("HumanoidRootPart")
+    local targetHRP = plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+    if hrp and targetHRP then
+        hrp.CFrame = targetHRP.CFrame * CFrame.new(0, 2, 0)
+        local bv = Instance.new("BodyVelocity", hrp)
+        bv.Velocity = Vector3.new(9999, 9999, 9999)
+        bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+        task.delay(0.2, function() bv:Destroy() end)
+    end
+end
+
+flingSheriff.MouseButton1Click:Connect(function()
+    local target = findSheriff()
+    if target then
+        flingPlayer(target)
+    end
+end)
+
+killAll.MouseButton1Click:Connect(function()
+    if findMurderer() ~= localplayer then
+        fu.notification("You're not murderer.")
+        return
+    end
+
+    if not localplayer.Character:FindFirstChild("Knife") then
+        local hum = localplayer.Character:FindFirstChild("Humanoid")
+        if localplayer.Backpack:FindFirstChild("Knife") then
+            hum:EquipTool(localplayer.Backpack:FindFirstChild("Knife"))
+        else
+            fu.notification("You don't have the knife..?")
+            return
+        end
+    end
+
+    for _, player in ipairs(game.Players:GetPlayers()) do
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player ~= localplayer then
+            player.Character:FindFirstChild("HumanoidRootPart").Anchored = true
+            player.Character:FindFirstChild("HumanoidRootPart").CFrame = localplayer.Character:FindFirstChild("HumanoidRootPart").CFrame + localplayer.Character:FindFirstChild("HumanoidRootPart").CFrame.LookVector * 1
+        end	
+    end
+
+    local args = {
+        [1] = "Slash"
+    }
+    localplayer.Character.Knife.Stab:FireServer(unpack(args))
 end)
 
 -- Input bindings
@@ -505,6 +646,15 @@ UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
     if input.KeyCode == Enum.KeyCode.RightShift then
         guiVisible = not guiVisible
         pq.Enabled = guiVisible
+    end
+end)
+
+local collapsed = false
+
+topBar.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        collapsed = not collapsed
+        rs.Visible = not collapsed
     end
 end)
 
