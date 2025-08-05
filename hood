@@ -25,19 +25,6 @@ local tbEnabled = true
 local fovRadius = 20
 local Player = nil
 
-UserInputService.InputBegan:Connect(function(input, gpe)
-	if input.UserInputType == Enum.UserInputType.MouseButton2 then
-		Config.AimbotEnabled = true
-	end
-end)
-
-UserInputService.InputEnded:Connect(function(input, gpe)
-	if input.UserInputType == Enum.UserInputType.MouseButton2 then
-		Config.AimbotEnabled = false
-	end
-end)
-
-
 -- Tạo ScreenGui chính
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = tostring(math.random(1e6, 1e7))
