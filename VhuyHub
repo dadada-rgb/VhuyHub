@@ -83,23 +83,6 @@ local function sendNotification(title, text)
 	})
 end
 
--- Load script theo PlaceId
-local placeId = game.PlaceId
-local scriptUrls = {
-	[9872472334] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
-	[10662542523] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
-	[10324347967] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
-	[10324346056] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
-	[10530697691] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
-	[10808838353] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
-	[142823291] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2",
-	[13772394625] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball",
-}
-
-local url = scriptUrls[placeId] or "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"
-loadstring(game:HttpGet(url))()
-sendNotification("Script Loaded", "Đã load DhuyXDtuyen")
-
 local TweenService = game:GetService("TweenService")
 
 -- Tạo hiệu ứng mờ nền
@@ -231,6 +214,23 @@ button.MouseButton1Click:Connect(function()
 	if currentTrack then
 		currentTrack:Stop()
 	end
+
+-- Load script theo PlaceId
+local placeId = game.PlaceId
+local scriptUrls = {
+	[9872472334] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10662542523] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10324347967] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10324346056] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10530697691] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10808838353] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[142823291] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2",
+	[13772394625] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball",
+}
+
+local url = scriptUrls[placeId] or "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"
+loadstring(game:HttpGet(url))()
+sendNotification("Script Loaded", "Đã load DhuyXDtuyen")
 
 	track:Play()
 	currentTrack = track
