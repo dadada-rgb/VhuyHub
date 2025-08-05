@@ -338,155 +338,85 @@ Players.PlayerRemoving:Connect(function()
 end)
 
 -- GUI setup
-local pq = Instance.new("ScreenGui")
-local rs = Instance.new("Frame")
-local tu = Instance.new("UICorner")
-local vw = Instance.new("TextButton") -- AutoFarm
-local mn = Instance.new("TextButton") -- Shoot
-local xy = Instance.new("TextButton") -- ESP
-local ag = Instance.new("TextButton") -- AutoGun (Not Working)
-local flingMurderer = Instance.new("TextButton")
-local flingSheriff = Instance.new("TextButton")
-local killAll = Instance.new("TextButton")
-local kl = Instance.new("UICorner")
-local ef = Instance.new("UICorner")
-local zq = Instance.new("UICorner")
-local wg = Instance.new("UICorner")
-local gk = Instance.new("UICorner")
+local playerGui = localplayer:WaitForChild("PlayerGui")
+local gui = Instance.new("ScreenGui", playerGui)
+gui.Name = "zX9qW2"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
 
-pq.Parent = localplayer:WaitForChild("PlayerGui", 5)
-pq.Name = "zX9qW2"
-pq.ResetOnSpawn = false
-
-local topBar = Instance.new("Frame")
+-- TopBar (kéo được & thu gọn)
+local topBar = Instance.new("TextButton")
 topBar.Name = "TopBar"
-topBar.Size = UDim2.new(0, 120, 0, 20)
-topBar.Position = UDim2.new(0.161, 0, 0.19, 0)
-topBar.BackgroundColor3 = Color3.fromRGB(200, 200, 255)
-topBar.Parent = pq
-topBar.Active = true
+topBar.Size = UDim2.new(0, 140, 0, 25)
+topBar.Position = UDim2.new(0.1, 0, 0.2, 0)
+topBar.BackgroundColor3 = Color3.fromRGB(180, 180, 255)
+topBar.Text = "DhuyxDtuyen"
+topBar.TextSize = 14
+topBar.Font = Enum.Font.SourceSansBold
+topBar.TextColor3 = Color3.new(0,0,0)
 topBar.Draggable = true
+topBar.Active = true
+topBar.Selectable = true
+topBar.Parent = gui
 
-local title = Instance.new("TextLabel")
-title.Parent = topBar
-title.Size = UDim2.new(1, 0, 1, 0)
-title.BackgroundTransparency = 1
-title.Text = "DhuyxDtuyen"
-title.Font = Enum.Font.SourceSansBold
-title.TextColor3 = Color3.fromRGB(0, 0, 0)
-title.TextSize = 14
+-- Frame chứa các nút
+local buttonFrame = Instance.new("Frame")
+buttonFrame.Name = "MainFrame"
+buttonFrame.Size = UDim2.new(0, 140, 0, 220)
+buttonFrame.Position = UDim2.new(0, 0, 1, 0)
+buttonFrame.AnchorPoint = Vector2.new(0, 1)
+buttonFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+buttonFrame.Visible = true
+buttonFrame.Parent = topBar
 
-rs.Parent = pq
-rs.Position = UDim2.new(0.161, 0, 0.21, 0)
-rs.Size = UDim2.new(0, 120, 0, 200)
-rs.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-rs.Active = true
-rs.Draggable = true
+-- Layout căn nút
+local layout = Instance.new("UIListLayout", buttonFrame)
+layout.Padding = UDim.new(0, 5)
+layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+layout.SortOrder = Enum.SortOrder.LayoutOrder
 
-tu.CornerRadius = UDim.new(0, 8)
-tu.Parent = rs
+-- Tạo hàm nhanh để thêm nút
+local function createButton(name, text)
+	local btn = Instance.new("TextButton")
+	btn.Name = name
+	btn.Text = text
+	btn.Size = UDim2.new(0, 120, 0, 25)
+	btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+	btn.Font = Enum.Font.SourceSansBold
+	btn.TextSize = 12
+	btn.ZIndex = 2
+	btn.AutoButtonColor = true
+	btn.Selectable = true
+	btn.Active = true
+	btn.Parent = buttonFrame
+	return btn
+end
 
-vw.Parent = rs
-vw.Name = "jH4mP8"
-vw.Position = UDim2.new(0.083, 0, 0.05, 0)
-vw.Size = UDim2.new(0, 100, 0, 25)
-vw.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-vw.Text = "AutoFarm (Off)"
-vw.Font = Enum.Font.SourceSansBold
-vw.TextColor3 = Color3.fromRGB(0, 0, 0)
-vw.TextSize = 12
-vw.Active = true
-vw.Selectable = true
+-- Các nút gốc (giữ nguyên tên để hoạt động đúng)
+local autoFarmBtn = createButton("jH4mP8", "AutoFarm (Off)")
+local shootBtn = createButton("tR7nY5", "Shoot")
+local espBtn = createButton("uP5kQ3", "ESP (Off)")
+local autoGunBtn = createButton("vQ2zW9", "AutoGun")
+local flingMurdererBtn = createButton("flingMurderer", "Fling Murderer")
+local flingSheriffBtn = createButton("flingSheriff", "Fling Sheriff")
+local killAllBtn = createButton("killAll", "Kill All")
 
-kl.CornerRadius = UDim.new(0, 8)
-kl.Parent = vw
+-- Tương thích mobile (ZIndex cao, Selectable, Active)
+for _, btn in ipairs(buttonFrame:GetChildren()) do
+	if btn:IsA("TextButton") then
+		btn.ZIndex = 5
+		btn.Selectable = true
+		btn.Active = true
+	end
+end
 
-mn.Parent = rs
-mn.Name = "tR7nY5"
-mn.Position = UDim2.new(0.083, 0, 0.283, 0)
-mn.Size = UDim2.new(0, 100, 0, 25)
-mn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-mn.Text = "Shoot"
-mn.Font = Enum.Font.SourceSansBold
-mn.TextColor3 = Color3.fromRGB(0, 0, 0)
-mn.TextSize = 12
-mn.Active = true
-mn.Selectable = true
-
-ef.CornerRadius = UDim.new(0, 8)
-ef.Parent = mn
-
-xy.Parent = rs
-xy.Name = "uP5kQ3"
-xy.Position = UDim2.new(0.083, 0, 0.517, 0)
-xy.Size = UDim2.new(0, 100, 0, 25)
-xy.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-xy.Text = "ESP (Off)"
-xy.Font = Enum.Font.SourceSansBold
-xy.TextColor3 = Color3.fromRGB(0, 0, 0)
-xy.TextSize = 12
-xy.Active = true
-xy.Selectable = true
-
-zq.CornerRadius = UDim.new(0, 8)
-zq.Parent = xy
-
-ag.Parent = rs
-ag.Name = "vQ2zW9"
-ag.Position = UDim2.new(0.083, 0, 0.75, 0)
-ag.Size = UDim2.new(0, 100, 0, 25)
-ag.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-ag.Text = "AutoGun (Not Working)"
-ag.Font = Enum.Font.SourceSansBold
-ag.TextColor3 = Color3.fromRGB(0, 0, 0)
-ag.TextSize = 12
-ag.Active = false
-ag.Selectable = false
-
-local flingMurderer = Instance.new("TextButton")
-flingMurderer.Parent = rs
-flingMurderer.Name = "flingMurderer"
-flingMurderer.Position = UDim2.new(0.083, 0, 0.983, 0)
-flingMurderer.Size = UDim2.new(0, 100, 0, 25)
-flingMurderer.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-flingMurderer.Text = "Fling Murderer"
-flingMurderer.Font = Enum.Font.SourceSansBold
-flingMurderer.TextColor3 = Color3.fromRGB(0, 0, 0)
-flingMurderer.TextSize = 12
-
-local killAll = Instance.new("TextButton")
-killAll.Parent = rs
-killAll.Name = "killAll"
-killAll.Position = UDim2.new(0.083, 0, 1.216, 0)
-killAll.Size = UDim2.new(0, 100, 0, 25)
-killAll.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-killAll.Text = "Kill All"
-killAll.Font = Enum.Font.SourceSansBold
-killAll.TextColor3 = Color3.fromRGB(0, 0, 0)
-killAll.TextSize = 12
-
-wg.CornerRadius = UDim.new(0, 8)
-wg.Parent = killAll
-
-local flingSheriff = Instance.new("TextButton")
-flingSheriff.Parent = rs
-flingSheriff.Name = "flingSheriff"
-flingSheriff.Position = UDim2.new(0.083, 0, 1.216, 0)
-flingSheriff.Size = UDim2.new(0, 100, 0, 25)
-flingSheriff.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-flingSheriff.Text = "Fling Sheriff"
-flingSheriff.Font = Enum.Font.SourceSansBold
-flingSheriff.TextColor3 = Color3.fromRGB(0, 0, 0)
-flingSheriff.TextSize = 12
-
-wg.CornerRadius = UDim.new(0, 8)
-wg.Parent = flingMurderer
-
-gk.CornerRadius = UDim.new(0, 8)
-gk.Parent = flingSheriff
-
-wg.CornerRadius = UDim.new(0, 8)
-wg.Parent = ag
+-- Gắn sự kiện Toggle mở rộng / thu gọn
+local collapsed = false
+topBar.MouseButton1Click:Connect(function()
+	collapsed = not collapsed
+	buttonFrame.Visible = not collapsed
+end)
 
 -- Button functionality
 vw.MouseButton1Click:Connect(function()
@@ -511,21 +441,6 @@ xy.MouseButton1Click:Connect(function()
     end
 end)
 
-flingMurderer.MouseButton1Click:Connect(function()
-    local target = findMurderer()
-    if target and target.Character then
-        local hrp = localplayer.Character and localplayer.Character:FindFirstChild("HumanoidRootPart")
-        local targetHRP = target.Character:FindFirstChild("HumanoidRootPart")
-        if hrp and targetHRP then
-            hrp.CFrame = targetHRP.CFrame * CFrame.new(0, 2, 0)
-            local bv = Instance.new("BodyVelocity", hrp)
-            bv.Velocity = Vector3.new(9999, 9999, 9999)
-            bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-            task.delay(0.2, function() bv:Destroy() end)
-        end
-    end
-end)
-
 ag.MouseButton1Click:Connect(function()
     for _, item in ipairs(workspace:GetDescendants()) do
         if item:IsA("Tool") and item.Name == "GunDrop" then
@@ -540,22 +455,21 @@ ag.Text = "AutoGun"
 ag.Active = true
 ag.Selectable = true
 
-local function flingPlayer(plr)
-    local hrp = localplayer.Character and localplayer.Character:FindFirstChild("HumanoidRootPart")
-    local targetHRP = plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-    if hrp and targetHRP then
-        hrp.CFrame = targetHRP.CFrame * CFrame.new(0, 2, 0)
-        local bv = Instance.new("BodyVelocity", hrp)
-        bv.Velocity = Vector3.new(9999, 9999, 9999)
-        bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-        task.delay(0.2, function() bv:Destroy() end)
+flingMurderer.MouseButton1Click:Connect(function()
+    local target = findMurderer()
+    if target then
+        miniFling(target)
+    else
+        warn("Không tìm thấy murderer.")
     end
-end
+end)
 
 flingSheriff.MouseButton1Click:Connect(function()
     local target = findSheriff()
     if target then
-        flingPlayer(target)
+        miniFling(target)
+    else
+        warn("Không tìm thấy sheriff.")
     end
 end)
 
@@ -587,6 +501,69 @@ killAll.MouseButton1Click:Connect(function()
     }
     localplayer.Character.Knife.Stab:FireServer(unpack(args))
 end)
+
+function miniFling(playerToFling)
+	local character = localplayer.Character
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	local rootPart = humanoid and humanoid.RootPart
+	local targetCharacter = playerToFling.Character
+
+	-- tìm parts để fling
+	local targetHumanoid = targetCharacter:FindFirstChildOfClass("Humanoid")
+	local targetRoot = targetHumanoid and targetHumanoid.RootPart
+	local targetHead = targetCharacter:FindFirstChild("Head")
+	local accessory = targetCharacter:FindFirstChildOfClass("Accessory")
+	local handle = accessory and accessory:FindFirstChild("Handle")
+
+	-- lưu vị trí gốc
+	if rootPart and rootPart.Velocity.Magnitude < 50 then
+		getgenv().OldPos = rootPart.CFrame
+	end
+
+	-- Xác định phần nào sẽ là đối tượng camera
+	if targetHead then
+		workspace.CurrentCamera.CameraSubject = targetHead
+	elseif handle then
+		workspace.CurrentCamera.CameraSubject = handle
+	elseif targetHumanoid and targetRoot then
+		workspace.CurrentCamera.CameraSubject = targetHumanoid
+	end
+
+	-- Dùng vị trí để tạo lực
+	local function flingPart(part)
+		local angle = 0
+		repeat
+			if part.Velocity.Magnitude < 50 then
+				angle += 100
+				rootPart.CFrame = part.CFrame * CFrame.new(0, 1.5, 0) * CFrame.Angles(math.rad(angle), 0, 0)
+				character:SetPrimaryPartCFrame(rootPart.CFrame)
+				rootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
+				rootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+				task.wait()
+			end
+		until part.Velocity.Magnitude > 500
+	end
+
+	if targetRoot and targetHead then
+		if (targetRoot.Position - targetHead.Position).Magnitude > 5 then
+			flingPart(targetHead)
+		else
+			flingPart(targetRoot)
+		end
+	elseif targetRoot then
+		flingPart(targetRoot)
+	elseif targetHead then
+		flingPart(targetHead)
+	elseif handle then
+		flingPart(handle)
+	else
+		fu.notification("Can't find a proper part of target player to fling.")
+	end
+
+	-- Reset lại camera và vị trí gốc
+	rootPart.CFrame = getgenv().OldPos
+	character:SetPrimaryPartCFrame(getgenv().OldPos)
+end
 
 -- Input bindings
 UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
