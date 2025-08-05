@@ -21,7 +21,6 @@ local Config = {
 }
 
 local autoSelect = false
-local macroEnabled = false
 local tbEnabled = true -- TriggerBot luôn hoạt động
 local fovRadius = 20
 local HoldingRightClick = false
@@ -299,35 +298,6 @@ local function UpdateAntilock()
         root.CFrame = root.CFrame * CFrame.new(math.random(-Config.ShiftAmount, Config.ShiftAmount)/50, 0, math.random(-Config.ShiftAmount, Config.ShiftAmount)/50)
     end
 end
-
--- Macro Zoom (Shift Lock trên điện thoại)
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.DPadDown then
-        macroEnabled = true
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.DPadDown then
-        macroEnabled = false
-    end
-end)
-
-RunService.Heartbeat:Connect(function()
-    if macroEnabled then
-        LocalPlayer.CameraMinZoomDistance = 0.5
-        LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
-        task.wait()
-        LocalPlayer.CameraMode = Enum.CameraMode.Classic
-        LocalPlayer.CameraMinZoomDistance = 5
-        task.wait()
-    else
-        LocalPlayer.CameraMinZoomDistance = 0.5
-        LocalPlayer.CameraMode = Enum.CameraMode.Classic
-    end
-end)
 
 -- Cập nhật danh sách người chơi
 local function UpdatePlayerList()
