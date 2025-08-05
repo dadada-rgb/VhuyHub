@@ -341,14 +341,13 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Fling Function
 function miniFling(playerToFling)
     local character = localplayer.Character
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     local rootPart = humanoid and humanoid.RootPart
     local targetCharacter = playerToFling.Character
     if not character or not humanoid or not rootPart or not targetCharacter then
-        fu.notification("No valid character of said target player. May have died.")
+        fu.notification("Không tìm thấy nhân vật hợp lệ của mục tiêu.")
         return
     end
 
@@ -358,44 +357,47 @@ function miniFling(playerToFling)
     local accessory = targetCharacter:FindFirstChildOfClass("Accessory")
     local handle = accessory and accessory:FindFirstChild("Handle")
 
+    if not targetRoot and not targetHead and not handle then
+        fu.notification("Không tìm thấy bộ phận hợp lệ để fling.")
+        return
+    end
+
     if rootPart and rootPart.Velocity.Magnitude < 50 then
         getgenv().OldPos = rootPart.CFrame
     end
 
     local function flingPart(part)
-        local duration = 2
+        local duration = 1.5 -- Giảm thời gian để tăng tốc độ fling
         local startTime = tick()
         local angle = 0
+        local bv = Instance.new("BodyVelocity")
+        bv.Name = "FlingVelocity"
+        bv.Parent = rootPart
+        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bv.Velocity = Vector3.new(0, 0, 0) -- Khởi tạo vận tốc ban đầu
+
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+        humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
+        workspace.FallenPartsDestroyHeight = 0/0
+
         repeat
-            if rootPart and targetHumanoid and part then
-                if part.Velocity.Magnitude < 50 then
-                    angle = angle + 100
-                    rootPart.CFrame = CFrame.new(part.Position) * CFrame.new(0, 1.5, 0) * CFrame.Angles(math.rad(angle), 0, 0)
-                    character:SetPrimaryPartCFrame(rootPart.CFrame)
-                    rootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
-                    rootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
-                    task.wait()
-                else
-                    rootPart.CFrame = CFrame.new(part.Position) * CFrame.new(0, 1.5, targetHumanoid.WalkSpeed) * CFrame.Angles(math.rad(90), 0, 0)
-                    character:SetPrimaryPartCFrame(rootPart.CFrame)
-                    task.wait()
-                end
+            if rootPart and targetHumanoid and part and part.Parent and humanoid.Health > 0 then
+                angle = angle + 150 -- Tăng góc xoay để mạnh hơn
+                rootPart.CFrame = CFrame.new(part.Position) * CFrame.new(0, 2, 0) * CFrame.Angles(math.rad(angle), 0, 0)
+                character:SetPrimaryPartCFrame(rootPart.CFrame)
+                bv.Velocity = Vector3.new(1e8, 1e8, 1e8) -- Tăng lực fling
+                rootPart.RotVelocity = Vector3.new(1e9, 1e9, 1e9) -- Tăng lực xoay
+                task.wait(0.01) -- Giảm độ trễ để fling nhanh hơn
             else
                 break
             end
-        until part.Velocity.Magnitude > 500 or not part.Parent or not targetCharacter or targetHumanoid.Sit or humanoid.Health <= 0 or tick() > startTime + duration
+        until part.Velocity.Magnitude > 1000 or not part.Parent or not targetCharacter or targetHumanoid.Sit or humanoid.Health <= 0 or tick() > startTime + duration
+
+        bv:Destroy()
     end
 
-    workspace.FallenPartsDestroyHeight = 0/0
-    local bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.Name = "EpixVel"
-    bodyVelocity.Parent = rootPart
-    bodyVelocity.Velocity = Vector3.new(9e8, 9e8, 9e8)
-    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
-
     if targetRoot and targetHead then
-        if (targetRoot.CFrame.p - targetHead.CFrame.p).Magnitude > 5 then
+        if (targetRoot.Position - targetHead.Position).Magnitude > 5 then
             flingPart(targetHead)
         else
             flingPart(targetRoot)
@@ -406,26 +408,28 @@ function miniFling(playerToFling)
         flingPart(targetHead)
     elseif handle then
         flingPart(handle)
-    else
-        fu.notification("Can't find a proper part of target player to fling.")
     end
 
-    bodyVelocity:Destroy()
+    -- Reset trạng thái
     humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
     workspace.CurrentCamera.CameraSubject = humanoid
-    repeat
-        rootPart.CFrame = getgenv().OldPos * CFrame.new(0, 0.5, 0)
-        character:SetPrimaryPartCFrame(rootPart.CFrame)
-        humanoid:ChangeState("GettingUp")
-        for _, part in ipairs(character:GetChildren()) do
-            if part:IsA("BasePart") then
-                part.Velocity = Vector3.new()
-                part.RotVelocity = Vector3.new()
+    if getgenv().OldPos then
+        repeat
+            rootPart.CFrame = getgenv().OldPos * CFrame.new(0, 1, 0)
+            character:SetPrimaryPartCFrame(rootPart.CFrame)
+            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+            for _, part in ipairs(character:GetChildren()) do
+                if part:IsA("BasePart") then
+                    part.Velocity = Vector3.new(0, 0, 0)
+                    part.RotVelocity = Vector3.new(0, 0, 0)
+                end
             end
-        end
-        task.wait()
-    until (rootPart.Position - getgenv().OldPos.p).Magnitude < 25
+            task.wait(0.01)
+        until (rootPart.Position - getgenv().OldPos.p).Magnitude < 20
+    end
     workspace.FallenPartsDestroyHeight = getgenv().FPDH or -500
+    fu.notification("Đã fling " .. playerToFling.Name)
 end
 
 -- Event connections
