@@ -492,7 +492,7 @@ end
 
 -- Tự động aim khi bật qua GUI
 RunService.RenderStepped:Connect(function()
-    if Config.AimbotEnabled and getgenv().Aimbot.Status then
+    if Config.AimbotEnabled and getgenv().Aimbot.Status and HoldingRightClick then
         Player = GetClosestValidPlayer()
         if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
             local part = Player.Character[getgenv().Aimbot.Hitpart]
