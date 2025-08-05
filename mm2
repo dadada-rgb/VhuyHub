@@ -15,7 +15,6 @@ local OFFSET_TO_PING_MULT = 1
 local UPDATE_INTERVAL = 0.5
 local RANDOM_DELAY = 0.1
 local MAX_COIN_DISTANCE = 100
-local MAX_GUN_DISTANCE = 500
 local ANTI_CHEAT_DELAY = 0.05
 
 -- Variables
