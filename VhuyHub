@@ -136,8 +136,7 @@ local uc = Instance.new("UICorner")
 uc.CornerRadius = UDim.new(0, 12)
 uc.Parent = title
 
--- Biến mất sau 1 giây
-task.delay(1, function()
+task.delay(3, function()
 	gui:Destroy()
 	blur:Destroy()
 end)
@@ -145,22 +144,6 @@ end)
 -- Chống một số hình thức scan GUI đơn giản
 pcall(function()
 	gui.Parent = game:GetService("CoreGui"):FindFirstAncestorWhichIsA("ScreenGui") or game:GetService("CoreGui")
-end)
-
-local TweenService = game:GetService("TweenService")
-
--- Hiệu ứng chữ VhuyHub từ từ
-title.TextTransparency = 1
-local tween = TweenService:Create(title, TweenInfo.new(1), {TextTransparency = 0})
-tween:Play()
-
--- Giữ lại 3 giây rồi biến mất
-task.delay(3, function()
-	local tweenOut = TweenService:Create(title, TweenInfo.new(1), {TextTransparency = 1})
-	tweenOut:Play()
-	tweenOut.Completed:Wait()
-	gui:Destroy()
-	blur:Destroy()
 end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote"))()
