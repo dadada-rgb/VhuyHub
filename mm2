@@ -327,8 +327,14 @@ local function checkLineOfSight(startPos, endPos)
     return not raycastResult or raycastResult.Instance:IsDescendantOf(findMurderer().Character)
 end
 
+-- Thêm biến để giới hạn tần suất killAll
+local lastKillAll = tick()
+
+-- Auto-Shoot khi là Sheriff và Auto-Kill khi là Murderer trong AutoFarm
 RunService.Heartbeat:Connect(function()
     if not autoFarm or not isScriptRunning then return end
+    
+    -- Kiểm tra Sheriff
     if findSheriff() == localplayer then
         local murderer = findMurderer()
         if murderer and murderer.Character and murderer.Character:FindFirstChild("HumanoidRootPart") and localplayer.Character and localplayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -338,6 +344,40 @@ RunService.Heartbeat:Connect(function()
                 task.spawn(shootMurderer)
             end
         end
+    end
+    
+    -- Kiểm tra Murderer và gọi killAll
+    if findMurderer() == localplayer and tick() - lastKillAll >= 1 then
+        lastKillAll = tick()
+        if not localplayer.Character:FindFirstChild("Knife") then
+            local hum = localplayer.Character:FindFirstChild("Humanoid")
+            if localplayer.Backpack:FindFirstChild("Knife") then
+                hum:EquipTool(localplayer.Backpack:FindFirstChild("Knife"))
+                task.wait(0.1)
+            else
+                fu.notification("You don't have the knife..?")
+                return
+            end
+        end
+
+        for _, player in ipairs(game.Players:GetPlayers()) do
+            if player ~= localplayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                local targetPart = player.Character:FindFirstChild("HumanoidRootPart")
+                targetPart.Anchored = true
+                targetPart.CFrame = localplayer.Character:FindFirstChild("HumanoidRootPart").CFrame + localplayer.Character:FindFirstChild("HumanoidRootPart").CFrame.LookVector * 1
+                task.wait(0.05)
+            end
+        end
+
+        local args = { [1] = "Slash" }
+        localplayer.Character.Knife.Stab:FireServer(unpack(args))
+        task.wait(0.1)
+        for _, player in ipairs(game.Players:GetPlayers()) do
+            if player ~= localplayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                player.Character:FindFirstChild("HumanoidRootPart").Anchored = false
+            end
+        end
+        fu.notification("Auto Kill All executed.")
     end
 end)
 
@@ -486,20 +526,25 @@ gui.Name = "zX9qW2"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
 
--- TopBar (kéo được & thu gọn)
-local topBar = Instance.new("TextButton")
-topBar.Name = "TopBar"
-topBar.Size = UDim2.new(0, 140, 0, 25)
-topBar.Position = UDim2.new(0.1, 0, 0.2, 0)
-topBar.BackgroundColor3 = Color3.fromRGB(180, 180, 255)
-topBar.Text = "DhuyxDtuyen"
-topBar.TextSize = 14
-topBar.Font = Enum.Font.SourceSansBold
-topBar.TextColor3 = Color3.new(0,0,0)
-topBar.Draggable = true
-topBar.Active = true
-topBar.Selectable = true
-topBar.Parent = gui
+-- Nút ẩn/hiện Frame
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 40, 0, 40)
+ToggleButton.Position = UDim2.new(0, 10, 0, 10)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+ToggleButton.Text = ">"
+ToggleButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+ToggleButton.TextSize = 20
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Active = true
+ToggleButton.Draggable = true
+ToggleButton.Parent = gui
+Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 8)
+
+-- Xử lý ẩn/hiện Frame
+ToggleButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+    ToggleButton.Text = MainFrame.Visible and ">" or "<"
+end)
 
 -- Frame chứa các nút
 local buttonFrame = Instance.new("Frame")
@@ -509,7 +554,7 @@ buttonFrame.AnchorPoint = Vector2.new(0, 1)
 buttonFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
 buttonFrame.Visible = true
 buttonFrame.Position = UDim2.new(0.1, 0, 0.2, 25)
-buttonFrame.Parent = topBar
+buttonFrame.Parent = ToggleButton
 
 -- Layout căn nút
 local layout = Instance.new("UIListLayout", buttonFrame)
@@ -552,15 +597,6 @@ for _, btn in ipairs(buttonFrame:GetChildren()) do
 		btn.Active = true
 	end
 end
-
--- Gắn sự kiện Toggle mở rộng / thu gọn
-local collapsed = false
-topBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        collapsed = not collapsed
-        buttonFrame.Visible = not collapsed
-    end
-end)
 
 -- AutoFarm Toggle
 autoFarmBtn.MouseButton1Click:Connect(function()
