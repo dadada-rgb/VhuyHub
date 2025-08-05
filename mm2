@@ -382,91 +382,135 @@ RunService.Heartbeat:Connect(function()
 end)
 
 function miniFling(playerToFling)
-    local character = localplayer.Character
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    local rootPart = humanoid and humanoid.RootPart
-    local targetCharacter = playerToFling.Character
-    if not character or not humanoid or not rootPart or not targetCharacter then
-        fu.notification("Không tìm thấy nhân vật hợp lệ của mục tiêu.")
+    local Character = localplayer.Character
+    local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+    local RootPart = Humanoid and Humanoid.RootPart
+
+    local TCharacter = playerToFling.Character
+    local THumanoid = TCharacter and TCharacter:FindFirstChildOfClass("Humanoid")
+    local TRootPart = THumanoid and THumanoid.RootPart
+    local THead = TCharacter and TCharacter:FindFirstChild("Head")
+    local Accessory = TCharacter and TCharacter:FindFirstChildOfClass("Accessory")
+    local Handle = Accessory and Accessory:FindFirstChild("Handle")
+
+    if not Character or not Humanoid or not RootPart or not TCharacter then
+        fu.notification("Không tìm thấy nhân vật hợp lệ của bạn hoặc mục tiêu.")
         return
     end
 
-    local targetHumanoid = targetCharacter:FindFirstChildOfClass("Humanoid")
-    local targetRoot = targetHumanoid and targetHumanoid.RootPart
-    local targetHead = targetCharacter:FindFirstChild("Head")
-    local accessory = targetCharacter:FindFirstChildOfClass("Accessory")
-    local handle = accessory and accessory:FindFirstChild("Handle")
-
-    if not targetRoot and not targetHead and not handle then
+    if not TRootPart and not THead and not Handle then
         fu.notification("Không tìm thấy bộ phận hợp lệ để fling.")
         return
     end
 
-    if rootPart and rootPart.Velocity.Magnitude < 50 then
-        getgenv().OldPos = rootPart.CFrame
+    if THumanoid and THumanoid.Sit then
+        fu.notification("Mục tiêu đang ngồi, không thể fling.")
+        return
     end
 
-    local function flingPart(part)
-        local duration = 1.5 -- Giảm thời gian để tăng tốc độ fling
-        local startTime = tick()
-        local angle = 0
-        local bv = Instance.new("BodyVelocity")
-        bv.Name = "FlingVelocity"
-        bv.Parent = rootPart
-        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        bv.Velocity = Vector3.new(0, 0, 0) -- Khởi tạo vận tốc ban đầu
+    -- Lưu vị trí gốc
+    if RootPart.Velocity.Magnitude < 50 then
+        getgenv().OldPos = RootPart.CFrame
+    end
 
-        humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
-        humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-        workspace.FallenPartsDestroyHeight = 0/0
+    -- Chuyển camera tới mục tiêu
+    if THead then
+        workspace.CurrentCamera.CameraSubject = THead
+    elseif Handle then
+        workspace.CurrentCamera.CameraSubject = Handle
+    elseif THumanoid then
+        workspace.CurrentCamera.CameraSubject = THumanoid
+    end
+
+    -- Hàm di chuyển và fling
+    local function FPos(BasePart, Pos, Ang)
+        RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
+        Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
+        RootPart.Velocity = Vector3.new(9e7, 9e7, 9e7)
+        RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
+    end
+
+    -- Hàm thực hiện fling
+    local function SFBasePart(BasePart)
+        local TimeToWait = 2
+        local Time = tick()
+        local Angle = 0
 
         repeat
-            if rootPart and targetHumanoid and part and part.Parent and humanoid.Health > 0 then
-                angle = angle + 150 -- Tăng góc xoay để mạnh hơn
-                rootPart.CFrame = CFrame.new(part.Position) * CFrame.new(0, 2, 0) * CFrame.Angles(math.rad(angle), 0, 0)
-                character:SetPrimaryPartCFrame(rootPart.CFrame)
-                bv.Velocity = Vector3.new(1e8, 1e8, 1e8) -- Tăng lực fling
-                rootPart.RotVelocity = Vector3.new(1e9, 1e9, 1e9) -- Tăng lực xoay
-                task.wait(0.01) -- Giảm độ trễ để fling nhanh hơn
+            if RootPart and THumanoid and BasePart and BasePart.Parent and Humanoid.Health > 0 then
+                if BasePart.Velocity.Magnitude < 50 then
+                    Angle = Angle + 100
+                    FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(2.25, 1.5, -2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(-2.25, -1.5, 2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
+                    task.wait()
+                else
+                    FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, -THumanoid.WalkSpeed), CFrame.Angles(0, 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, 1.5, TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(math.rad(90), 0, 0))
+                    task.wait()
+                    FPos(BasePart, CFrame.new(0, -1.5, -TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(0, 0, 0))
+                    task.wait()
+                end
             else
                 break
             end
-        until part.Velocity.Magnitude > 1000 or not part.Parent or not targetCharacter or targetHumanoid.Sit or humanoid.Health <= 0 or tick() > startTime + duration
-
-        bv:Destroy()
+        until BasePart.Velocity.Magnitude > 500 or BasePart.Parent ~= TCharacter or not TCharacter.Parent or THumanoid.Sit or Humanoid.Health <= 0 or tick() > Time + TimeToWait
     end
 
-    if targetRoot and targetHead then
-        if (targetRoot.Position - targetHead.Position).Magnitude > 5 then
-            flingPart(targetHead)
-        else
-            flingPart(targetRoot)
-        end
-    elseif targetRoot then
-        flingPart(targetRoot)
-    elseif targetHead then
-        flingPart(targetHead)
-    elseif handle then
-        flingPart(handle)
+    -- Vô hiệu hóa FallenPartsDestroyHeight
+    workspace.FallenPartsDestroyHeight = 0/0
+
+    -- Tạo BodyVelocity để tăng lực fling
+    local BV = Instance.new("BodyVelocity")
+    BV.Name = "FlingVelocity"
+    BV.Parent = RootPart
+    BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
+    BV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+
+    -- Vô hiệu hóa trạng thái ngồi
+    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+
+    -- Chọn bộ phận để fling
+    if TRootPart and THead and (TRootPart.CFrame.p - THead.CFrame.p).Magnitude > 5 then
+        SFBasePart(THead)
+    elseif TRootPart then
+        SFBasePart(TRootPart)
+    elseif THead then
+        SFBasePart(THead)
+    elseif Handle then
+        SFBasePart(Handle)
+    else
+        fu.notification("Không tìm thấy bộ phận hợp lệ để fling.")
     end
 
-    -- Reset trạng thái
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
-    humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
-    workspace.CurrentCamera.CameraSubject = humanoid
+    -- Dọn dẹp
+    BV:Destroy()
+    Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+    workspace.CurrentCamera.CameraSubject = Humanoid
+
+    -- Trở về vị trí gốc
     if getgenv().OldPos then
         repeat
-            rootPart.CFrame = getgenv().OldPos * CFrame.new(0, 1, 0)
-            character:SetPrimaryPartCFrame(rootPart.CFrame)
-            humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-            for _, part in ipairs(character:GetChildren()) do
+            RootPart.CFrame = getgenv().OldPos * CFrame.new(0, 0.5, 0)
+            Character:SetPrimaryPartCFrame(getgenv().OldPos * CFrame.new(0, 0.5, 0))
+            Humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
+            for _, part in ipairs(Character:GetChildren()) do
                 if part:IsA("BasePart") then
                     part.Velocity = Vector3.new(0, 0, 0)
                     part.RotVelocity = Vector3.new(0, 0, 0)
                 end
             end
-            task.wait(0.01)
-        until (rootPart.Position - getgenv().OldPos.p).Magnitude < 20
+            task.wait()
+        until (RootPart.Position - getgenv().OldPos.p).Magnitude < 25
     end
     workspace.FallenPartsDestroyHeight = getgenv().FPDH or -500
     fu.notification("Đã fling " .. playerToFling.Name)
@@ -540,63 +584,79 @@ ToggleButton.Draggable = true
 ToggleButton.Parent = gui
 Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 8)
 
+-- Frame chính
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 280, 0, 200)
+MainFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+MainFrame.Active = true
+MainFrame.Draggable = true
+MainFrame.Parent = gui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+
 -- Xử lý ẩn/hiện Frame
 ToggleButton.MouseButton1Click:Connect(function()
     MainFrame.Visible = not MainFrame.Visible
     ToggleButton.Text = MainFrame.Visible and ">" or "<"
 end)
 
--- Frame chứa các nút
-local buttonFrame = Instance.new("Frame")
-buttonFrame.Name = "MainFrame"
-buttonFrame.Size = UDim2.new(0, 140, 0, 220)
-buttonFrame.AnchorPoint = Vector2.new(0, 1)
-buttonFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-buttonFrame.Visible = true
-buttonFrame.Position = UDim2.new(0.1, 0, 0.2, 25)
-buttonFrame.Parent = ToggleButton
+-- Frame bên trái (4 nút)
+local LeftButtonFrame = Instance.new("Frame")
+LeftButtonFrame.Size = UDim2.new(0.5, -5, 1, -25)
+LeftButtonFrame.Position = UDim2.new(0, 5, 0, 20)
+LeftButtonFrame.BackgroundTransparency = 1
+LeftButtonFrame.Parent = MainFrame
 
--- Layout căn nút
-local layout = Instance.new("UIListLayout", buttonFrame)
-layout.Padding = UDim.new(0, 5)
-layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-layout.SortOrder = Enum.SortOrder.LayoutOrder
+local LeftLayout = Instance.new("UIListLayout")
+LeftLayout.Padding = UDim.new(0, 5)
+LeftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+LeftLayout.SortOrder = Enum.SortOrder.LayoutOrder
+LeftLayout.Parent = LeftButtonFrame
 
--- Tạo hàm nhanh để thêm nút
-local function createButton(name, text)
-	local btn = Instance.new("TextButton")
-	btn.Name = name
-	btn.Text = text
-	btn.Size = UDim2.new(0, 120, 0, 25)
-	btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-	btn.TextColor3 = Color3.fromRGB(0, 0, 0)
-	btn.Font = Enum.Font.SourceSansBold
-	btn.TextSize = 12
-	btn.ZIndex = 2
-	btn.AutoButtonColor = true
-	btn.Selectable = true
-	btn.Active = true
-	btn.Parent = buttonFrame
-	return btn
+-- Frame bên phải (4 nút)
+local RightButtonFrame = Instance.new("Frame")
+RightButtonFrame.Size = UDim2.new(0.5, -5, 1, -25)
+RightButtonFrame.Position = UDim2.new(0.5, 0, 0, 20)
+RightButtonFrame.BackgroundTransparency = 1
+RightButtonFrame.Parent = MainFrame
+
+local RightLayout = Instance.new("UIListLayout")
+RightLayout.Padding = UDim.new(0, 5)
+RightLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+RightLayout.SortOrder = Enum.SortOrder.LayoutOrder
+RightLayout.Parent = RightButtonFrame
+
+-- Hàm tạo nút
+local function createButton(name, text, parent)
+    local btn = Instance.new("TextButton")
+    btn.Name = name
+    btn.Text = text
+    btn.Size = UDim2.new(0, 120, 0, 25)
+    btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    btn.BackgroundTransparency = 0.2
+    btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    btn.Font = Enum.Font.SourceSansBold
+    btn.TextSize = 12
+    btn.ZIndex = 5
+    btn.AutoButtonColor = true
+    btn.Selectable = true
+    btn.Active = true
+    btn.Parent = parent
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+    return btn
 end
 
--- Các nút gốc
-local autoFarmBtn = createButton("jH4mP8", "AutoFarm (Off)")
-local shootBtn = createButton("tR7nY5", "Shoot")
-local espBtn = createButton("uP5kQ3", "ESP (Off)")
-local autoGunBtn = createButton("vQ2zW9", "AutoGun")
-local flingMurdererBtn = createButton("flingMurderer", "Fling Murderer")
-local flingSheriffBtn = createButton("flingSheriff", "Fling Sheriff")
-local killAllBtn = createButton("killAll", "Kill All")
+-- Tạo 8 nút (4 bên trái, 4 bên phải)
+local autoFarmBtn = createButton("jH4mP8", "AutoFarm (Off)", LeftButtonFrame)
+local shootBtn = createButton("tR7nY5", "Shoot", LeftButtonFrame)
+local espBtn = createButton("uP5kQ3", "ESP (Off)", LeftButtonFrame)
+local autoGunBtn = createButton("vQ2zW9", "AutoGun", LeftButtonFrame)
 
--- Tương thích mobile
-for _, btn in ipairs(buttonFrame:GetChildren()) do
-	if btn:IsA("TextButton") then
-		btn.ZIndex = 5
-		btn.Selectable = true
-		btn.Active = true
-	end
-end
+local flingMurdererBtn = createButton("flingMurderer", "Fling Murderer", RightButtonFrame)
+local flingSheriffBtn = createButton("flingSheriff", "Fling Sheriff", RightButtonFrame)
+local killAllBtn = createButton("killAll", "Kill All", RightButtonFrame)
+local tpLobbyBtn = createButton("tpLobby", "TP Lobby", RightButtonFrame)
 
 -- AutoFarm Toggle
 autoFarmBtn.MouseButton1Click:Connect(function()
@@ -668,7 +728,6 @@ killAllBtn.MouseButton1Click:Connect(function()
         fu.notification("You're not murderer.")
         return
     end
-
     if not localplayer.Character:FindFirstChild("Knife") then
         local hum = localplayer.Character:FindFirstChild("Humanoid")
         if localplayer.Backpack:FindFirstChild("Knife") then
@@ -679,7 +738,6 @@ killAllBtn.MouseButton1Click:Connect(function()
             return
         end
     end
-
     for _, player in ipairs(game.Players:GetPlayers()) do
         if player ~= localplayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             local targetPart = player.Character:FindFirstChild("HumanoidRootPart")
@@ -688,7 +746,6 @@ killAllBtn.MouseButton1Click:Connect(function()
             task.wait(0.05)
         end
     end
-
     local args = { [1] = "Slash" }
     localplayer.Character.Knife.Stab:FireServer(unpack(args))
     task.wait(0.1)
@@ -697,6 +754,12 @@ killAllBtn.MouseButton1Click:Connect(function()
             player.Character:FindFirstChild("HumanoidRootPart").Anchored = false
         end
     end
+    fu.notification("Auto Kill All executed.")
+end)
+
+tpLobbyBtn.MouseButton1Click:Connect(function()
+    local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
+    character:MoveTo(Vector3.new(-107, 152, 41))
 end)
 
 -- Input bindings
