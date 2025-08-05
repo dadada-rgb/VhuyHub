@@ -168,106 +168,6 @@ flyButton = CreateButton("Fly: OFF", function()
     UpdateButtonText()
 end)
 
--- Khởi tạo ScreenGui cho ESP
-local espGui = Instance.new("ScreenGui")
-espGui.Name = "SafeESP"
-espGui.ResetOnSpawn = false
-espGui.IgnoreGuiInset = true
-espGui.Parent = PlayerGui
-
--- Danh sách ESP
-local ESPs = {}
-
--- Kiểm tra trạng thái người chơi
-local function IsValidTarget(player)
-    if not player or not player.Character or not player.Character:FindFirstChild("Humanoid") or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
-    local bodyEffects = player.Character:FindFirstChild("BodyEffects")
-    local isKO = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
-    local isGrabbed = player.Character:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
-    return not (isKO or isGrabbed)
-end
-
--- Tạo ESP
-local function CreateESP(player)
-    if ESPs[player] or player == LocalPlayer then return end
-    local label = Instance.new("TextLabel")
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(200, 200, 200)
-    label.TextSize = 14
-    label.Font = Enum.Font.GothamBlack
-    label.Text = player.DisplayName
-    label.TextStrokeTransparency = 0.7
-    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    label.Size = UDim2.new(0, 200, 0, 20)
-    label.AnchorPoint = Vector2.new(0.5, 0.5)
-    label.Position = UDim2.new(0.5, 0, 0.5, 0)
-    label.Visible = false
-    label.Parent = espGui
-
-    local highlight = Instance.new("Highlight")
-    highlight.Enabled = false
-    highlight.FillTransparency = 0.7
-    highlight.OutlineTransparency = 0.3
-    highlight.FillColor = Color3.fromRGB(200, 200, 200)
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-    highlight.Adornee = player.Character
-    highlight.Parent = espGui
-
-    ESPs[player] = { label = label, highlight = highlight }
-end
-
--- Xóa ESP
-local function RemoveESP(player)
-    if ESPs[player] then
-        pcall(function()
-            ESPs[player].label:Destroy()
-            ESPs[player].highlight:Destroy()
-        end)
-        ESPs[player] = nil
-    end
-end
-
--- Cập nhật ESP
-local function UpdateESP()
-    if not Config.ESPEnabled then
-        for _, v in pairs(ESPs) do
-            v.label.Visible = false
-            v.highlight.Enabled = false
-        end
-        return
-    end
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and IsValidTarget(player) then
-            local character = player.Character
-            local head = character:FindFirstChild("Head")
-            if head then
-                CreateESP(player)
-                local headPos = head.Position
-                local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
-                local esp = ESPs[player]
-                if esp then
-                    local isSelected = Config.SelectedPlayers[player.Name]
-                    esp.label.TextColor3 = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(200, 200, 200)
-                    esp.highlight.FillColor = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(200, 200, 200)
-                    if onScreen then
-                        esp.label.Visible = true
-                        esp.label.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y - 20)
-                        esp.highlight.Enabled = true
-                    else
-                        esp.label.Visible = false
-                        esp.highlight.Enabled = false
-                    end
-                end
-            else
-                RemoveESP(player)
-            end
-        else
-            RemoveESP(player)
-        end
-    end
-end
-
--- Thêm nút Fling vào phần tạo nút
 flingButton = CreateButton("Fling Selected", function()
     for playerName, _ in pairs(Config.SelectedPlayers) do
         local targetPlayer = Players:FindFirstChild(playerName)
@@ -375,6 +275,105 @@ flingButton = CreateButton("Fling Selected", function()
         end
     end
 end)
+
+-- Khởi tạo ScreenGui cho ESP
+local espGui = Instance.new("ScreenGui")
+espGui.Name = "SafeESP"
+espGui.ResetOnSpawn = false
+espGui.IgnoreGuiInset = true
+espGui.Parent = PlayerGui
+
+-- Danh sách ESP
+local ESPs = {}
+
+-- Kiểm tra trạng thái người chơi
+local function IsValidTarget(player)
+    if not player or not player.Character or not player.Character:FindFirstChild("Humanoid") or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
+    local bodyEffects = player.Character:FindFirstChild("BodyEffects")
+    local isKO = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
+    local isGrabbed = player.Character:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
+    return not (isKO or isGrabbed)
+end
+
+-- Tạo ESP
+local function CreateESP(player)
+    if ESPs[player] or player == LocalPlayer then return end
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamBlack
+    label.Text = player.DisplayName
+    label.TextStrokeTransparency = 0.7
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.Size = UDim2.new(0, 200, 0, 20)
+    label.AnchorPoint = Vector2.new(0.5, 0.5)
+    label.Position = UDim2.new(0.5, 0, 0.5, 0)
+    label.Visible = false
+    label.Parent = espGui
+
+    local highlight = Instance.new("Highlight")
+    highlight.Enabled = false
+    highlight.FillTransparency = 0.7
+    highlight.OutlineTransparency = 0.3
+    highlight.FillColor = Color3.fromRGB(200, 200, 200)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.Adornee = player.Character
+    highlight.Parent = espGui
+
+    ESPs[player] = { label = label, highlight = highlight }
+end
+
+-- Xóa ESP
+local function RemoveESP(player)
+    if ESPs[player] then
+        pcall(function()
+            ESPs[player].label:Destroy()
+            ESPs[player].highlight:Destroy()
+        end)
+        ESPs[player] = nil
+    end
+end
+
+-- Cập nhật ESP
+local function UpdateESP()
+    if not Config.ESPEnabled then
+        for _, v in pairs(ESPs) do
+            v.label.Visible = false
+            v.highlight.Enabled = false
+        end
+        return
+    end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and IsValidTarget(player) then
+            local character = player.Character
+            local head = character:FindFirstChild("Head")
+            if head then
+                CreateESP(player)
+                local headPos = head.Position
+                local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
+                local esp = ESPs[player]
+                if esp then
+                    local isSelected = Config.SelectedPlayers[player.Name]
+                    esp.label.TextColor3 = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(200, 200, 200)
+                    esp.highlight.FillColor = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(200, 200, 200)
+                    if onScreen then
+                        esp.label.Visible = true
+                        esp.label.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y - 20)
+                        esp.highlight.Enabled = true
+                    else
+                        esp.label.Visible = false
+                        esp.highlight.Enabled = false
+                    end
+                end
+            else
+                RemoveESP(player)
+            end
+        else
+            RemoveESP(player)
+        end
+    end
+end
 
 -- Logic Speed từ v.txt
 local function UpdateSpeed()
@@ -622,7 +621,6 @@ end)
 
 -- Vòng lặp chính
 RunService.RenderStepped:Connect(function(deltaTime)
-    UpdateAntilock()
     UpdateESP()
     UpdateSpeed()
     UpdateFly(deltaTime)
