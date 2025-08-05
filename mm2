@@ -363,11 +363,11 @@ topBar.Parent = gui
 local buttonFrame = Instance.new("Frame")
 buttonFrame.Name = "MainFrame"
 buttonFrame.Size = UDim2.new(0, 140, 0, 220)
-buttonFrame.Position = UDim2.new(0, 0, 1, 0)
 buttonFrame.AnchorPoint = Vector2.new(0, 1)
 buttonFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
 buttonFrame.Visible = true
-buttonFrame.Parent = topBar
+buttonFrame.Parent = gui
+buttonFrame.Position = UDim2.new(0.1, 0, 0.2, 25)
 
 -- Layout căn nút
 local layout = Instance.new("UIListLayout", buttonFrame)
@@ -418,22 +418,24 @@ topBar.MouseButton1Click:Connect(function()
 	buttonFrame.Visible = not collapsed
 end)
 
--- Button functionality
-vw.MouseButton1Click:Connect(function()
+-- AutoFarm Toggle
+autoFarmBtn.MouseButton1Click:Connect(function()
     autoFarm = not autoFarm
-    vw.Text = "AutoFarm (" .. (autoFarm and "On" or "Off") .. ")"
+    autoFarmBtn.Text = "AutoFarm (" .. (autoFarm and "On" or "Off") .. ")"
     if autoFarm then
         task.spawn(autoFarmCoins)
     end
 end)
 
-mn.MouseButton1Click:Connect(function()
+-- Shoot Murderer
+shootBtn.MouseButton1Click:Connect(function()
     task.spawn(shootMurderer)
 end)
 
-xy.MouseButton1Click:Connect(function()
+-- Toggle ESP
+espBtn.MouseButton1Click:Connect(function()
     espActive = not espActive
-    xy.Text = "ESP (" .. (espActive and "On" or "Off") .. ")"
+    espBtn.Text = "ESP (" .. (espActive and "On" or "Off") .. ")"
     if espActive then
         reloadPlayerESP()
     else
@@ -441,7 +443,8 @@ xy.MouseButton1Click:Connect(function()
     end
 end)
 
-ag.MouseButton1Click:Connect(function()
+-- AutoGun (nhặt súng)
+autoGunBtn.MouseButton1Click:Connect(function()
     for _, item in ipairs(workspace:GetDescendants()) do
         if item:IsA("Tool") and item.Name == "GunDrop" then
             local hrp = localplayer.Character and localplayer.Character:FindFirstChild("HumanoidRootPart")
@@ -451,11 +454,9 @@ ag.MouseButton1Click:Connect(function()
         end
     end
 end)
-ag.Text = "AutoGun"
-ag.Active = true
-ag.Selectable = true
 
-flingMurderer.MouseButton1Click:Connect(function()
+-- Fling Murderer
+flingMurdererBtn.MouseButton1Click:Connect(function()
     local target = findMurderer()
     if target then
         miniFling(target)
@@ -464,7 +465,8 @@ flingMurderer.MouseButton1Click:Connect(function()
     end
 end)
 
-flingSheriff.MouseButton1Click:Connect(function()
+-- Fling Sheriff
+flingSheriffBtn.MouseButton1Click:Connect(function()
     local target = findSheriff()
     if target then
         miniFling(target)
@@ -473,7 +475,8 @@ flingSheriff.MouseButton1Click:Connect(function()
     end
 end)
 
-killAll.MouseButton1Click:Connect(function()
+-- Kill All
+killAllBtn.MouseButton1Click:Connect(function()
     if findMurderer() ~= localplayer then
         fu.notification("You're not murderer.")
         return
@@ -490,15 +493,14 @@ killAll.MouseButton1Click:Connect(function()
     end
 
     for _, player in ipairs(game.Players:GetPlayers()) do
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player ~= localplayer then
-            player.Character:FindFirstChild("HumanoidRootPart").Anchored = true
-            player.Character:FindFirstChild("HumanoidRootPart").CFrame = localplayer.Character:FindFirstChild("HumanoidRootPart").CFrame + localplayer.Character:FindFirstChild("HumanoidRootPart").CFrame.LookVector * 1
-        end	
+        if player ~= localplayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local targetPart = player.Character:FindFirstChild("HumanoidRootPart")
+            targetPart.Anchored = true
+            targetPart.CFrame = localplayer.Character.HumanoidRootPart.CFrame + localplayer.Character.HumanoidRootPart.CFrame.LookVector * 1
+        end
     end
 
-    local args = {
-        [1] = "Slash"
-    }
+    local args = { [1] = "Slash" }
     localplayer.Character.Knife.Stab:FireServer(unpack(args))
 end)
 
@@ -621,8 +623,8 @@ pq.Enabled = guiVisible
 UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
     if gameProcessedEvent then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
-        guiVisible = not guiVisible
-        pq.Enabled = guiVisible
+        gui.Enabled = guiVisible
+        buttonFrame.Visible = not collapsed
     end
 end)
 
