@@ -23,18 +23,17 @@ local Config = {
 local autoSelect = false
 local tbEnabled = true -- TriggerBot luôn hoạt động
 local fovRadius = 20
-local HoldingRightClick = false
 local Player = nil
 
 UserInputService.InputBegan:Connect(function(input, gpe)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
-		HoldingRightClick = true
+		Config.AimbotEnabled = true
 	end
 end)
 
 UserInputService.InputEnded:Connect(function(input, gpe)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
-		HoldingRightClick = false
+		Config.AimbotEnabled = false
 	end
 end)
 
@@ -570,7 +569,7 @@ end
 
 -- Tự động aim khi bật qua GUI
 RunService.RenderStepped:Connect(function()
-    if Config.AimbotEnabled and getgenv().Aimbot.Status and HoldingRightClick then
+    if Config.AimbotEnabled and getgenv().Aimbot.Status then
         Player = GetClosestValidPlayer()
         if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
             local part = Player.Character[getgenv().Aimbot.Hitpart]
@@ -582,7 +581,7 @@ RunService.RenderStepped:Connect(function()
     end
 
     -- TriggerBot khi bật Shift Lock trên điện thoại
-    if HoldingRightClick and tbEnabled then
+    if tbEnabled then
         local part = GetBestTargetPart()
         if part then
 	local character = part:FindFirstAncestorOfClass("Model")
