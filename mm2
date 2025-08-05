@@ -368,6 +368,7 @@ buttonFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
 buttonFrame.Visible = true
 buttonFrame.Parent = gui
 buttonFrame.Position = UDim2.new(0.1, 0, 0.2, 25)
+buttonFrame.Draggable = true
 
 -- Layout căn nút
 local layout = Instance.new("UIListLayout", buttonFrame)
