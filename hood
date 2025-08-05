@@ -10,29 +10,46 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- Cấu hình
 local Config = {
-    ESPEnabled = true, -- Trạng thái ESP
-    ShiftAmount = 0.5, -- Độ dịch chuyển antilock
-    SelectedPlayers = {} -- Danh sách người chơi được chọn
+    ESPEnabled = false,
+    SpeedEnabled = false,
+    FlyEnabled = false,
+    AimbotEnabled = false,
+    ShiftAmount = 0.5,
+    SelectedPlayers = {},
+    FlySpeed = 25,
+    SpeedAmount = 20
 }
 
-local autoSelect = false 
+local autoSelect = false
+local macroEnabled = false
+local tbEnabled = true -- TriggerBot luôn hoạt động
+local fovRadius = 20
+local HoldingRightClick = false
+local Player = nil
 
--- Khởi tạo ScreenGui cho ESP
-local espGui = Instance.new("ScreenGui")
-espGui.Name = "SafeESP"
-espGui.ResetOnSpawn = false
-espGui.IgnoreGuiInset = true
-espGui.Parent = PlayerGui
+UserInputService.InputBegan:Connect(function(input, gpe)
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		HoldingRightClick = true
+	end
+end)
 
--- Khởi tạo GUI
+UserInputService.InputEnded:Connect(function(input, gpe)
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		HoldingRightClick = false
+	end
+end)
+
+
+-- Tạo ScreenGui chính
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = tostring(math.random(1e6, 1e7))
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Enabled = true
 ScreenGui.Parent = PlayerGui
 
+-- Frame chính (hồng pastel)
 local MenuFrame = Instance.new("Frame")
-MenuFrame.Size = UDim2.new(0, 120, 0, 160)
+MenuFrame.Size = UDim2.new(0, 250, 0, 200)
 MenuFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
 MenuFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
 MenuFrame.BackgroundTransparency = 0
@@ -41,23 +58,50 @@ MenuFrame.Draggable = true
 MenuFrame.Parent = ScreenGui
 Instance.new("UICorner", MenuFrame).CornerRadius = UDim.new(0, 8)
 
+-- Nút ẩn/hiện Frame
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 40, 0, 40)
+ToggleButton.Position = UDim2.new(0, 10, 0, 10)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+ToggleButton.Text = ">"
+ToggleButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+ToggleButton.TextSize = 20
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Active = true
+ToggleButton.Draggable = true
+ToggleButton.Parent = ScreenGui
+Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 8)
+
+-- Xử lý ẩn/hiện Frame
+ToggleButton.MouseButton1Click:Connect(function()
+    MenuFrame.Visible = not MenuFrame.Visible
+    ToggleButton.Text = MenuFrame.Visible and ">" or "<"
+end)
+
+-- Tiêu đề Frame
 local MenuTitle = Instance.new("TextLabel")
-MenuTitle.Size = UDim2.new(1, 0, 0, 18)
+MenuTitle.Size = UDim2.new(1, 0, 0, 20)
 MenuTitle.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-MenuTitle.Text = "VhuyHub"
+MenuTitle.Text = "DhuyxDTuyen"
 MenuTitle.TextColor3 = Color3.fromRGB(0, 0, 0)
 MenuTitle.Font = Enum.Font.SourceSans
-MenuTitle.TextSize = 12
+MenuTitle.TextSize = 14
 MenuTitle.Parent = MenuFrame
 Instance.new("UICorner", MenuTitle).CornerRadius = UDim.new(0, 8)
 
+-- Frame danh sách người chơi (bên trái)
+local PlayerListFrame = Instance.new("Frame")
+PlayerListFrame.Size = UDim2.new(0.5, -5, 1, -25)
+PlayerListFrame.Position = UDim2.new(0, 5, 0, 20)
+PlayerListFrame.BackgroundTransparency = 1
+PlayerListFrame.Parent = MenuFrame
+
 local PlayerList = Instance.new("ScrollingFrame")
-PlayerList.Size = UDim2.new(1, -4, 1, -22)
-PlayerList.Position = UDim2.new(0, 2, 0, 20)
+PlayerList.Size = UDim2.new(1, 0, 1, 0)
 PlayerList.CanvasSize = UDim2.new(0, 0, 0, 0)
 PlayerList.ScrollBarThickness = 3
 PlayerList.BackgroundTransparency = 1
-PlayerList.Parent = MenuFrame
+PlayerList.Parent = PlayerListFrame
 
 local UIListLayout = Instance.new("UIListLayout")
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -66,6 +110,70 @@ UIListLayout.Parent = PlayerList
 UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     PlayerList.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
 end)
+
+-- Frame nút chức năng (bên phải)
+local ButtonFrame = Instance.new("Frame")
+ButtonFrame.Size = UDim2.new(0.5, -5, 1, -25)
+ButtonFrame.Position = UDim2.new(0.5, 0, 0, 20)
+ButtonFrame.BackgroundTransparency = 1
+ButtonFrame.Parent = MenuFrame
+
+local ButtonLayout = Instance.new("UIListLayout")
+ButtonLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ButtonLayout.Padding = UDim.new(0, 5)
+ButtonLayout.Parent = ButtonFrame
+
+-- Hàm tạo nút
+local function CreateButton(name, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, -10, 0, 25)
+    button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    button.BackgroundTransparency = 0.2
+    button.TextColor3 = Color3.fromRGB(0, 0, 0)
+    button.TextSize = 12
+    button.Font = Enum.Font.SourceSans
+    button.Text = name
+    button.Parent = ButtonFrame
+    button.MouseButton1Click:Connect(callback)
+    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 4)
+    return button
+end
+
+-- Tạo các nút chức năng
+local aimbotButton, espButton, speedButton, flyButton
+local function UpdateButtonText()
+    aimbotButton.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
+    espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
+    speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
+    flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
+end
+
+aimbotButton = CreateButton("Aimbot: OFF", function()
+    Config.AimbotEnabled = not Config.AimbotEnabled
+    UpdateButtonText()
+end)
+
+espButton = CreateButton("ESP: OFF", function()
+    Config.ESPEnabled = not Config.ESPEnabled
+    UpdateButtonText()
+end)
+
+speedButton = CreateButton("Speed: OFF", function()
+    Config.SpeedEnabled = not Config.SpeedEnabled
+    UpdateButtonText()
+end)
+
+flyButton = CreateButton("Fly: OFF", function()
+    Config.FlyEnabled = not Config.FlyEnabled
+    UpdateButtonText()
+end)
+
+-- Khởi tạo ScreenGui cho ESP
+local espGui = Instance.new("ScreenGui")
+espGui.Name = "SafeESP"
+espGui.ResetOnSpawn = false
+espGui.IgnoreGuiInset = true
+espGui.Parent = PlayerGui
 
 -- Danh sách ESP
 local ESPs = {}
@@ -159,7 +267,31 @@ local function UpdateESP()
     end
 end
 
--- Antilock (luôn hoạt động)
+-- Logic Speed từ v.txt
+local function UpdateSpeed()
+    if Config.SpeedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local root = LocalPlayer.Character.HumanoidRootPart
+        local humanoid = LocalPlayer.Character.Humanoid
+        local moveDirection = humanoid.MoveDirection
+        local speedAmount = Config.SpeedAmount / 8
+        root.CFrame = root.CFrame + moveDirection * speedAmount
+    end
+end
+
+-- Logic Fly từ v.txt
+local function UpdateFly(deltaTime)
+    if Config.FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local root = LocalPlayer.Character.HumanoidRootPart
+        local moveDirection = LocalPlayer.Character.Humanoid.MoveDirection
+        local flySpeed = Config.FlySpeed
+        local vertical = UserInputService:IsKeyDown(Enum.KeyCode.Space) and flySpeed / 8 or UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and -flySpeed / 8 or 0
+        root.CFrame = root.CFrame + moveDirection * deltaTime * flySpeed * 10
+        root.CFrame = root.CFrame + Vector3.new(0, vertical, 0)
+        root.Velocity = root.Velocity * Vector3.new(1, 0, 1) + Vector3.new(0, 1.9, 0)
+    end
+end
+
+-- Antilock
 local function UpdateAntilock()
     local character = LocalPlayer.Character
     if character and character:FindFirstChild("HumanoidRootPart") then
@@ -168,36 +300,33 @@ local function UpdateAntilock()
     end
 end
 
--- Macro Zoom kiểu lock/unlock camera nhanh khi nhấn giữ phím X (hoặc DPadDown trên mobile gamepad)
-local macroEnabled = false
-
+-- Macro Zoom (Shift Lock trên điện thoại)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	if gameProcessed then return end
-	if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.DPadDown then
-		macroEnabled = true
-	end
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.DPadDown then
+        macroEnabled = true
+    end
 end)
 
 UserInputService.InputEnded:Connect(function(input, gameProcessed)
-	if gameProcessed then return end
-	if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.DPadDown then
-		macroEnabled = false
-	end
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.X or input.KeyCode == Enum.KeyCode.DPadDown then
+        macroEnabled = false
+    end
 end)
 
 RunService.Heartbeat:Connect(function()
-	local player = Players.LocalPlayer
-	if macroEnabled then
-		player.CameraMinZoomDistance = 0.5
-		player.CameraMode = Enum.CameraMode.LockFirstPerson
-		task.wait() -- nhanh như heartbeat
-		player.CameraMode = Enum.CameraMode.Classic
-		player.CameraMinZoomDistance = 5
-		task.wait()
-	else
-		player.CameraMinZoomDistance = 0.5
-		player.CameraMode = Enum.CameraMode.Classic
-	end
+    if macroEnabled then
+        LocalPlayer.CameraMinZoomDistance = 0.5
+        LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+        task.wait()
+        LocalPlayer.CameraMode = Enum.CameraMode.Classic
+        LocalPlayer.CameraMinZoomDistance = 5
+        task.wait()
+    else
+        LocalPlayer.CameraMinZoomDistance = 0.5
+        LocalPlayer.CameraMode = Enum.CameraMode.Classic
+    end
 end)
 
 -- Cập nhật danh sách người chơi
@@ -234,11 +363,6 @@ UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
         ScreenGui.Enabled = not ScreenGui.Enabled
-    elseif input.KeyCode == Enum.KeyCode.K then
-        Config.ESPEnabled = not Config.ESPEnabled
-    elseif input.KeyCode == Enum.KeyCode.X then
-        Config.ZoomEnabled = true
-        UpdateZoom()
     elseif input.KeyCode == Enum.KeyCode.T then
         autoSelect = not autoSelect
         if autoSelect then
@@ -251,6 +375,146 @@ UserInputService.InputBegan:Connect(function(input, processed)
             Config.SelectedPlayers = {}
         end
         UpdatePlayerList()
+    end
+end)
+
+-- TriggerBot logic
+local hitParts = {
+    "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "LeftUpperArm", "LeftLowerArm", "LeftHand",
+    "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+    "RightUpperLeg", "RightLowerLeg", "RightFoot", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"
+}
+
+local function validPart(p)
+    if not p or not p.Parent or not p.Parent:FindFirstChild("Humanoid") then return false end
+    local player = Players:GetPlayerFromCharacter(p.Parent)
+    if not player or not Config.SelectedPlayers[player.Name] then return false end
+    for _, n in ipairs(hitParts) do
+        if p.Name:lower() == n:lower() then return true end
+    end
+    return false
+end
+
+local function distToCursor(part)
+    local v, vis = Camera:WorldToViewportPoint(part.Position)
+    if not vis then return math.huge end
+    local m = UserInputService:GetMouseLocation()
+    return (Vector2.new(v.X, v.Y) - Vector2.new(m.X, m.Y)).Magnitude
+end
+
+local function click()
+    if mouse1press then
+        mouse1press()
+        mouse1release()
+    elseif mouse1click then
+        mouse1click()
+    else
+        VirtualInputManager:Button1Down(Vector2.new(), Camera.CFrame)
+        task.wait()
+        VirtualInputManager:Button1Up(Vector2.new(), Camera.CFrame)
+    end
+end
+
+local function GetBestTargetPart()
+    local bestPart, bestDist = nil, fovRadius
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and plr.Character then
+            for _, partName in ipairs(hitParts) do
+                local part = plr.Character:FindFirstChild(partName)
+                if part and part:IsA("BasePart") then
+                    local dist = distToCursor(part)
+                    if dist < bestDist then
+                        bestPart = part
+                        bestDist = dist
+                    end
+                end
+            end
+        end
+    end
+    return bestPart
+end
+
+getgenv().Aimbot = {
+	Status = true,
+	Hitpart = "HumanoidRootPart",
+}
+
+-- Hàm lấy ping hiện tại
+local function GetPing()
+	local stats = LocalPlayer:FindFirstChild("NetworkClient") or game:GetService("Stats"):FindFirstChild("Network")
+	local ping = 50
+	if stats then
+		local data = stats:FindFirstChild("DataPing")
+		if data then
+			ping = data:GetValue()
+		end
+	end
+	return math.clamp(ping, 10, 300)
+end
+
+-- Hàm tính prediction
+local function GetPredictedPosition(part)
+	local ping = GetPing()
+	local delay = ping / 1000
+	local velocity = part.Velocity
+	local predictedPos = part.Position + (velocity * delay)
+	return predictedPos
+end
+
+local function IsObstructed(origin, targetPos)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    local result = Workspace:Raycast(origin, (targetPos - origin), raycastParams)
+    if result and result.Instance and not result.Instance:IsDescendantOf(Player and Player.Character) then
+        return true
+    end
+    return false
+end
+
+local function GetClosestValidPlayer()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and IsValidTarget(plr) and plr.Character and plr.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
+            local pos, visible = Camera:WorldToViewportPoint(plr.Character[getgenv().Aimbot.Hitpart].Position)
+            if visible then
+                local dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
+                if dist < shortestDistance then
+                    closestPlayer = plr
+                    shortestDistance = dist
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+-- Tự động aim khi bật qua GUI
+RunService.RenderStepped:Connect(function()
+    if Config.AimbotEnabled and getgenv().Aimbot.Status then
+        Player = GetClosestValidPlayer()
+        if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
+            local part = Player.Character[getgenv().Aimbot.Hitpart]
+            local predictedPos = GetPredictedPosition(part)
+            if not IsObstructed(Camera.CFrame.Position, predictedPos) then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
+            end
+        end
+    end
+
+    -- TriggerBot khi bật Shift Lock trên điện thoại
+    if HoldingRightClick and tbEnabled then
+        local part = GetBestTargetPart()
+        if part then
+            task.spawn(function()
+                local cap = part
+                task.wait(0)
+                if tbEnabled and distToCursor(cap) <= fovRadius then
+                    click()
+                end
+            end)
+        end
     end
 end)
 
@@ -274,12 +538,12 @@ Connect(Players.PlayerRemoving, function(player)
     UpdatePlayerList()
 end)
 
-Connect(RunService.RenderStepped, UpdateESP)
-
 -- Vòng lặp chính
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(deltaTime)
     UpdateAntilock()
-    UpdateZoom()
+    UpdateESP()
+    UpdateSpeed()
+    UpdateFly(deltaTime)
 end)
 
 -- Cập nhật danh sách người chơi định kỳ
@@ -288,274 +552,6 @@ task.spawn(function()
         UpdatePlayerList()
         task.wait(math.random(12, 15))
     end
-end)
-
--- Antilock luôn hoạt động
-local function AntilockStep()
-    local character = LocalPlayer.Character
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        local root = character.HumanoidRootPart
-        local offsetX = math.random(-5, 5) / 100
-        local offsetZ = math.random(-5, 5) / 100
-        root.CFrame = root.CFrame * CFrame.new(offsetX, 0, offsetZ)
-    end
-end
-
-local Players, UIS, Run, VU = game:GetService("Players"), game:GetService("UserInputService"), game:GetService("RunService"), game:GetService("VirtualUser")
-local LP, Mouse, Cam = Players.LocalPlayer, Players.LocalPlayer:GetMouse(), workspace.CurrentCamera
-
-local tbEnabled = true -- TriggerBot luôn hoạt động
-local predictionTime = 0
-local fovRadius = 20
-local hitParts = {
-    "Head",
-    "HumanoidRootPart",
-    "UpperTorso",
-    "LowerTorso",
-    "LeftUpperArm",
-    "LeftLowerArm",
-    "LeftHand",
-    "RightUpperArm",
-    "RightLowerArm",
-    "RightHand",
-    "LeftUpperLeg",
-    "LeftLowerLeg",
-    "LeftFoot",
-    "RightUpperLeg",
-    "RightLowerLeg",
-    "RightFoot",
-    "Torso",
-    "Left Arm",
-    "Right Arm",
-    "Left Leg",
-    "Right Leg"
-}
-
--- Kiểm tra target có hợp lệ không
-local function validPart(p)
-    if not p or not p.Parent or not p.Parent:FindFirstChild("Humanoid") then return false end
-    local player = Players:GetPlayerFromCharacter(p.Parent)
-    if not player or not Config.SelectedPlayers[player.Name] then return false end
-    for _, n in ipairs(hitParts) do
-        if p.Name:lower() == n:lower() then return true end
-    end
-    return false
-end
-
--- Tính khoảng cách từ chuột tới part
-local function distToCursor(part)
-    local v, vis = Cam:WorldToViewportPoint(part.Position)
-    if not vis then return math.huge end
-    local m = UIS:GetMouseLocation()
-    return (Vector2.new(v.X, v.Y) - Vector2.new(m.X, m.Y)).Magnitude
-end
-
--- Click chuột trái
-local function click()
-    if mouse1press then 
-        mouse1press() 
-        mouse1release()
-    elseif mouse1click then 
-        mouse1click()
-    else
-        VU:Button1Down(Vector2.new(), Cam.CFrame)
-        task.wait()
-        VU:Button1Up(Vector2.new(), Cam.CFrame)
-    end
-end
-
-local function GetBestTargetPart()
-    local bestPart, bestDist = nil, fovRadius
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LP and Config.SelectedPlayers[plr.Name] and plr.Character then
-            for _, partName in ipairs(hitParts) do
-                local part = plr.Character:FindFirstChild(partName)
-                if part and part:IsA("BasePart") then
-                    local dist = distToCursor(part)
-                    if dist < bestDist then
-                        bestPart = part
-                        bestDist = dist
-                    end
-                end
-            end
-        end
-    end
-    return bestPart
-end
-
-Run.RenderStepped:Connect(function()
-    if not tbEnabled then return end
-    local part = GetBestTargetPart()
-    if part then
-        task.spawn(function()
-            local cap = part
-            task.wait(predictionTime)
-            if tbEnabled and distToCursor(cap) <= fovRadius then
-                click()
-            end
-        end)
-    end
-end)
-
-
-getgenv().Aimbot = {
-    Status = true,
-    Hitpart = 'HumanoidRootPart',
-    ['Prediction'] = {
-        X = 0.165,
-        Y = 0.1,
-    },
-}
-
-if getgenv().AimbotRan then return else getgenv().AimbotRan = true end
-
-local Player = nil
-local HoldingRightClick = false
-
--- Kiểm tra xem có vật cản không
-local function IsObstructed(origin, targetPos)
-	local raycastParams = RaycastParams.new()
-	raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-	raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-	local result = Workspace:Raycast(origin, (targetPos - origin), raycastParams)
-	if result and result.Instance and not result.Instance:IsDescendantOf(Player.Character) then
-		return true
-	end
-	return false
-end
-
--- Lấy player gần nhất hợp lệ
-local function GetClosestValidPlayer()
-	local closestPlayer = nil
-	local shortestDistance = math.huge
-
-	for _, plr in pairs(Players:GetPlayers()) do
-		if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and IsValidTarget(plr) and plr.Character and plr.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
-			local pos, visible = Camera:WorldToViewportPoint(plr.Character[getgenv().Aimbot.Hitpart].Position)
-			if visible then
-				local dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
-				if dist < shortestDistance then
-					closestPlayer = plr
-					shortestDistance = dist
-				end
-			end
-		end
-	end
-
-	return closestPlayer
-end
-
--- Bật tắt bằng chuột phải
-Mouse.Button2Down:Connect(function()
-	HoldingRightClick = true
-	Player = GetClosestValidPlayer()
-end)
-
-Mouse.Button2Up:Connect(function()
-	HoldingRightClick = false
-	Player = nil
-end)
-
--- Aimbot logic
-RunService.RenderStepped:Connect(function()
-	if not HoldingRightClick or not getgenv().Aimbot.Status or not Player then return end
-
-	if not IsValidTarget(Player) then
-		Player = nil
-		return
-	end
-
-	local part = Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart)
-	if not part then return end
-
-	local predictedPos = part.Position + part.Velocity * Vector3.new(getgenv().Aimbot.Prediction.X, getgenv().Aimbot.Prediction.Y, getgenv().Aimbot.Prediction.X)
-	if IsObstructed(Camera.CFrame.Position, predictedPos) then return end
-
-	Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
-end)
-
-local RunService = game:GetService("RunService")
-local Stats = game:GetService("Stats")
-
--- Hàm lấy ping hiện tại
-local function GetPing()
-	local pingStat = Stats.Network.ServerStatsItem["Data Ping"]
-	if pingStat then
-		return pingStat:GetValue() or 0
-	end
-	return 0
-end
-
--- Hàm tính Prediction Vector dựa trên ping và tốc độ mục tiêu
-local function CalculatePrediction(ping, targetVelocity)
-	local delay = ping / 1000
-	return targetVelocity * delay
-end
-
--- Hàm cập nhật giá trị Prediction X và Y theo mục tiêu
-local function UpdatePrediction(selectedTarget)
-	if selectedTarget and selectedTarget.Character then
-		local hrp = selectedTarget.Character:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			local velocity = hrp.Velocity
-			local ping = GetPing()
-			local predictionVector = CalculatePrediction(ping, velocity)
-
-			-- Gán vào biến Prediction toàn cục (nếu dùng getgenv())
-			getgenv().Aimbot.Prediction.X = predictionVector.X
-			getgenv().Aimbot.Prediction.Y = predictionVector.Y
-
-			-- Debug log nếu cần
-			print("[AutoPrediction] Ping:", ping, "Velocity:", velocity, "→ Prediction:", predictionVector)
-		end
-	end
-end
-
--- Ví dụ: Gọi định kỳ mỗi khung hình hoặc mỗi nửa giây
-RunService.RenderStepped:Connect(function()
-	local target = getgenv().Aimbot.Target -- hoặc selectedTarget nếu bạn đặt ở nơi khác
-	if target then
-		UpdatePrediction(target)
-	end
-end)
-
-local player = game.Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
--- Tạo ScreenGui
-local gui = Instance.new("ScreenGui")
-gui.Name = "PredictionDisplay"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-gui.Parent = playerGui
-
--- Tạo Frame nhỏ có thể kéo
-local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 120, 0, 40)
-frame.Position = UDim2.new(0, 10, 1, -50) -- Góc dưới bên trái
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.BackgroundTransparency = 0.3
-frame.Active = true
-frame.Draggable = true
-frame.Parent = gui
-Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
-
--- Tạo TextLabel để hiện X/Y
-local label = Instance.new("TextLabel")
-label.Size = UDim2.new(1, 0, 1, 0)
-label.BackgroundTransparency = 1
-label.TextColor3 = Color3.fromRGB(255, 255, 255)
-label.TextScaled = true
-label.Font = Enum.Font.Code
-label.Text = "X: 0.00\nY: 0.00"
-label.Parent = frame
-
--- Cập nhật liên tục giá trị từ getgenv().Aimbot.Prediction
-game:GetService("RunService").RenderStepped:Connect(function()
-	local pred = getgenv().Aimbot and getgenv().Aimbot.Prediction
-	if pred then
-		label.Text = string.format("X: %.2f\nY: %.2f", pred.X or 0, pred.Y or 0)
-	end
 end)
 
 -- Dọn dẹp khi thoát
@@ -571,4 +567,5 @@ game:BindToClose(function()
     end
     pcall(function() if ScreenGui and ScreenGui.Parent then ScreenGui:Destroy() end end)
     pcall(function() if espGui and espGui.Parent then espGui:Destroy() end end)
+    pcall(function() if gui and gui.Parent then gui:Destroy() end end)
 end)
