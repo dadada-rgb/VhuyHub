@@ -290,15 +290,6 @@ local function UpdateFly(deltaTime)
     end
 end
 
--- Antilock
-local function UpdateAntilock()
-    local character = LocalPlayer.Character
-    if character and character:FindFirstChild("HumanoidRootPart") then
-        local root = character.HumanoidRootPart
-        root.CFrame = root.CFrame * CFrame.new(math.random(-Config.ShiftAmount, Config.ShiftAmount)/50, 0, math.random(-Config.ShiftAmount, Config.ShiftAmount)/50)
-    end
-end
-
 -- Cập nhật danh sách người chơi
 local function UpdatePlayerList()
     for _, cd in pairs(PlayerList:GetChildren()) do
@@ -346,6 +337,14 @@ UserInputService.InputBegan:Connect(function(input, processed)
         end
         UpdatePlayerList()
     end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.R then
+		Config.SpeedEnabled = not Config.SpeedEnabled
+		UpdateButtonText()
+	end
 end)
 
 -- TriggerBot logic
@@ -477,6 +476,9 @@ RunService.RenderStepped:Connect(function()
     if HoldingRightClick and tbEnabled then
         local part = GetBestTargetPart()
         if part then
+	local character = part:FindFirstAncestorOfClass("Model")
+	local player = character and Players:GetPlayerFromCharacter(character)
+	if player and IsValidTarget(player) then
             task.spawn(function()
                 local cap = part
                 task.wait(0)
