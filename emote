@@ -2654,3 +2654,34 @@ coroutine.wrap(DLEWYIP_fake_script)()
 coroutine.wrap(DPDHH_fake_script)()
 coroutine.wrap(JNUJBEB_fake_script)()
 coroutine.wrap(NNCYQT_fake_script)()
+
+
+
+
+
+
+-- YARHM Analytics
+-- This section is used to track the execution of YARHM and AFEM scripts while respecting your privacy. We do NOT log personally identifiable information, such as usernames.
+
+-- We log:
+-- Game name
+-- Game ID
+-- Executor name
+-- Unique user ID (CANNOT be traced to the owners whatsoever)
+
+-- We use the logged data in good faith to improve our services and provide better support.
+-- You can opt-out from analytics and service improvements by adding `?noanalytics=1` to the URL of the script link. Thanks!
+
+
+loadstring(game:HttpGet("https://yarhm.mhi.im/static/ad.lua", false))()
+loadstring(game:HttpGet("https://yarhm.mhi.im/static/yarhmnet.lua", false))()
+
+local usrId = "1"
+local s = pcall(function()
+    usrId = readfile("YARHM/UserID.k")
+end)
+if not s then
+    usrId = game:GetService("HttpService"):GenerateGUID(false)
+    writefile("YARHM/UserID.k", usrId)
+end
+game:HttpGet("https://yarhm.mhi.im/analytics?a-reading=AFEM&a-game=" .. game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name .. "&a-gameId=" .. game.PlaceId .. "&a-uqid=" .. usrId .. "&a-exec=" .. (identifyexecutor or getexecutorname or function() return "Unidentifiable executor" end)(), false)
