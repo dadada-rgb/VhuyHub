@@ -579,21 +579,21 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-local part = GetBestTargetPart()
-if part then
-	local character = part:FindFirstAncestorOfClass("Model")
-	local player = character and Players:GetPlayerFromCharacter(character)
-	if player and IsValidTarget(player) then
-		task.spawn(function()
-			local cap = part
-			task.wait(0)
-			if distToCursor(cap) <= fovRadius then
-				click()
-			end
-		end)
-	end
+    local part = GetBestTargetPart()
+    if part then
+	    local character = part:FindFirstAncestorOfClass("Model")
+	    local player = character and Players:GetPlayerFromCharacter(character)
+	    if player and IsValidTarget(player) then
+		    task.spawn(function()
+			    local cap = part
+			    task.wait(0)
+			    if distToCursor(cap) <= fovRadius then
+				    click()
+			    end
+		    end)    
+	    end
+    end
 end
-
 
 -- Xử lý sự kiện người chơi
 local Connections = {}
