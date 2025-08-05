@@ -100,26 +100,9 @@ local url = scriptUrls[placeId] or "https://raw.githubusercontent.com/dadada-rgb
 loadstring(game:HttpGet(url))()
 sendNotification("Script Loaded", "Đã load DhuyXDtuyen")
 
--- Tạo hiệu ứng mở đầu VhuyHub
-local blur = Instance.new("BlurEffect")
-blur.Size = 20
-blur.Parent = game.Lighting
+-- Chữ DhuyxDtuyen đẹp có hiệu ứng mờ dần
+local tweenService = game:GetService("TweenService")
 
-local gui = Instance.new("ScreenGui")
-gui.Name = "VhuyIntroGui"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-gui.DisplayOrder = 99999
-gui.Parent = game:GetService("CoreGui") -- dùng CoreGui để tránh bị reset khi respawn
-
--- Khung nền mờ
-local bg = Instance.new("Frame")
-bg.Size = UDim2.new(1, 0, 1, 0)
-bg.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-bg.BackgroundTransparency = 0.5
-bg.Parent = gui
-
--- Chữ VhuyHub đẹp
 local title = Instance.new("TextLabel")
 title.AnchorPoint = Vector2.new(0.5, 0.5)
 title.Position = UDim2.new(0.5, 0, 0.5, 0)
@@ -127,18 +110,34 @@ title.Size = UDim2.new(0, 300, 0, 100)
 title.Text = "DhuyxDtuyen"
 title.Font = Enum.Font.GothamBlack
 title.TextColor3 = Color3.fromRGB(255, 179, 186) -- pastel pink
+title.TextTransparency = 1 -- bắt đầu mờ hoàn toàn
 title.TextScaled = true
 title.BackgroundTransparency = 1
 title.Parent = gui
 
--- Bo góc chữ nếu thích
+-- Bo góc chữ
 local uc = Instance.new("UICorner")
 uc.CornerRadius = UDim.new(0, 12)
 uc.Parent = title
 
-task.delay(3, function()
-	gui:Destroy()
-	blur:Destroy()
+-- Tween vào (fade in)
+local fadeIn = tweenService:Create(title, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+	TextTransparency = 0
+})
+fadeIn:Play()
+
+-- Sau 3 giây giữ, Tween ra (fade out)
+fadeIn.Completed:Connect(function()
+	task.wait(3)
+	local fadeOut = tweenService:Create(title, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+		TextTransparency = 1
+	})
+	fadeOut:Play()
+
+	fadeOut.Completed:Connect(function()
+		gui:Destroy()
+		blur:Destroy()
+	end)
 end)
 
 -- Chống một số hình thức scan GUI đơn giản
