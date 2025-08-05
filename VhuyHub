@@ -170,7 +170,7 @@ local animGui = Instance.new("ScreenGui")
 animGui.Name = "AnimGui"
 animGui.ResetOnSpawn = false
 animGui.IgnoreGuiInset = true
-animGui.Parent = game:GetService("CoreGui")
+animGui.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
 
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(0, 200, 0, 30)
