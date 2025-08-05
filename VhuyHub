@@ -254,5 +254,5 @@ toggleBtn.MouseButton1Click:Connect(function()
 	toggleBtn.Text = expanded and "🎵 Emote ▲" or "🎵 Emote ▼"
 end)
 
-https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote"))()
 
