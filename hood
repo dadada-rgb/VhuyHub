@@ -436,7 +436,7 @@ end)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
-	if input.KeyCode == Enum.KeyCode.R then
+	if input.KeyCode == Enum.KeyCode.Q then
 		Config.SpeedEnabled = not Config.SpeedEnabled
 		UpdateButtonText()
 	end
@@ -503,9 +503,8 @@ getgenv().Aimbot = {
 	Hitpart = "HumanoidRootPart",
 }
 
--- Hàm lấy ping hiện tại
 local function GetPing()
-	local stats = LocalPlayer:FindFirstChild("NetworkClient") or game:GetService("Stats"):FindFirstChild("Network")
+	local stats = game:GetService("Stats"):FindFirstChild("Network")
 	local ping = 50
 	if stats then
 		local data = stats:FindFirstChild("DataPing")
@@ -516,12 +515,21 @@ local function GetPing()
 	return math.clamp(ping, 10, 300)
 end
 
--- Hàm tính prediction
 local function GetPredictedPosition(part)
-	local ping = GetPing()
-	local delay = ping / 1000
+	if not part or not part:IsA("BasePart") then return part.Position end
+
 	local velocity = part.Velocity
-	local predictedPos = part.Position + (velocity * delay)
+	local origin = Camera.CFrame.Position
+	local distance = (part.Position - origin).Magnitude
+	local ping = GetPing()
+
+	-- Dự đoán thời gian đạn bay (ms → s)
+	local delay = ping / 1000
+
+	-- Cộng thêm khoảng cách để prediction xa hơn nếu cần
+	local distanceFactor = math.clamp(distance / 100, 1, 3)
+	local predictedPos = part.Position + velocity * delay * distanceFactor
+
 	return predictedPos
 end
 
