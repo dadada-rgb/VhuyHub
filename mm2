@@ -455,18 +455,23 @@ espBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- AutoGun (nhặt súng)
 autoGunBtn.MouseButton1Click:Connect(function()
-    for _, item in ipairs(workspace:GetDescendants()) do
-        if item:IsA("Tool") and item.Name == "GunDrop" then
-            local hrp = localplayer.Character and localplayer.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                hrp.CFrame = item.Handle.CFrame + Vector3.new(0, 2, 0)
-            end
-        end
+    local map = getMap()
+    if not map or not map:FindFirstChild("GunDrop") then
+        fu.notification("No dropped gun to be teleported to.")
+        return
+    end
+    local hrp = localplayer.Character and localplayer.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local previousPosition = hrp.CFrame
+        hrp.CFrame = map:FindFirstChild("GunDrop"):GetPivot() + Vector3.new(0, 2, 0)
+        localplayer.Backpack.ChildAdded:Wait()
+        hrp.CFrame = previousPosition
+        fu.notification("Gun picked up.")
+    else
+        fu.notification("No valid character to teleport.")
     end
 end)
-
 -- Fling Murderer
 flingMurdererBtn.MouseButton1Click:Connect(function()
     local target = findMurderer()
