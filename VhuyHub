@@ -156,3 +156,83 @@ end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote"))()
 
+-- Button GUI để phát animation C
+local player = game.Players.LocalPlayer
+local mouse = player:GetMouse()
+
+-- Tạo GUI cho nút
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CButtonGui"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = game.CoreGui
+
+-- Nút chính
+local button = Instance.new("TextButton")
+button.Name = "PlayCButton"
+button.Size = UDim2.new(0, 40, 0, 40)
+button.Position = UDim2.new(0, 10, 0, 300) -- vị trí ban đầu
+button.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+button.Text = "C"
+button.TextColor3 = Color3.new(0, 0, 0)
+button.TextScaled = true
+button.AutoButtonColor = true
+button.Parent = screenGui
+
+-- Bo góc
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(1, 0)
+uiCorner.Parent = button
+
+-- Kéo nút
+local dragging = false
+local dragInput, dragStart, startPos
+
+button.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = button.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+button.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement then
+		dragInput = input
+	end
+end)
+
+game:GetService("UserInputService").InputChanged:Connect(function(input)
+	if input == dragInput and dragging then
+		local delta = input.Position - dragStart
+		button.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+
+-- Khi bấm nút thì phát animation "C"
+button.MouseButton1Click:Connect(function()
+	local char = player.Character
+	if not char then return end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum then return end
+	if hum.MoveDirection.Magnitude > 0 then return end
+
+	local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
+	local anim = Instance.new("Animation")
+	anim.AnimationId = "http://www.roblox.com/asset/?id=15609995579" -- Animation C
+	local track = animator:LoadAnimation(anim)
+
+	-- Dừng animation hiện tại nếu có
+	if currentTrack then
+		currentTrack:Stop()
+	end
+
+	track:Play()
+	currentTrack = track
+	currentKey = "C"
+end)
