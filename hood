@@ -522,14 +522,20 @@ RunService.RenderStepped:Connect(function()
 
     if tbEnabled then
         local part = GetBestTargetPart()
-        if part then
+        if part and IsValidTarget(Players:GetPlayerFromCharacter(part.Parent)) then
             task.spawn(function()
-                local cap = part
-                local predictedPos = GetPredictedPosition(cap)
+                local predictedPos = GetPredictedPosition(part)
                 local screenPos, vis = Camera:WorldToViewportPoint(predictedPos)
                 if vis and (Vector2.new(screenPos.X, screenPos.Y) - UserInputService:GetMouseLocation()).Magnitude <= fovRadius then
                     if not IsObstructed(Camera.CFrame.Position, predictedPos) then
-                        click()
+                        if UserInputService.TouchEnabled then
+                            local touchPos = UserInputService:GetMouseLocation()
+                            VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.Begin, touchPos)
+                            task.wait()
+                            VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.End, touchPos)
+                        else
+                            click()
+                        end
                     end
                 end
             end)
