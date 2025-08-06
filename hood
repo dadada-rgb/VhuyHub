@@ -145,7 +145,7 @@ local function UpdateButtonText()
     speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
     flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
     armorButton.Text = "TP Armor"
-    flingTouchButton.Text = "FlingTouch: " .. (Config.FlyEnabled and "ON" or "OFF")
+    flingTouchButton.Text = "FlingTouch: "FlingTouch .. (Config. and "ON" or "OFF")
 end
 
 aimbotButton = CreateButton("Aimbot: OFF", function()
@@ -659,7 +659,7 @@ task.spawn(function()
 		local ko = bodyEffects and bodyEffects:FindFirstChild("K.O")
 
 		if char and hum and hrp and ko then
-			if hum.Health <= 3 and not teleporting then
+			if hum.Health <= 15 and not teleporting then
 				-- Teleport lên trời
 				teleporting = true
 				storedCFrame = hrp.CFrame
