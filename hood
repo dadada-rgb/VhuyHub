@@ -405,6 +405,139 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
+local player = game:GetService("Players").LocalPlayer
+local teleporting = false
+local storedCFrame = nil
+
+task.spawn(function()
+	while true do
+		local char = player.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		local bodyEffects = char and char:FindFirstChild("BodyEffects")
+		local ko = bodyEffects and bodyEffects:FindFirstChild("K.O")
+
+		if char and hum and hrp and ko then
+			if hum.Health <= 15 and not teleporting then
+				-- Teleport lên trời
+				teleporting = true
+				storedCFrame = hrp.CFrame
+				hrp.CFrame = CFrame.new(9999, 9999, 9999)
+				warn("[AntiStomp] Teleported to sky at low HP")
+
+				-- Đợi 3 giây rồi kiểm tra lại K.O
+				task.wait(3)
+
+				if ko.Value == false and hum.Health > 0 then
+					-- Nếu không bị K.O thì quay về vị trí cũ
+					hrp.CFrame = storedCFrame + Vector3.new(0, 2, 0)
+					warn("[AntiStomp] Returned to ground after 3s")
+				else
+					warn("[AntiStomp] Still K.O or dead, staying in sky")
+				end
+
+				teleporting = false
+			end
+		end
+
+		task.wait(0.1)
+	end
+end)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local currentTool = nil
+
+-- Hàm kiểm tra Tool có phải là súng và có thuộc tính Ammo
+local function isGun(tool)
+	if not tool then return false end
+	return tool:FindFirstChild("Ammo") ~= nil
+end
+
+-- Hàm reload nếu Ammo = 0
+local function checkAmmoAndReload()
+	if not currentTool then return end
+	if isGun(currentTool) then
+		local ammo = currentTool:FindFirstChild("Ammo")
+		if ammo and ammo:IsA("IntValue") and ammo.Value <= 0 then
+			-- Giả lập nhấn phím R
+			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.R, false, game)
+			task.wait(0.1)
+			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.R, false, game)
+		end
+	end
+end
+
+-- Theo dõi khi trang bị Tool
+player.CharacterAdded:Connect(function(char)
+	character = char
+end)
+
+player:GetPropertyChangedSignal("Character"):Connect(function()
+	character = player.Character
+end)
+
+player.Backpack.ChildAdded:Connect(function(tool)
+	tool.Equipped:Connect(function()
+		currentTool = tool
+	end)
+end)
+
+player.Character.ChildAdded:Connect(function(tool)
+	if tool:IsA("Tool") then
+		currentTool = tool
+	end
+end)
+
+player.Character.ChildRemoved:Connect(function(tool)
+	if tool == currentTool then
+		currentTool = nil
+	end
+end)
+
+-- Kiểm tra liên tục mỗi 0.5 giây
+while true do
+	checkAmmoAndReload()
+	task.wait(0.5)
+end
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/GOOSEBUMPPS/anti/main/sky", true))()
+
+-- Logic fling khi chạm
+task.spawn(function()
+	while true do
+		task.wait()
+		if Config.FlingTouch then
+			local char = LocalPlayer.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			local hum = char and char:FindFirstChildOfClass("Humanoid")
+			if hrp and hum then
+				hum.PlatformStand = true
+				-- Xoay nhân vật
+				RunService.Stepped:Wait()
+				char:PivotTo(char:GetPivot() * CFrame.Angles(0, math.rad(500), 0))
+				
+				-- Gắn lực lên người khác khi chạm
+				hrp.Touched:Connect(function(part)
+					local enemyChar = part:FindFirstAncestorOfClass("Model")
+					local enemyPlr = enemyChar and Players:GetPlayerFromCharacter(enemyChar)
+					if enemyPlr and enemyPlr ~= LocalPlayer then
+						local eHRP = enemyChar:FindFirstChild("HumanoidRootPart")
+						if eHRP then
+							eHRP.AssemblyLinearVelocity = Vector3.new(9999, 9999, 9999)
+						end
+					end
+				end)
+			end
+		end
+	end
+end)
+
+
 -- TriggerBot logic
 local hitParts = {
     "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "LeftUpperArm", "LeftLowerArm", "LeftHand",
@@ -605,134 +738,3 @@ game:BindToClose(function()
     pcall(function() if gui and gui.Parent then gui:Destroy() end end)
 end)
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/GOOSEBUMPPS/anti/main/sky", true))()
-
-local player = game:GetService("Players").LocalPlayer
-local teleporting = false
-local storedCFrame = nil
-
-task.spawn(function()
-	while true do
-		local char = player.Character
-		local hum = char and char:FindFirstChildOfClass("Humanoid")
-		local hrp = char and char:FindFirstChild("HumanoidRootPart")
-		local bodyEffects = char and char:FindFirstChild("BodyEffects")
-		local ko = bodyEffects and bodyEffects:FindFirstChild("K.O")
-
-		if char and hum and hrp and ko then
-			if hum.Health <= 15 and not teleporting then
-				-- Teleport lên trời
-				teleporting = true
-				storedCFrame = hrp.CFrame
-				hrp.CFrame = CFrame.new(9999, 9999, 9999)
-				warn("[AntiStomp] Teleported to sky at low HP")
-
-				-- Đợi 3 giây rồi kiểm tra lại K.O
-				task.wait(3)
-
-				if ko.Value == false and hum.Health > 0 then
-					-- Nếu không bị K.O thì quay về vị trí cũ
-					hrp.CFrame = storedCFrame + Vector3.new(0, 2, 0)
-					warn("[AntiStomp] Returned to ground after 3s")
-				else
-					warn("[AntiStomp] Still K.O or dead, staying in sky")
-				end
-
-				teleporting = false
-			end
-		end
-
-		task.wait(0.1)
-	end
-end)
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-
-local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local currentTool = nil
-
--- Hàm kiểm tra Tool có phải là súng và có thuộc tính Ammo
-local function isGun(tool)
-	if not tool then return false end
-	return tool:FindFirstChild("Ammo") ~= nil
-end
-
--- Hàm reload nếu Ammo = 0
-local function checkAmmoAndReload()
-	if not currentTool then return end
-	if isGun(currentTool) then
-		local ammo = currentTool:FindFirstChild("Ammo")
-		if ammo and ammo:IsA("IntValue") and ammo.Value <= 0 then
-			-- Giả lập nhấn phím R
-			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.R, false, game)
-			task.wait(0.1)
-			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.R, false, game)
-		end
-	end
-end
-
--- Theo dõi khi trang bị Tool
-player.CharacterAdded:Connect(function(char)
-	character = char
-end)
-
-player:GetPropertyChangedSignal("Character"):Connect(function()
-	character = player.Character
-end)
-
-player.Backpack.ChildAdded:Connect(function(tool)
-	tool.Equipped:Connect(function()
-		currentTool = tool
-	end)
-end)
-
-player.Character.ChildAdded:Connect(function(tool)
-	if tool:IsA("Tool") then
-		currentTool = tool
-	end
-end)
-
-player.Character.ChildRemoved:Connect(function(tool)
-	if tool == currentTool then
-		currentTool = nil
-	end
-end)
-
--- Kiểm tra liên tục mỗi 0.5 giây
-while true do
-	checkAmmoAndReload()
-	task.wait(0.5)
-end
-
--- Logic fling khi chạm
-task.spawn(function()
-	while true do
-		task.wait()
-		if Config.FlingTouch then
-			local char = LocalPlayer.Character
-			local hrp = char and char:FindFirstChild("HumanoidRootPart")
-			local hum = char and char:FindFirstChildOfClass("Humanoid")
-			if hrp and hum then
-				hum.PlatformStand = true
-				-- Xoay nhân vật
-				RunService.Stepped:Wait()
-				char:PivotTo(char:GetPivot() * CFrame.Angles(0, math.rad(500), 0))
-				
-				-- Gắn lực lên người khác khi chạm
-				hrp.Touched:Connect(function(part)
-					local enemyChar = part:FindFirstAncestorOfClass("Model")
-					local enemyPlr = enemyChar and Players:GetPlayerFromCharacter(enemyChar)
-					if enemyPlr and enemyPlr ~= LocalPlayer then
-						local eHRP = enemyChar:FindFirstChild("HumanoidRootPart")
-						if eHRP then
-							eHRP.AssemblyLinearVelocity = Vector3.new(9999, 9999, 9999)
-						end
-					end
-				end)
-			end
-		end
-	end
-end)
