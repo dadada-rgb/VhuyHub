@@ -145,7 +145,7 @@ local function UpdateButtonText()
     speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
     flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
     armorButton.Text = "TP Armor"
-    flingTouchButton.Text = "FlingTouch: "FlingTouch .. (Config. and "ON" or "OFF")
+    flingTouchButton.Text = "FlingTouch: " .. (Config.FlingTouch and "ON" or "OFF")
 end
 
 aimbotButton = CreateButton("Aimbot: OFF", function()
