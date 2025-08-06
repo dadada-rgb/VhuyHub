@@ -434,7 +434,7 @@ end
 local function GetBestTargetPart()
     local bestPart, bestDist = nil, fovRadius
     for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and IsValidTarget(plr) and plr.Character then
+        if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and plr.Character then
             for _, partName in ipairs(hitParts) do
                 local part = plr.Character:FindFirstChild(partName)
                 if part and part:IsA("BasePart") then
