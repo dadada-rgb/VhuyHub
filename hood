@@ -555,6 +555,97 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+local flingConnectionStepped
+local flingConnectionTouch
+
+local function ToggleFlingTouch(enabled)
+	-- Dừng nếu đang chạy
+	if flingConnectionStepped then
+		flingConnectionStepped:Disconnect()
+		flingConnectionStepped = nil
+	end
+	if flingConnectionTouch then
+		flingConnectionTouch:Disconnect()
+		flingConnectionTouch = nil
+	end
+
+	if enabled then
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local hrp = char:WaitForChild("HumanoidRootPart")
+		local hum = char:WaitForChild("Humanoid")
+
+		hum.PlatformStand = true
+
+		-- Quay liên tục
+		flingConnectionStepped = RunService.Stepped:Connect(function()
+			hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(200), 0)
+		end)
+
+		-- Khi chạm, fling người khác
+		flingConnectionTouch = hrp.Touched:Connect(function(hit)
+			local model = hit:FindFirstAncestorOfClass("Model")
+			local enemy = Players:GetPlayerFromCharacter(model)
+			if enemy and enemy ~= LocalPlayer and model:FindFirstChild("HumanoidRootPart") then
+				local targetHRP = model:FindFirstChild("HumanoidRootPart")
+				targetHRP.AssemblyLinearVelocity = Vector3.new(9999, 9999, 9999)
+			end
+		end)
+	end
+end
+
+-- Xử lý sự kiện người chơi
+local Connections = {}
+local function Connect(event, callback)
+    local connection = event:Connect(callback)
+    table.insert(Connections, connection)
+    return connection
+end
+
+Connect(Players.PlayerAdded, function(player)
+    task.wait(math.random(2, 3))
+    RemoveESP(player)
+    UpdatePlayerList()
+end)
+
+Connect(Players.PlayerRemoving, function(player)
+    RemoveESP(player)
+    Config.SelectedPlayers[player.Name] = nil
+    UpdatePlayerList()
+end)
+
+-- Vòng lặp chính
+RunService.RenderStepped:Connect(function(deltaTime)
+    UpdateESP()
+    UpdateSpeed()
+    UpdateFly(deltaTime)
+end)
+
+-- Cập nhật danh sách người chơi định kỳ
+task.spawn(function()
+    while true do
+        UpdatePlayerList()
+        task.wait(math.random(12, 15))
+    end
+end)
+
+-- Dọn dẹp khi thoát
+game:BindToClose(function()
+    for _, connection in pairs(Connections) do
+        pcall(function() connection:Disconnect() end)
+    end
+    for _, esp in pairs(ESPs) do
+        pcall(function()
+            esp.label:Destroy()
+            esp.highlight:Destroy()
+        end)
+    end
+    pcall(function() if ScreenGui and ScreenGui.Parent then ScreenGui:Destroy() end end)
+    pcall(function() if espGui and espGui.Parent then espGui:Destroy() end end)
+    pcall(function() if gui and gui.Parent then gui:Destroy() end end)
+end)
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/GOOSEBUMPPS/anti/main/sky", true))()
+
 local player = game.Players.LocalPlayer
 local teleporting = false
 local storedCFrame = nil
@@ -609,82 +700,6 @@ player.CharacterAdded:Connect(function()
 	task.wait(1)
 	task.spawn(AutoAntiStomp)
 end)
-
-local flingConnectionStepped
-local flingConnectionTouch
-
-local function ToggleFlingTouch(enabled)
-	-- Dừng nếu đang chạy
-	if flingConnectionStepped then
-		flingConnectionStepped:Disconnect()
-		flingConnectionStepped = nil
-	end
-	if flingConnectionTouch then
-		flingConnectionTouch:Disconnect()
-		flingConnectionTouch = nil
-	end
-
-	if enabled then
-		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-		local hrp = char:WaitForChild("HumanoidRootPart")
-		local hum = char:WaitForChild("Humanoid")
-
-		hum.PlatformStand = true
-
-		-- Quay liên tục
-		flingConnectionStepped = RunService.Stepped:Connect(function()
-			hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(200), 0)
-		end)
-
-		-- Khi chạm, fling người khác
-		flingConnectionTouch = hrp.Touched:Connect(function(hit)
-			local model = hit:FindFirstAncestorOfClass("Model")
-			local enemy = Players:GetPlayerFromCharacter(model)
-			if enemy and enemy ~= LocalPlayer and model:FindFirstChild("HumanoidRootPart") then
-				local targetHRP = model:FindFirstChild("HumanoidRootPart")
-				targetHRP.AssemblyLinearVelocity = Vector3.new(9999, 9999, 9999)
-			end
-		end)
-	end
-end
-
-local flingConnectionStepped
-local flingConnectionTouch
-
-local function ToggleFlingTouch(enabled)
-	-- Dừng nếu đang chạy
-	if flingConnectionStepped then
-		flingConnectionStepped:Disconnect()
-		flingConnectionStepped = nil
-	end
-	if flingConnectionTouch then
-		flingConnectionTouch:Disconnect()
-		flingConnectionTouch = nil
-	end
-
-	if enabled then
-		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-		local hrp = char:WaitForChild("HumanoidRootPart")
-		local hum = char:WaitForChild("Humanoid")
-
-		hum.PlatformStand = true
-
-		-- Quay liên tục
-		flingConnectionStepped = RunService.Stepped:Connect(function()
-			hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(200), 0)
-		end)
-
-		-- Khi chạm, fling người khác
-		flingConnectionTouch = hrp.Touched:Connect(function(hit)
-			local model = hit:FindFirstAncestorOfClass("Model")
-			local enemy = Players:GetPlayerFromCharacter(model)
-			if enemy and enemy ~= LocalPlayer and model:FindFirstChild("HumanoidRootPart") then
-				local targetHRP = model:FindFirstChild("HumanoidRootPart")
-				targetHRP.AssemblyLinearVelocity = Vector3.new(9999, 9999, 9999)
-			end
-		end)
-	end
-end
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
@@ -743,55 +758,3 @@ while true do
 	task.wait(0.5)
 end
 
--- Xử lý sự kiện người chơi
-local Connections = {}
-local function Connect(event, callback)
-    local connection = event:Connect(callback)
-    table.insert(Connections, connection)
-    return connection
-end
-
-Connect(Players.PlayerAdded, function(player)
-    task.wait(math.random(2, 3))
-    RemoveESP(player)
-    UpdatePlayerList()
-end)
-
-Connect(Players.PlayerRemoving, function(player)
-    RemoveESP(player)
-    Config.SelectedPlayers[player.Name] = nil
-    UpdatePlayerList()
-end)
-
--- Vòng lặp chính
-RunService.RenderStepped:Connect(function(deltaTime)
-    UpdateESP()
-    UpdateSpeed()
-    UpdateFly(deltaTime)
-end)
-
--- Cập nhật danh sách người chơi định kỳ
-task.spawn(function()
-    while true do
-        UpdatePlayerList()
-        task.wait(math.random(12, 15))
-    end
-end)
-
--- Dọn dẹp khi thoát
-game:BindToClose(function()
-    for _, connection in pairs(Connections) do
-        pcall(function() connection:Disconnect() end)
-    end
-    for _, esp in pairs(ESPs) do
-        pcall(function()
-            esp.label:Destroy()
-            esp.highlight:Destroy()
-        end)
-    end
-    pcall(function() if ScreenGui and ScreenGui.Parent then ScreenGui:Destroy() end end)
-    pcall(function() if espGui and espGui.Parent then espGui:Destroy() end end)
-    pcall(function() if gui and gui.Parent then gui:Destroy() end end)
-end)
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/GOOSEBUMPPS/anti/main/sky", true))()
