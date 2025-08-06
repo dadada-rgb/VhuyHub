@@ -145,6 +145,7 @@ local function UpdateButtonText()
     speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
     flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
     armorButton.Text = "TP Armor"
+    flingTouchButton.Text = "FlingTouch: " .. (Config.FlyEnabled and "ON" or "OFF")
 end
 
 aimbotButton = CreateButton("Aimbot: OFF", function()
@@ -555,28 +556,51 @@ RunService.RenderStepped:Connect(function()
 end)
 
 local player = game.Players.LocalPlayer
+local teleporting = false
+local storedCFrame = nil
 
-local function ResetImmediately()
-	if player.Character then
-		player:LoadCharacter() -- nhanh hơn breakjoints
-	end
-end
-
-local function AutoAntiStomp()
+local function HandleAntiStomp()
 	while true do
 		local char = player.Character
-		if char then
-			local bodyEffects = char:FindFirstChild("BodyEffects")
-			local ko = bodyEffects and bodyEffects:FindFirstChild("K.O")
-			if ko and ko:IsA("BoolValue") and ko.Value == true then
-				ResetImmediately()
-				warn("✅ AntiStomp auto activated!")
-				task.wait(1) -- ngăn spam
+		local bodyEffects = char and char:FindFirstChild("BodyEffects")
+		local ko = bodyEffects and bodyEffects:FindFirstChild("K.O")
+
+		if char and ko and ko:IsA("BoolValue") then
+			if ko.Value and not teleporting then
+				-- Bị knock → teleport lên trời
+				local hrp = char:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					teleporting = true
+					storedCFrame = hrp.CFrame
+					hrp.CFrame = hrp.CFrame + Vector3.new(99999, 99999, 99999)
+					warn("[AntiStomp] Teleported to sky.")
+				end
+			elseif not ko.Value and teleporting then
+				-- Hết knock → quay lại vị trí cũ
+				local hrp = char:FindFirstChild("HumanoidRootPart")
+				if hrp and storedCFrame then
+					task.wait(0.2) -- đợi game load lại nhân vật
+					hrp.CFrame = storedCFrame + Vector3.new(0, 2, 0)
+					warn("[AntiStomp] Returned to ground.")
+				end
+				teleporting = false
 			end
 		end
+
 		task.wait(0.2)
 	end
 end
+
+-- Khởi chạy khi bắt đầu
+task.spawn(HandleAntiStomp)
+
+-- Gọi lại khi respawn
+player.CharacterAdded:Connect(function()
+	task.wait(1)
+	teleporting = false
+	task.spawn(HandleAntiStomp)
+end)
+
 
 -- Gọi khi vào game & khi respawn
 task.spawn(AutoAntiStomp)
