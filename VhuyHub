@@ -39,8 +39,7 @@ local function setup(char)
 	end)
 
 	-- Nhấn phím để phát lại animation
-	inputConnection = uis.InputBegan:Connect(function(input, gp)
-		if gp then return end
+	inputConnection = uis.InputBegan:Connect(function(input)
 		local key = input.KeyCode.Name
 		local animId = animations[key]
 		if animId and hum.MoveDirection.Magnitude == 0 then
