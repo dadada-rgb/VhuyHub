@@ -8,7 +8,7 @@ local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local character = player.Character or player.CharacterAdded:Wait()
+local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
 local currentTool = nil
 
 -- Cấu hình
@@ -20,9 +20,9 @@ local Config = {
     ShiftAmount = 0.5,
     SelectedPlayers = {},
     FlySpeed = 35,
-    SpeedAmount = 30
-    AntiStomp = false
-    FlingTouch = false
+    SpeedAmount = 30,
+    AntiStomp = false,
+    FlingTouch = false,
 }
 
 local autoSelect = false
