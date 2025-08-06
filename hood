@@ -213,7 +213,6 @@ end)
 
 flingTouchButton = CreateButton("Fling Touch: OFF", function()
 	Config.FlingTouch = not Config.FlingTouch
-	ToggleFlingTouch(Config.FlingTouch)
 	UpdateButtonText()
 end)
 
@@ -555,44 +554,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
-local flingConnectionStepped
-local flingConnectionTouch
-
-local function ToggleFlingTouch(enabled)
-	-- Dừng nếu đang chạy
-	if flingConnectionStepped then
-		flingConnectionStepped:Disconnect()
-		flingConnectionStepped = nil
-	end
-	if flingConnectionTouch then
-		flingConnectionTouch:Disconnect()
-		flingConnectionTouch = nil
-	end
-
-	if enabled then
-		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-		local hrp = char:WaitForChild("HumanoidRootPart")
-		local hum = char:WaitForChild("Humanoid")
-
-		hum.PlatformStand = true
-
-		-- Quay liên tục
-		flingConnectionStepped = RunService.Stepped:Connect(function()
-			hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(200), 0)
-		end)
-
-		-- Khi chạm, fling người khác
-		flingConnectionTouch = hrp.Touched:Connect(function(hit)
-			local model = hit:FindFirstAncestorOfClass("Model")
-			local enemy = Players:GetPlayerFromCharacter(model)
-			if enemy and enemy ~= LocalPlayer and model:FindFirstChild("HumanoidRootPart") then
-				local targetHRP = model:FindFirstChild("HumanoidRootPart")
-				targetHRP.AssemblyLinearVelocity = Vector3.new(9999, 9999, 9999)
-			end
-		end)
-	end
-end
-
 -- Xử lý sự kiện người chơi
 local Connections = {}
 local function Connect(event, callback)
@@ -685,6 +646,10 @@ task.spawn(function()
 	end
 end)
 
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local currentTool = nil
@@ -742,3 +707,32 @@ while true do
 	task.wait(0.5)
 end
 
+-- Logic fling khi chạm
+task.spawn(function()
+	while true do
+		task.wait()
+		if Config.FlingTouch then
+			local char = LocalPlayer.Character
+			local hrp = char and char:FindFirstChild("HumanoidRootPart")
+			local hum = char and char:FindFirstChildOfClass("Humanoid")
+			if hrp and hum then
+				hum.PlatformStand = true
+				-- Xoay nhân vật
+				RunService.Stepped:Wait()
+				char:PivotTo(char:GetPivot() * CFrame.Angles(0, math.rad(500), 0))
+				
+				-- Gắn lực lên người khác khi chạm
+				hrp.Touched:Connect(function(part)
+					local enemyChar = part:FindFirstAncestorOfClass("Model")
+					local enemyPlr = enemyChar and Players:GetPlayerFromCharacter(enemyChar)
+					if enemyPlr and enemyPlr ~= LocalPlayer then
+						local eHRP = enemyChar:FindFirstChild("HumanoidRootPart")
+						if eHRP then
+							eHRP.AssemblyLinearVelocity = Vector3.new(9999, 9999, 9999)
+						end
+					end
+				end)
+			end
+		end
+	end
+end)
