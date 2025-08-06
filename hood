@@ -434,7 +434,7 @@ end
 local function GetBestTargetPart()
     local bestPart, bestDist = nil, fovRadius
     for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and plr.Character then
+        if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and IsValidTarget(plr) and plr.Character then
             for _, partName in ipairs(hitParts) do
                 local part = plr.Character:FindFirstChild(partName)
                 if part and part:IsA("BasePart") then
@@ -510,9 +510,9 @@ end
 
 RunService.RenderStepped:Connect(function()
     if Config.AimbotEnabled and getgenv().Aimbot.Status then
-        local player = GetClosestValidPlayer()
-        if player and player.Character and player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
-            local part = player.Character[getgenv().Aimbot.Hitpart]
+        Player = GetClosestValidPlayer()
+        if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
+            local part = Player.Character[getgenv().Aimbot.Hitpart]
             local predictedPos = GetPredictedPosition(part)
             if not IsObstructed(Camera.CFrame.Position, predictedPos) then
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
@@ -522,21 +522,12 @@ RunService.RenderStepped:Connect(function()
 
     if tbEnabled then
         local part = GetBestTargetPart()
-        if part and IsValidTarget(Players:GetPlayerFromCharacter(part.Parent)) then
+        if part then
             task.spawn(function()
-                local predictedPos = GetPredictedPosition(part)
-                local screenPos, vis = Camera:WorldToViewportPoint(predictedPos)
-                if vis and (Vector2.new(screenPos.X, screenPos.Y) - UserInputService:GetMouseLocation()).Magnitude <= fovRadius then
-                    if not IsObstructed(Camera.CFrame.Position, predictedPos) then
-                        if UserInputService.TouchEnabled then
-                            local touchPos = UserInputService:GetMouseLocation()
-                            VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.Begin, touchPos)
-                            task.wait()
-                            VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.End, touchPos)
-                        else
-                            click()
-                        end
-                    end
+                local cap = part
+                task.wait(0)
+                if tbEnabled and distToCursor(cap) <= fovRadius then
+                    click()
                 end
             end)
         end
