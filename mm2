@@ -24,6 +24,7 @@ local lastUpdate = tick()
 local autoFarm = false
 local lastShot = tick()
 local isScriptRunning = false
+local FlingTouch = false
 
 -- ESP Container
 local espcontainer = {
@@ -380,6 +381,46 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
+local function ToggleFlingTouch(enabled)
+	-- Hủy nếu đang bật
+	if flingConnectionStepped then
+		flingConnectionStepped:Disconnect()
+		flingConnectionStepped = nil
+	end
+	if flingConnectionTouch then
+		flingConnectionTouch:Disconnect()
+		flingConnectionTouch = nil
+	end
+
+	if enabled then
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local hrp = char:WaitForChild("HumanoidRootPart")
+		local hum = char:WaitForChild("Humanoid")
+
+		hum.PlatformStand = true
+
+		-- Xoay liên tục
+		flingConnectionStepped = RunService.Stepped:Connect(function()
+			hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(300), 0)
+		end)
+
+		-- Fling khi chạm bất kỳ part nào
+		flingConnectionTouch = hrp.Touched:Connect(function(part)
+			local targetChar = part:FindFirstAncestorOfClass("Model")
+			local targetPlayer = Players:GetPlayerFromCharacter(targetChar)
+
+			if targetChar and targetPlayer and targetPlayer ~= LocalPlayer then
+				-- Fling toàn bộ part trong model
+				for _, limb in ipairs(targetChar:GetDescendants()) do
+					if limb:IsA("BasePart") then
+						limb.AssemblyLinearVelocity = Vector3.new(9999, 9999, 9999)
+					end
+				end
+			end
+		end)
+	end
+end
+
 function miniFling(playerToFling)
     local Character = localplayer.Character
     local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
@@ -651,6 +692,7 @@ local autoFarmBtn = createButton("jH4mP8", "AutoFarm (Off)", LeftButtonFrame)
 local shootBtn = createButton("tR7nY5", "Shoot", LeftButtonFrame)
 local espBtn = createButton("uP5kQ3", "ESP (Off)", LeftButtonFrame)
 local autoGunBtn = createButton("vQ2zW9", "AutoGun", LeftButtonFrame)
+local flingtouchBtn = createButton"123", "FlingTouch(Off)", LeftButtonFrame)
 
 local flingMurdererBtn = createButton("flingMurderer", "Fling Murderer", RightButtonFrame)
 local flingSheriffBtn = createButton("flingSheriff", "Fling Sheriff", RightButtonFrame)
@@ -663,6 +705,14 @@ autoFarmBtn.MouseButton1Click:Connect(function()
     autoFarmBtn.Text = "AutoFarm (" .. (autoFarm and "On" or "Off") .. ")"
     if autoFarm then
         task.spawn(autoFarmCoins)
+    end
+end)
+
+flingtouchBtn.MouseButton1Click:Connect(function()
+    FlingTouch = not FlingTouch
+    flingtouchBtn.Text = "FlingTouch (" .. (FlingTouch and "On" or "Off") .. ")"
+    if FlingTouch  then
+        task.spawn(ToggleFlingTouch)
     end
 end)
 
