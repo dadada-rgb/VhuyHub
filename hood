@@ -16,8 +16,8 @@ local Config = {
     AimbotEnabled = false,
     ShiftAmount = 0.5,
     SelectedPlayers = {},
-    FlySpeed = 25,
-    SpeedAmount = 20
+    FlySpeed = 35,
+    SpeedAmount = 30
 }
 
 local autoSelect = false
@@ -448,8 +448,16 @@ end)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
-	if input.KeyCode == Enum.KeyCode.Q then
+	if input.KeyCode == Enum.KeyCode.Z then
 		Config.SpeedEnabled = not Config.SpeedEnabled
+		UpdateButtonText()
+	end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.Q then
+		Config.FlyEnabled = not Config.FlyEnabled
 		UpdateButtonText()
 	end
 end)
@@ -517,7 +525,7 @@ getgenv().Aimbot = {
 
 local function GetPing()
 	local stats = game:GetService("Stats"):FindFirstChild("Network")
-	local ping = 50
+	local ping = 200
 	if stats then
 		local data = stats:FindFirstChild("DataPing")
 		if data then
