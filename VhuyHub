@@ -232,7 +232,6 @@ local scriptUrls = {
 	[142823291] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2",
 	[13772394625] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball",
         [6839171747] = "https://raw.githubusercontent.com/DarkDoorsKing/Project/main/Doors.lua",
-        [2693023319] = "https://raw.githubusercontent.com/Iliankytb/Iliankytb/main/BestAntarticaExpedition"
 }
 
 local url = scriptUrls[placeId] or "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"
