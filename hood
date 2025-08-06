@@ -137,13 +137,13 @@ local function CreateButton(name, callback)
 end
 
 -- Tạo các nút chức năng
-local aimbotButton, espButton, speedButton, flyButton, flingButton
+local aimbotButton, espButton, speedButton, flyButton, armorButton
 local function UpdateButtonText()
     aimbotButton.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
     espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
     speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
     flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
-    flingButton.Text = "Fling Selected"
+    armorButton.Text = "TP Armor"
 end
 
 aimbotButton = CreateButton("Aimbot: OFF", function()
@@ -166,112 +166,35 @@ flyButton = CreateButton("Fly: OFF", function()
     UpdateButtonText()
 end)
 
-flingButton = CreateButton("Fling Selected", function()
-    for playerName, _ in pairs(Config.SelectedPlayers) do
-        local targetPlayer = Players:FindFirstChild(playerName)
-        if targetPlayer and targetPlayer ~= LocalPlayer and IsValidTarget(targetPlayer) then
-            local Character = LocalPlayer.Character
-            local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
-            local RootPart = Humanoid and Humanoid.RootPart
-            local TCharacter = targetPlayer.Character
-            local THumanoid = TCharacter and TCharacter:FindFirstChildOfClass("Humanoid")
-            local TRootPart = THumanoid and THumanoid.RootPart
-            local THead = TCharacter and TCharacter:FindFirstChild("Head")
+armorButton = CreateButton("TP Armor", function()
+	Character = LocalPlayer.Character
+	Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+	RootPart = Character and Character:FindFirstChild("HumanoidRootPart")
 
-            if Character and Humanoid and RootPart and TCharacter and THumanoid and TRootPart and not THumanoid.Sit then
-                local OldPos = RootPart.CFrame
-                workspace.FallenPartsDestroyHeight = 0/0
+	if not (Character and Humanoid and RootPart) then return end
 
-                local BV = Instance.new("BodyVelocity")
-                BV.Name = "EpixVel"
-                BV.Parent = RootPart
-                BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
-                BV.MaxForce = Vector3.new(1/0, 1/0, 1/0)
+	OldCFrame = RootPart.CFrame
+	TargetPosition = Vector3.new(-934.52, -25.25, 571.18)
 
-                Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+	-- Teleport tới vị trí mục tiêu
+	RootPart.CFrame = CFrame.new(TargetPosition + Vector3.new(0, 5, 0)) -- nhấc lên để không kẹt ground
 
-                local function FPos(BasePart, Pos, Ang)
-                    RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
-                    Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
-                    RootPart.Velocity = Vector3.new(9e7, 9e7 * 10, 9e7)
-                    RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
-                end
+	task.wait(0.25) -- đợi ổn định
 
-                local function SFBasePart(BasePart)
-                    local TimeToWait = 2
-                    local Time = tick()
-                    local Angle = 0
+	-- Tìm part có ClickDetector gần chân
+	for _, part in ipairs(workspace:GetPartBoundsInBox(RootPart.CFrame, Vector3.new(6, 6, 6))) do
+		if part:IsA("BasePart") and part ~= RootPart and part:FindFirstChildOfClass("ClickDetector") then
+			clickDetector = part:FindFirstChildOfClass("ClickDetector")
+			if clickDetector then
+				fireclickdetector(clickDetector)
+				break
+			end
+		end
+	end
 
-                    repeat
-                        if RootPart and THumanoid then
-                            if BasePart.Velocity.Magnitude < 50 then
-                                Angle = Angle + 100
-                                FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
-                                task.wait()
-                                FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
-                                task.wait()
-                                FPos(BasePart, CFrame.new(2.25, 1.5, -2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
-                                task.wait()
-                                FPos(BasePart, CFrame.new(-2.25, -1.5, 2.25) + THumanoid.MoveDirection * BasePart.Velocity.Magnitude / 1.25, CFrame.Angles(math.rad(Angle), 0, 0))
-                                task.wait()
-                                FPos(BasePart, CFrame.new(0, 1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle), 0, 0))
-                                task.wait()
-                                FPos(BasePart, CFrame.new(0, -1.5, 0) + THumanoid.MoveDirection, CFrame.Angles(math.rad(Angle), 0, 0))
-                                task.wait()
-                            else
-                                FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
-                                task.wait()
-                                FPos(BasePart, CFrame.new(0, -1.5, -THumanoid.WalkSpeed), CFrame.Angles(0, 0, 0))
-                                task.wait()
-                                FPos(BasePart, CFrame.new(0, 1.5, THumanoid.WalkSpeed), CFrame.Angles(math.rad(90), 0, 0))
-                                task.wait()
-                                FPos(BasePart, CFrame.new(0, 1.5, TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(math.rad(90), 0, 0))
-                                task.wait()
-                                FPos(BasePart, CFrame.new(0, -1.5, -TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(0, 0, 0))
-                                task.wait()
-                                FPos(BasePart, CFrame.new(0, 1.5, TRootPart.Velocity.Magnitude / 1.25), CFrame.Angles(math.rad(90), 0, 0))
-                                task.wait()
-                                FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(90), 0, 0))
-                                task.wait()
-                                FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
-                                task.wait()
-                                FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(math.rad(-90), 0, 0))
-                                task.wait()
-                                FPos(BasePart, CFrame.new(0, -1.5, 0), CFrame.Angles(0, 0, 0))
-                                task.wait()
-                            end
-                        else
-                            break
-                        end
-                    until BasePart.Velocity.Magnitude > 500 or BasePart.Parent ~= targetPlayer.Character or targetPlayer.Parent ~= Players or not targetPlayer.Character == TCharacter or THumanoid.Sit or Humanoid.Health <= 0 or tick() > Time + TimeToWait
-                end
-
-                if TRootPart and THead and (TRootPart.CFrame.p - THead.CFrame.p).Magnitude > 5 then
-                    SFBasePart(THead)
-                else
-                    SFBasePart(TRootPart)
-                end
-
-                BV:Destroy()
-                Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
-                workspace.CurrentCamera.CameraSubject = Humanoid
-
-                repeat
-                    RootPart.CFrame = OldPos * CFrame.new(0, .5, 0)
-                    Character:SetPrimaryPartCFrame(OldPos * CFrame.new(0, .5, 0))
-                    Humanoid:ChangeState("GettingUp")
-                    for _, x in pairs(Character:GetChildren()) do
-                        if x:IsA("BasePart") then
-                            x.Velocity, x.RotVelocity = Vector3.new(), Vector3.new()
-                        end
-                    end
-                    task.wait()
-                until (RootPart.Position - OldPos.p).Magnitude < 25
-                workspace.FallenPartsDestroyHeight = getgenv().FPDH or -500
-                task.wait(0.5) -- Đợi trước khi fling người tiếp theo
-            end
-        end
-    end
+	-- Quay lại vị trí ban đầu sau 3 giây
+	task.wait(3)
+	RootPart.CFrame = OldCFrame + Vector3.new(0, 0.5, 0)
 end)
 
 -- Khởi tạo ScreenGui cho ESP
@@ -487,22 +410,31 @@ local function distToCursor(part)
 end
 
 local function click()
-    if mouse1press then
-        mouse1press()
-        mouse1release()
-    elseif mouse1click then
-        mouse1click()
-    else
-        VirtualInputManager:Button1Down(Vector2.new(), Camera.CFrame)
+    if UserInputService.TouchEnabled then
+        -- Giả lập chạm màn hình cho di động
+        local touchPos = UserInputService:GetMouseLocation()
+        VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.Begin, touchPos)
         task.wait()
-        VirtualInputManager:Button1Up(Vector2.new(), Camera.CFrame)
+        VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.End, touchPos)
+    else
+        -- Giữ logic click cho PC
+        if mouse1press then
+            mouse1press()
+            mouse1release()
+        elseif mouse1click then
+            mouse1click()
+        else
+            VirtualInputManager:Button1Down(Vector2.new(), Camera.CFrame)
+            task.wait()
+            VirtualInputManager:Button1Up(Vector2.new(), Camera.CFrame)
+        end
     end
 end
 
 local function GetBestTargetPart()
     local bestPart, bestDist = nil, fovRadius
     for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and plr.Character then
+        if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and IsValidTarget(plr) and plr.Character then
             for _, partName in ipairs(hitParts) do
                 local part = plr.Character:FindFirstChild(partName)
                 if part and part:IsA("BasePart") then
@@ -576,12 +508,11 @@ local function GetClosestValidPlayer()
     return closestPlayer
 end
 
--- Tự động aim khi bật qua GUI
 RunService.RenderStepped:Connect(function()
     if Config.AimbotEnabled and getgenv().Aimbot.Status then
-        Player = GetClosestValidPlayer()
-        if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
-            local part = Player.Character[getgenv().Aimbot.Hitpart]
+        local player = GetClosestValidPlayer()
+        if player and player.Character and player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
+            local part = player.Character[getgenv().Aimbot.Hitpart]
             local predictedPos = GetPredictedPosition(part)
             if not IsObstructed(Camera.CFrame.Position, predictedPos) then
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
@@ -594,9 +525,12 @@ RunService.RenderStepped:Connect(function()
         if part then
             task.spawn(function()
                 local cap = part
-                task.wait(0)
-                if tbEnabled and distToCursor(cap) <= fovRadius then
-                    click()
+                local predictedPos = GetPredictedPosition(cap)
+                local screenPos, vis = Camera:WorldToViewportPoint(predictedPos)
+                if vis and (Vector2.new(screenPos.X, screenPos.Y) - UserInputService:GetMouseLocation()).Magnitude <= fovRadius then
+                    if not IsObstructed(Camera.CFrame.Position, predictedPos) then
+                        click()
+                    end
                 end
             end)
         end
