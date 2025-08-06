@@ -18,6 +18,7 @@ local Config = {
     SelectedPlayers = {},
     FlySpeed = 35,
     SpeedAmount = 30
+    local maxDistance = 80 -- tối đa 80 studs
 }
 
 local autoSelect = false
@@ -435,23 +436,30 @@ local function click()
 end
 
 local function GetBestTargetPart()
-    local bestPart, bestDist = nil, fovRadius
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and plr.Character then
-            for _, partName in ipairs(hitParts) do
-                local part = plr.Character:FindFirstChild(partName)
-                if part and part:IsA("BasePart") then
-                    local dist = distToCursor(part)
-                    if dist < bestDist then
-                        bestPart = part
-                        bestDist = dist
-                    end
-                end
-            end
-        end
-    end
-    return bestPart
+	local bestPart, bestDist = nil, fovRadius
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and IsValidTarget(plr) and plr.Character then
+			local distance = (plr.Character:GetPrimaryPartCFrame().Position - Camera.CFrame.Position).Magnitude
+			if distance <= maxDistance then
+				for _, partName in ipairs(hitParts) do
+					local part = plr.Character:FindFirstChild(partName)
+					if part and part:IsA("BasePart") then
+						local _, onScreen = Camera:WorldToViewportPoint(part.Position)
+						if onScreen then
+							local dist = distToCursor(part)
+							if dist < bestDist then
+								bestPart = part
+								bestDist = dist
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	return bestPart
 end
+
 
 getgenv().Aimbot = {
 	Status = true,
@@ -633,9 +641,7 @@ RunService.RenderStepped:Connect(function(deltaTime)
             local part = target.Character[getgenv().Aimbot.Hitpart]
             local predictedPos = GetPredictedPosition(part)
             if not IsObstructed(Camera.CFrame.Position, predictedPos) then
-                local currentPos = Camera.CFrame.Position
-                local direction = (predictedPos - currentPos).Unit
-                Camera.CFrame = CFrame.lookAt(currentPos, currentPos + direction)
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
             end
         end
     end
