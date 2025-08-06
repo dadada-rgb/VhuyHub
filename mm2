@@ -692,7 +692,7 @@ local autoFarmBtn = createButton("jH4mP8", "AutoFarm (Off)", LeftButtonFrame)
 local shootBtn = createButton("tR7nY5", "Shoot", LeftButtonFrame)
 local espBtn = createButton("uP5kQ3", "ESP (Off)", LeftButtonFrame)
 local autoGunBtn = createButton("vQ2zW9", "AutoGun", LeftButtonFrame)
-local flingtouchBtn = createButton"123", "FlingTouch(Off)", LeftButtonFrame)
+local flingtouchBtn = createButton("123", "FlingTouch (Off)", LeftButtonFrame)
 
 local flingMurdererBtn = createButton("flingMurderer", "Fling Murderer", RightButtonFrame)
 local flingSheriffBtn = createButton("flingSheriff", "Fling Sheriff", RightButtonFrame)
@@ -705,14 +705,6 @@ autoFarmBtn.MouseButton1Click:Connect(function()
     autoFarmBtn.Text = "AutoFarm (" .. (autoFarm and "On" or "Off") .. ")"
     if autoFarm then
         task.spawn(autoFarmCoins)
-    end
-end)
-
-flingtouchBtn.MouseButton1Click:Connect(function()
-    FlingTouch = not FlingTouch
-    flingtouchBtn.Text = "FlingTouch (" .. (FlingTouch and "On" or "Off") .. ")"
-    if FlingTouch  then
-        task.spawn(ToggleFlingTouch)
     end
 end)
 
@@ -748,6 +740,14 @@ autoGunBtn.MouseButton1Click:Connect(function()
         fu.notification("Gun picked up.")
     else
         fu.notification("No valid character to teleport.")
+    end
+end)
+
+flingtouchBtn.MouseButton1Click:Connect(function()
+    FlingTouch = not FlingTouch
+    flingtouchBtn.Text = "FlingTouch (" .. (FlingTouch and "On" or "Off") .. ")"
+    if FlingTouch  then
+        task.spawn(ToggleFlingTouch)
     end
 end)
 
