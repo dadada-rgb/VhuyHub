@@ -8,9 +8,6 @@ local Camera = Workspace.CurrentCamera
 local Mouse = LocalPlayer:GetMouse()
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local currentTool = nil
-
 -- Cấu hình
 local Config = {
     ESPEnabled = false,
@@ -21,7 +18,7 @@ local Config = {
     SelectedPlayers = {},
     FlySpeed = 35,
     SpeedAmount = 30,
-    FlingTouch = false,
+    FlingTouch = false
 }
 
 local autoSelect = false
@@ -148,7 +145,6 @@ local function UpdateButtonText()
     speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
     flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
     armorButton.Text = "TP Armor"
-    flingTouchButton.Text = "Fling Touch: " .. (Config.FlingTouch and "ON" or "OFF")
 end
 
 aimbotButton = CreateButton("Aimbot: OFF", function()
@@ -182,12 +178,12 @@ armorButton = CreateButton("TP Armor", function()
 	local TargetPosition = Vector3.new(-934.52, -25.25, 571.18) -- vị trí armor shop của bạn
 
 	-- Teleport đến armor
-	RootPart.CFrame = CFrame.new(TargetPosition + Vector3.new(0, 3, 0)) -- đứng cao hơn một chút
+	RootPart.CFrame = CFrame.new(TargetPosition + Vector3.new(0, 1, 0)) -- đứng cao hơn một chút
 
 	task.wait(0.5) -- đợi vật lý ổn định
 
 	-- Quét các part gần chân để tìm ClickDetector
-	local parts = workspace:GetPartBoundsInBox(RootPart.CFrame, Vector3.new(6, 6, 6))
+	local parts = workspace:GetPartBoundsInBox(RootPart.CFrame, Vector3.new(10, 10, 10))
 	local clicked = false
 
 	for _, part in ipairs(parts) do
@@ -216,40 +212,10 @@ end)
 
 flingTouchButton = CreateButton("Fling Touch: OFF", function()
 	Config.FlingTouch = not Config.FlingTouch
+	ToggleFlingTouch(Config.FlingTouch)
 	UpdateButtonText()
 end)
 
-local player = game.Players.LocalPlayer
-
-local function ResetImmediately()
-	if player.Character then
-		player:LoadCharacter() -- nhanh hơn breakjoints
-	end
-end
-
-local function AutoAntiStomp()
-	while true do
-		local char = player.Character
-		if char then
-			local bodyEffects = char:FindFirstChild("BodyEffects")
-			local ko = bodyEffects and bodyEffects:FindFirstChild("K.O")
-			if ko and ko:IsA("BoolValue") and ko.Value == true then
-				ResetImmediately()
-				warn("✅ AntiStomp auto activated!")
-				task.wait(1) -- ngăn spam
-			end
-		end
-		task.wait(0.2)
-	end
-end
-
--- Gọi khi vào game & khi respawn
-task.spawn(AutoAntiStomp)
-
-player.CharacterAdded:Connect(function()
-	task.wait(1)
-	task.spawn(AutoAntiStomp)
-end)
 
 -- Khởi tạo ScreenGui cho ESP
 local espGui = Instance.new("ScreenGui")
@@ -372,59 +338,6 @@ local function UpdateFly(deltaTime)
         root.CFrame = root.CFrame + Vector3.new(0, vertical, 0)
         root.Velocity = root.Velocity * Vector3.new(1, 0, 1) + Vector3.new(0, 1.9, 0)
     end
-end
-
--- Hàm kiểm tra Tool có phải là súng và có thuộc tính Ammo
-local function isGun(tool)
-	if not tool then return false end
-	return tool:FindFirstChild("Ammo") ~= nil
-end
-
--- Hàm reload nếu Ammo = 0
-local function checkAmmoAndReload()
-	if not currentTool then return end
-	if isGun(currentTool) then
-		local ammo = currentTool:FindFirstChild("Ammo")
-		if ammo and ammo:IsA("IntValue") and ammo.Value <= 0 then
-			-- Giả lập nhấn phím R
-			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.R, false, game)
-			task.wait(0.1)
-			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.R, false, game)
-		end
-	end
-end
-
--- Theo dõi khi trang bị Tool
-player.CharacterAdded:Connect(function(char)
-	character = char
-end)
-
-player:GetPropertyChangedSignal("Character"):Connect(function()
-	character = player.Character
-end)
-
-player.Backpack.ChildAdded:Connect(function(tool)
-	tool.Equipped:Connect(function()
-		currentTool = tool
-	end)
-end)
-
-player.Character.ChildAdded:Connect(function(tool)
-	if tool:IsA("Tool") then
-		currentTool = tool
-	end
-end)
-
-player.Character.ChildRemoved:Connect(function(tool)
-	if tool == currentTool then
-		currentTool = nil
-	end
-end)
-
--- Kiểm tra liên tục mỗi 0.5 giây
-while true do
-	checkAmmoAndReload()
-	task.wait(0.5)
 end
 
 -- Cập nhật danh sách người chơi
@@ -641,6 +554,115 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+local player = game.Players.LocalPlayer
+
+local function ResetImmediately()
+	if player.Character then
+		player:LoadCharacter() -- nhanh hơn breakjoints
+	end
+end
+
+local function AutoAntiStomp()
+	while true do
+		local char = player.Character
+		if char then
+			local bodyEffects = char:FindFirstChild("BodyEffects")
+			local ko = bodyEffects and bodyEffects:FindFirstChild("K.O")
+			if ko and ko:IsA("BoolValue") and ko.Value == true then
+				ResetImmediately()
+				warn("✅ AntiStomp auto activated!")
+				task.wait(1) -- ngăn spam
+			end
+		end
+		task.wait(0.2)
+	end
+end
+
+-- Gọi khi vào game & khi respawn
+task.spawn(AutoAntiStomp)
+
+player.CharacterAdded:Connect(function()
+	task.wait(1)
+	task.spawn(AutoAntiStomp)
+end)
+
+local flingConnectionStepped
+local flingConnectionTouch
+
+local function ToggleFlingTouch(enabled)
+	-- Dừng nếu đang chạy
+	if flingConnectionStepped then
+		flingConnectionStepped:Disconnect()
+		flingConnectionStepped = nil
+	end
+	if flingConnectionTouch then
+		flingConnectionTouch:Disconnect()
+		flingConnectionTouch = nil
+	end
+
+	if enabled then
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local hrp = char:WaitForChild("HumanoidRootPart")
+		local hum = char:WaitForChild("Humanoid")
+
+		hum.PlatformStand = true
+
+		-- Quay liên tục
+		flingConnectionStepped = RunService.Stepped:Connect(function()
+			hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(200), 0)
+		end)
+
+		-- Khi chạm, fling người khác
+		flingConnectionTouch = hrp.Touched:Connect(function(hit)
+			local model = hit:FindFirstAncestorOfClass("Model")
+			local enemy = Players:GetPlayerFromCharacter(model)
+			if enemy and enemy ~= LocalPlayer and model:FindFirstChild("HumanoidRootPart") then
+				local targetHRP = model:FindFirstChild("HumanoidRootPart")
+				targetHRP.AssemblyLinearVelocity = Vector3.new(9999, 9999, 9999)
+			end
+		end)
+	end
+end
+
+local flingConnectionStepped
+local flingConnectionTouch
+
+local function ToggleFlingTouch(enabled)
+	-- Dừng nếu đang chạy
+	if flingConnectionStepped then
+		flingConnectionStepped:Disconnect()
+		flingConnectionStepped = nil
+	end
+	if flingConnectionTouch then
+		flingConnectionTouch:Disconnect()
+		flingConnectionTouch = nil
+	end
+
+	if enabled then
+		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+		local hrp = char:WaitForChild("HumanoidRootPart")
+		local hum = char:WaitForChild("Humanoid")
+
+		hum.PlatformStand = true
+
+		-- Quay liên tục
+		flingConnectionStepped = RunService.Stepped:Connect(function()
+			hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(200), 0)
+		end)
+
+		-- Khi chạm, fling người khác
+		flingConnectionTouch = hrp.Touched:Connect(function(hit)
+			local model = hit:FindFirstAncestorOfClass("Model")
+			local enemy = Players:GetPlayerFromCharacter(model)
+			if enemy and enemy ~= LocalPlayer and model:FindFirstChild("HumanoidRootPart") then
+				local targetHRP = model:FindFirstChild("HumanoidRootPart")
+				targetHRP.AssemblyLinearVelocity = Vector3.new(9999, 9999, 9999)
+			end
+		end)
+	end
+end
+
+
 -- Xử lý sự kiện người chơi
 local Connections = {}
 local function Connect(event, callback)
@@ -691,5 +713,3 @@ game:BindToClose(function()
     pcall(function() if espGui and espGui.Parent then espGui:Destroy() end end)
     pcall(function() if gui and gui.Parent then gui:Destroy() end end)
 end)
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/GOOSEBUMPPS/anti/main/sky", true))()
