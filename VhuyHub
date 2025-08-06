@@ -232,15 +232,18 @@ local zombieAnims = {
 }
 
 local function applyZombieAnimations(character)
-	local animate = character:FindFirstChild("Animate")
-	if not animate then return end
+	local animate = character:WaitForChild("Animate", 3)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if not animate or not humanoid then return end
 
 	local function replace(animName, id)
-		if animate:FindFirstChild(animName) and animate[animName]:FindFirstChild("Animation") then
-			animate[animName].Animation.AnimationId = "rbxassetid://" .. id
+		local animFolder = animate:FindFirstChild(animName)
+		if animFolder and animFolder:FindFirstChild("Animation") then
+			animFolder.Animation.AnimationId = "rbxassetid://" .. id
 		end
 	end
 
+	-- Thay animation ID
 	replace("idle", zombieAnims.Idle)
 	replace("walk", zombieAnims.Walk)
 	replace("run", zombieAnims.Run)
@@ -249,6 +252,11 @@ local function applyZombieAnimations(character)
 	replace("climb", zombieAnims.Climb)
 	replace("swim", zombieAnims.Swim)
 	replace("swimidle", zombieAnims.SwimIdle)
+
+	-- Reset trạng thái để reload animation
+	humanoid:ChangeState(Enum.HumanoidStateType.Physics)
+	task.wait(0.05)
+	humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
 end
 
 -- Áp dụng khi spawn
