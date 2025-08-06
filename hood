@@ -646,59 +646,43 @@ end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/GOOSEBUMPPS/anti/main/sky", true))()
 
-local player = game.Players.LocalPlayer
+local player = game:GetService("Players").LocalPlayer
 local teleporting = false
 local storedCFrame = nil
 
-local function HandleAntiStomp()
+task.spawn(function()
 	while true do
 		local char = player.Character
+		local hum = char and char:FindFirstChildOfClass("Humanoid")
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
 		local bodyEffects = char and char:FindFirstChild("BodyEffects")
 		local ko = bodyEffects and bodyEffects:FindFirstChild("K.O")
 
-		if char and ko and ko:IsA("BoolValue") then
-			if ko.Value and not teleporting then
-				-- Bị knock → teleport lên trời
-				local hrp = char:FindFirstChild("HumanoidRootPart")
-				if hrp then
-					teleporting = true
-					storedCFrame = hrp.CFrame
-					hrp.CFrame = hrp.CFrame + Vector3.new(99999, 99999, 99999)
-					warn("[AntiStomp] Teleported to sky.")
-				end
-			elseif not ko.Value and teleporting then
-				-- Hết knock → quay lại vị trí cũ
-				local hrp = char:FindFirstChild("HumanoidRootPart")
-				if hrp and storedCFrame then
-					task.wait(0.2) -- đợi game load lại nhân vật
+		if char and hum and hrp and ko then
+			if hum.Health <= 3 and not teleporting then
+				-- Teleport lên trời
+				teleporting = true
+				storedCFrame = hrp.CFrame
+				hrp.CFrame = CFrame.new(9999, 9999, 9999)
+				warn("[AntiStomp] Teleported to sky at low HP")
+
+				-- Đợi 3 giây rồi kiểm tra lại K.O
+				task.wait(3)
+
+				if ko.Value == false and hum.Health > 0 then
+					-- Nếu không bị K.O thì quay về vị trí cũ
 					hrp.CFrame = storedCFrame + Vector3.new(0, 2, 0)
-					warn("[AntiStomp] Returned to ground.")
+					warn("[AntiStomp] Returned to ground after 3s")
+				else
+					warn("[AntiStomp] Still K.O or dead, staying in sky")
 				end
+
 				teleporting = false
 			end
 		end
 
-		task.wait(0.2)
+		task.wait(0.1)
 	end
-end
-
--- Khởi chạy khi bắt đầu
-task.spawn(HandleAntiStomp)
-
--- Gọi lại khi respawn
-player.CharacterAdded:Connect(function()
-	task.wait(1)
-	teleporting = false
-	task.spawn(HandleAntiStomp)
-end)
-
-
--- Gọi khi vào game & khi respawn
-task.spawn(AutoAntiStomp)
-
-player.CharacterAdded:Connect(function()
-	task.wait(1)
-	task.spawn(AutoAntiStomp)
 end)
 
 local player = Players.LocalPlayer
