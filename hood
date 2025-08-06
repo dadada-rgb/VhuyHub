@@ -525,14 +525,8 @@ getgenv().Aimbot = {
 
 local function GetPing()
 	local stats = game:GetService("Stats"):FindFirstChild("Network")
-	local ping = 200
-	if stats then
-		local data = stats:FindFirstChild("DataPing")
-		if data then
-			ping = data:GetValue()
-		end
-	end
-	return math.clamp(ping, 10, 300)
+	local data = stats and stats:FindFirstChild("DataPing")
+	return data and math.clamp(data:GetValue(), 10, 300) or 50
 end
 
 local function GetPredictedPosition(part)
