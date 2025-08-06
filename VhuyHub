@@ -136,8 +136,6 @@ task.delay(4, function()
 	end)
 end)
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote"))()
-
 -- Button GUI để phát animation C
 local player = game.Players.LocalPlayer
 local mouse = player:GetMouse()
@@ -219,6 +217,52 @@ button.MouseButton1Click:Connect(function()
 	currentTrack = track
 	currentKey = "C"
 end)
+
+local player = game.Players.LocalPlayer
+
+local zombieAnims = {
+	Idle = 6161589290,
+	Walk = 6161561193,
+	Run = 6161636826,
+	Jump = 6161619978,
+	Fall = 6161574767,
+	Climb = 6161553182,
+	Swim = 6161651097,
+	SwimIdle = 6161651097,
+}
+
+local function applyZombieAnimations(character)
+	local animate = character:FindFirstChild("Animate")
+	if not animate then return end
+
+	local function replace(animName, id)
+		if animate:FindFirstChild(animName) and animate[animName]:FindFirstChild("Animation") then
+			animate[animName].Animation.AnimationId = "rbxassetid://" .. id
+		end
+	end
+
+	replace("idle", zombieAnims.Idle)
+	replace("walk", zombieAnims.Walk)
+	replace("run", zombieAnims.Run)
+	replace("jump", zombieAnims.Jump)
+	replace("fall", zombieAnims.Fall)
+	replace("climb", zombieAnims.Climb)
+	replace("swim", zombieAnims.Swim)
+	replace("swimidle", zombieAnims.SwimIdle)
+end
+
+-- Áp dụng khi spawn
+player.CharacterAdded:Connect(function(char)
+	char:WaitForChild("Humanoid")
+	char:WaitForChild("Animate")
+	task.wait(0.1)
+	applyZombieAnimations(char)
+end)
+
+-- Áp dụng nếu đang sống
+if player.Character then
+	applyZombieAnimations(player.Character)
+end
 
 -- Load script theo PlaceId
 local placeId = game.PlaceId
