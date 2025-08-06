@@ -1,3 +1,5 @@
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote"))()
+
 local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
 local lp = game.Players.LocalPlayer
@@ -218,88 +220,50 @@ button.MouseButton1Click:Connect(function()
 	currentKey = "C"
 end)
 
-local function loadZombieAnimations(character)
-    local humanoid = character:WaitForChild("Humanoid", 5)
-    local animateScript = character:WaitForChild("Animate", 5)
-    if not humanoid or not animateScript then return end
+local player = game.Players.LocalPlayer
 
-    local animator = humanoid:FindFirstChildOfClass("Animator") or Instance.new("Animator", humanoid)
+local zombieAnims = {
+	Idle = 6161589290,
+	Walk = 6161561193,
+	Run = 6161636826,
+	Jump = 6161619978,
+	Fall = 6161574767,
+	Climb = 6161553182,
+	Swim = 6161651097,
+	SwimIdle = 6161651097,
+}
 
-    -- Danh sách animation zombie R15
-    local zombieAnims = {
-        idle = "rbxassetid://6161589290",
-        walk = "rbxassetid://6161561193",
-        run = "rbxassetid://6161636826",
-        jump = "rbxassetid://6161619978",
-        fall = "rbxassetid://6161574767",
-        climb = "rbxassetid://6161553182",
-        swim = "rbxassetid://6161651097",
-        swimidle = "rbxassetid://6161651097",
-    }
+local function applyZombieAnimations(character)
+	local animate = character:FindFirstChild("Animate")
+	if not animate then return end
 
-    -- Hàm thay thế animation
-    local function replaceAnimation(animName, animId)
-        local animFolder = animateScript:FindFirstChild(animName)
-        if animFolder and animFolder:FindFirstChild("Animation") then
-            animFolder.Animation.AnimationId = animId
-        else
-            -- Tạo mới nếu không tồn tại
-            local newAnim = Instance.new("Animation")
-            newAnim.Name = "Animation"
-            newAnim.AnimationId = animId
-            local folder = Instance.new("Folder")
-            folder.Name = animName
-            newAnim.Parent = folder
-            folder.Parent = animateScript
-        end
-    end
+	local function replace(animName, id)
+		if animate:FindFirstChild(animName) and animate[animName]:FindFirstChild("Animation") then
+			animate[animName].Animation.AnimationId = "rbxassetid://" .. id
+		end
+	end
 
-    -- Thay thế toàn bộ animation
-    for animName, animId in pairs(zombieAnims) do
-        replaceAnimation(animName, animId)
-    end
-
-    -- Đảm bảo reload animation
-    humanoid:ChangeState(Enum.HumanoidStateType.Physics)
-    task.wait(0.05)
-    humanoid:ChangeState(Enum.HumanoidStateType.GettingUp)
-
-    -- Phát animation trên server để đồng bộ
-    local function playAnimation(animId)
-        local anim = Instance.new("Animation")
-        anim.AnimationId = animId
-        local track = animator:LoadAnimation(anim)
-        track:Play()
-        return track
-    end
-
-    -- Kiểm tra trạng thái nhân vật để áp dụng animation phù hợp
-    humanoid.StateChanged:Connect(function(oldState, newState)
-        if newState == Enum.HumanoidStateType.Running and humanoid.MoveDirection.Magnitude > 0 then
-            playAnimation(zombieAnims.run)
-        elseif newState == Enum.HumanoidStateType.Jumping then
-            playAnimation(zombieAnims.jump)
-        elseif newState == Enum.HumanoidStateType.Freefall then
-            playAnimation(zombieAnims.fall)
-        elseif newState == Enum.HumanoidStateType.Climbing then
-            playAnimation(zombieAnims.climb)
-        elseif newState == Enum.HumanoidStateType.Swimming then
-            playAnimation(zombieAnims.swim)
-        elseif newState == Enum.HumanoidStateType.Landed then
-            playAnimation(zombieAnims.idle)
-        end
-    end)
+	replace("idle", zombieAnims.Idle)
+	replace("walk", zombieAnims.Walk)
+	replace("run", zombieAnims.Run)
+	replace("jump", zombieAnims.Jump)
+	replace("fall", zombieAnims.Fall)
+	replace("climb", zombieAnims.Climb)
+	replace("swim", zombieAnims.Swim)
+	replace("swimidle", zombieAnims.SwimIdle)
 end
 
--- Áp dụng khi nhân vật spawn
-game.Players.LocalPlayer.CharacterAdded:Connect(function(char)
-    task.wait(0.1) -- Đợi nhân vật load hoàn tất
-    loadZombieAnimations(char)
+-- Áp dụng khi spawn
+player.CharacterAdded:Connect(function(char)
+	char:WaitForChild("Humanoid")
+	char:WaitForChild("Animate")
+	task.wait(0.1)
+	applyZombieAnimations(char)
 end)
 
--- Áp dụng nếu nhân vật đã tồn tại
-if game.Players.LocalPlayer.Character then
-    loadZombieAnimations(game.Players.LocalPlayer.Character)
+-- Áp dụng nếu đang sống
+if player.Character then
+	applyZombieAnimations(player.Character)
 end
 
 -- Load script theo PlaceId
