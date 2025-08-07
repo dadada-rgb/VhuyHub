@@ -621,70 +621,103 @@ task.spawn(function()
     end
 end)
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/reload"))()
-
 local player = game:GetService("Players").LocalPlayer
 local teleporting = false
 local storedCFrame = nil
+local safePosition = Vector3.new(-934.52, -25.25 + 3, 571.18) -- Vị trí armor shop an toàn
 
 task.spawn(function()
-	while true do
-		local char = player.Character
-		local hum = char and char:FindFirstChildOfClass("Humanoid")
-		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    while true do
+        local char = player.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        
+        if char and hum and hrp then
+            -- Kiểm tra trạng thái bị hạ gục (K.O) hoặc máu thấp
+            local bodyEffects = char:FindFirstChild("BodyEffects")
+            local isKO = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
+            local isLowHealth = hum.Health <= 15
 
-		if char and hum and hrp then
-			if hum.Health <= 15 and not teleporting then
-				teleporting = true
-				storedCFrame = hrp.CFrame
-				hrp.CFrame = CFrame.new(9999, 9999, 9999)
-			elseif teleporting and hum.Health >= 20 then
-				hrp.CFrame = storedCFrame + Vector3.new(0, 2, 0)
-				teleporting = false
-			end
-		end
-
-		task.wait(0.1)
-	end
+            if (isKO or isLowHealth) and not teleporting then
+                teleporting = true
+                storedCFrame = hrp.CFrame -- Lưu vị trí hiện tại
+                hrp.CFrame = CFrame.new(safePosition) -- Dịch chuyển đến vị trí an toàn
+                warn("[Anti-Stomp] Detected KO or low health. Teleported to safe position.")
+            elseif teleporting and hum.Health >= 20 then
+                hrp.CFrame = storedCFrame + Vector3.new(0, 2, 0) -- Quay lại vị trí cũ
+                teleporting = false
+                warn("[Anti-Stomp] Health restored. Returned to original position.")
+            end
+        end
+        
+        task.wait(0.1) -- Tối ưu hóa, tránh kiểm tra quá nhanh
+    end
+end)
 end)
 
 local flingConnectionStepped
 local flingConnectionTouch
+local flingPower = 10000 -- Lực fling, có thể chỉnh sửa
+local flingSpinSpeed = 200 -- Tốc độ xoay, có thể chỉnh sửa
 
 local function ToggleFlingTouch(enabled)
-	-- Dừng nếu đang chạy
-	if flingConnectionStepped then
-		flingConnectionStepped:Disconnect()
-		flingConnectionStepped = nil
-	end
-	if flingConnectionTouch then
-		flingConnectionTouch:Disconnect()
-		flingConnectionTouch = nil
-	end
+    -- Dừng các kết nối hiện có
+    if flingConnectionStepped then
+        flingConnectionStepped:Disconnect()
+        flingConnectionStepped = nil
+    end
+    if flingConnectionTouch then
+        flingConnectionTouch:Disconnect()
+        flingConnectionTouch = nil
+    end
 
-	if enabled then
-		local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-		local hrp = char:WaitForChild("HumanoidRootPart")
-		local hum = char:WaitForChild("Humanoid")
+    if enabled then
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local hrp = char:WaitForChild("HumanoidRootPart")
+        local hum = char:WaitForChild("Humanoid")
 
-		hum.PlatformStand = true
+        -- Bật PlatformStand để tránh nhân vật tự di chuyển ngoài ý muốn
+        hum.PlatformStand = true
 
-		-- Quay liên tục
-		flingConnectionStepped = RunService.Stepped:Connect(function()
-			hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(200), 0)
-		end)
+        -- Xoay nhân vật liên tục để tăng hiệu ứng fling
+        flingConnectionStepped = RunService.Stepped:Connect(function()
+            if hrp and hum.Health > 0 then
+                hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(flingSpinSpeed), 0)
+            end
+        end)
 
-		-- Khi chạm, fling người khác
-		flingConnectionTouch = hrp.Touched:Connect(function(hit)
-			local model = hit:FindFirstAncestorOfClass("Model")
-			local enemy = Players:GetPlayerFromCharacter(model)
-			if enemy and enemy ~= LocalPlayer and model:FindFirstChild("HumanoidRootPart") then
-				local targetHRP = model:FindFirstChild("HumanoidRootPart")
-				targetHRP.AssemblyLinearVelocity = Vector3.new(9999, 9999, 9999)
-			end
-		end)
-	end
+        -- Xử lý va chạm để fling người chơi khác
+        flingConnectionTouch = hrp.Touched:Connect(function(hit)
+            local model = hit:FindFirstAncestorOfClass("Model")
+            local enemy = Players:GetPlayerFromCharacter(model)
+            if enemy and enemy ~= LocalPlayer and model:FindFirstChild("HumanoidRootPart") then
+                local targetHRP = model:FindFirstChild("HumanoidRootPart")
+                local targetHum = model:FindFirstChildOfClass("Humanoid")
+                if targetHum and targetHum.Health > 0 then
+                    -- Áp dụng lực fling
+                    targetHRP.AssemblyLinearVelocity = Vector3.new(
+                        flingPower * math.random(-1, 1),
+                        flingPower,
+                        flingPower * math.random(-1, 1)
+                    )
+                    -- Giảm máu nhẹ để tăng tính chân thực (tùy chọn)
+                    targetHum:TakeDamage(5)
+                end
+            end
+        end)
+    else
+        -- Tắt PlatformStand khi không fling
+        local char = LocalPlayer.Character
+        if char then
+            local hum = char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.PlatformStand = false
+            end
+        end
+    end
 end
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/reload"))()
 
 task.spawn(function()
 	while true do
