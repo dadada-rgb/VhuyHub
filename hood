@@ -166,13 +166,14 @@ local function CreateButton(name, callback)
 end
 
 -- Tạo các nút chức năng
-local aimbotButton, espButton, speedButton, flyButton, armorButton
+local aimbotButton, espButton, speedButton, flyButton, armorButton, tpAndStompButton
 local function UpdateButtonText()
     aimbotButton.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
     espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
     speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
     flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
     armorButton.Text = "TP Armor"
+    tpAndStompButton.Text = "autostomp"
 end
 
 aimbotButton = CreateButton("Aimbot: OFF", function()
@@ -236,6 +237,69 @@ armorButton = CreateButton("TP Armor", function()
 	-- Quay về chỗ cũ sau 3 giây
 	task.wait(3)
 	RootPart.CFrame = OldCFrame + Vector3.new(0, 0.5, 0)
+end)
+
+local tpAndStompButton = CreateButton("TP + Aim + AutoStomp", function()
+	local closestKO, closestAlive = nil, nil
+	local minDistKO, minDistAlive = math.huge, math.huge
+	local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+
+	for name, selected in pairs(Config.SelectedPlayers) do
+		if selected then
+			local plr = Players:FindFirstChild(name)
+			if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+				local pos = plr.Character.HumanoidRootPart.Position
+				local dist = (myPos - pos).Magnitude
+				local body = plr.Character:FindFirstChild("BodyEffects")
+				local isKO = body and body:FindFirstChild("K.O") and body["K.O"].Value
+				if isKO then
+					if dist < minDistKO then
+						closestKO = plr
+						minDistKO = dist
+					end
+				else
+					if dist < minDistAlive then
+						closestAlive = plr
+						minDistAlive = dist
+					end
+				end
+			end
+		end
+	end
+
+	local function stompTarget(target)
+		if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then return end
+		local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if not root then return end
+		local oldPos = root.CFrame
+		root.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 2.5, 0)
+
+		-- Đợi ổn định và stomp
+		task.wait(0.2)
+		VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+		task.wait(0.1)
+		VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+
+		-- Tránh spam, đợi 0.5s rồi quay về
+		task.wait(0.5)
+		root.CFrame = oldPos + Vector3.new(0, 3, 0)
+	end
+
+	if closestKO then
+		stompTarget(closestKO)
+	else
+		if closestAlive then
+			local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+			if root then
+				local pos = closestAlive.Character.HumanoidRootPart.Position
+				root.CFrame = CFrame.new(pos + Vector3.new(0, 50, 0))
+
+				-- Bật aimbot
+				Config.AimbotEnabled = true
+				UpdateButtonText()
+			end
+		end
+	end
 end)
 
 -- Khởi tạo ScreenGui cho ESP
@@ -395,7 +459,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
     if input.KeyCode == Enum.KeyCode.RightShift then
         ScreenGui.Enabled = not ScreenGui.Enabled
-    elseif input.KeyCode == Enum.KeyCode.T then
+    elseif input.KeyCode == Enum.KeyCode.Y then
         autoSelect = not autoSelect
         if autoSelect then
             for _, player in pairs(Players:GetPlayers()) do
@@ -415,6 +479,13 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if input.KeyCode == Enum.KeyCode.Z then
 		Config.SpeedEnabled = not Config.SpeedEnabled
 		UpdateButtonText()
+	end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.T then
+		    tpAndStompButton:Activate()
 	end
 end)
 
