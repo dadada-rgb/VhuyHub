@@ -224,5 +224,9 @@ else
 	sendNotification("Script Error", "Lỗi khi tải script: " .. tostring(result))
 end
 
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote"))()
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/fling"))()
+
 -- Thông báo khởi tạo
 sendNotification("Script Loaded", "Đã load DhuyXDtuyen")
