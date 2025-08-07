@@ -604,8 +604,6 @@ task.spawn(function()
 				teleporting = true
 				storedCFrame = hrp.CFrame
 				hrp.CFrame = CFrame.new(9999, 9999, 9999)
-				task.wait(0.25)
-				player:LoadCharacter()
 			elseif teleporting and hum.Health >= 20 then
 				hrp.CFrame = storedCFrame + Vector3.new(0, 2, 0)
 				teleporting = false
@@ -615,8 +613,6 @@ task.spawn(function()
 		task.wait(0.1)
 	end
 end)
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/reload"))()
 
 -- Logic fling khi chạm
 task.spawn(function()
@@ -661,6 +657,9 @@ task.spawn(function()
 		task.wait(0.25)
 	end
 end)
+
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/reload"))()
 
 -- Dọn dẹp khi thoát
 game:BindToClose(function()
