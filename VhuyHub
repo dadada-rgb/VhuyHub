@@ -1,3 +1,7 @@
+loadScript("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote")
+
+loadScript("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/fling")
+
 local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
 local lp = game.Players.LocalPlayer
@@ -213,9 +217,6 @@ local scriptUrls = {
 }
 
 local url = scriptUrls[placeId] or "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"
-
-loadScript("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote")
-loadScript("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/fling")
 
 -- Tải và chạy script với xử lý lỗi
 local success, result = pcall(function()
