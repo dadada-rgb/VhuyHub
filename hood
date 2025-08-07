@@ -166,7 +166,7 @@ local function CreateButton(name, callback)
 end
 
 -- Tạo các nút chức năng
-local aimbotButton, espButton, speedButton, flyButton, armorButton, flingTouchButton
+local aimbotButton, espButton, speedButton, flyButton, armorButton
 local function UpdateButtonText()
     aimbotButton.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
     espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
