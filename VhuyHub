@@ -1,7 +1,3 @@
-loadScript("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote")
-
-loadScript("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/fling")
-
 local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
 local lp = game.Players.LocalPlayer
@@ -227,6 +223,10 @@ if success then
 else
 	sendNotification("Script Error", "Lỗi khi tải script: " .. tostring(result))
 end
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote"))()
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/fling"))()
 
 -- Thông báo khởi tạo
 sendNotification("Script Loaded", "Đã load DhuyXDtuyen")
