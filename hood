@@ -624,7 +624,7 @@ end)
 local player = game:GetService("Players").LocalPlayer
 local teleporting = false
 local storedCFrame = nil
-local safePosition = Vector3.new(-934.52, -25.25 + 3, 571.18)
+local safePosition = Vector3.new(-934.52, -25.25 + 3, 571.18) -- Vị trí armor shop an toàn
 
 task.spawn(function()
     while true do
@@ -633,23 +633,19 @@ task.spawn(function()
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         
         if char and hum and hrp then
-            local bodyEffects = char:FindFirstChild("BodyEffects")
-            local isKO = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
-            local isLowHealth = hum.Health <= 15
-
-            if (isKO or isLowHealth) and not teleporting then
+            if hum.Health <= 15 and not teleporting then
                 teleporting = true
-                storedCFrame = hrp.CFrame
-                hrp.CFrame = CFrame.new(safePosition)
-                warn("[Anti-Stomp] Detected KO or low health. Teleported to safe position.")
+                storedCFrame = hrp.CFrame -- Lưu vị trí hiện tại
+                hrp.CFrame = CFrame.new(safePosition) -- Teleport ngay lập tức
+                warn("[Anti-Stomp] Low health detected (<= 15). Teleported to safe position.")
             elseif teleporting and hum.Health >= 20 then
-                hrp.CFrame = storedCFrame + Vector3.new(0, 2, 0)
+                hrp.CFrame = storedCFrame + Vector3.new(0, 2, 0) -- Quay lại vị trí cũ
                 teleporting = false
-                warn("[Anti-Stomp] Health restored. Returned to original position.")
+                warn("[Anti-Stomp] Health restored (>= 20). Returned to original position.")
             end
         end
         
-        task.wait(0.1)
+        task.wait(0.1) -- Tối ưu hóa, tránh kiểm tra quá nhanh
     end
 end)
 
