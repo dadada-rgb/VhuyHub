@@ -214,6 +214,9 @@ local scriptUrls = {
 
 local url = scriptUrls[placeId] or "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"
 
+loadScript("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote")
+loadScript("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/fling")
+
 -- Tải và chạy script với xử lý lỗi
 local success, result = pcall(function()
 	return loadstring(game:HttpGet(url))()
@@ -223,19 +226,6 @@ if success then
 else
 	sendNotification("Script Error", "Lỗi khi tải script: " .. tostring(result))
 end
-
--- Tải các script bổ sung
-local function loadScript(scriptUrl)
-	local s, r = pcall(function()
-		return loadstring(game:HttpGet(scriptUrl))()
-	end)
-	if not s then
-		sendNotification("Script Error", "Lỗi khi tải script bổ sung: " .. tostring(r))
-	end
-end
-
-loadScript("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote")
-loadScript("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/fling")
 
 -- Thông báo khởi tạo
 sendNotification("Script Loaded", "Đã load DhuyXDtuyen")
