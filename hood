@@ -628,23 +628,6 @@ task.spawn(function()
 	end
 end)
 
-task.spawn(function()
-	while true do
-		local char = LocalPlayer.Character
-		local hrp = char and char:FindFirstChild("HumanoidRootPart")
-		if hrp then
-			-- Giữ nguyên vị trí, chỉ làm nhiễu velocity
-			local spoof = Vector3.new(
-				math.random(-50, 50),
-				math.random(-50, 50),
-				math.random(-50, 50)
-		 )
-			hrp.Velocity = spoof
-		end
-		RunService.Heartbeat:Wait()
-	end
-end)
-
 loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/reload"))()
 
 local flingConnectionStepped
@@ -684,6 +667,18 @@ local function ToggleFlingTouch(enabled)
 		end)
 	end
 end
+
+getgenv().Sky = true --disable or enable the antilock
+getgenv().SkyAmount = 90 --how far it should be
+ 
+game:GetService("RunService").heartbeat:Connect(function()
+    if getgenv().Sky ~= false then 
+    local vel = game.Players.LocalPlayer.Character.HumanoidRootPart.Velocity
+    game.Players.LocalPlayer.Character.HumanoidRootPart.Velocity = Vector3.new(0,      getgenv().SkyAmount,0) 
+    game:GetService("RunService").RenderStepped:Wait()
+    game.Players.LocalPlayer.Character.HumanoidRootPart.Velocity = vel
+    end 
+end)
 
 -- Dọn dẹp khi thoát
 game:BindToClose(function()
