@@ -624,7 +624,7 @@ end)
 local player = game:GetService("Players").LocalPlayer
 local teleporting = false
 local storedCFrame = nil
-local safePosition = Vector3.new(-934.52, -25.25 + 3, 571.18) -- Vị trí armor shop an toàn
+local safePosition = Vector3.new(-934.52, -25.25 + 3, 571.18)
 
 task.spawn(function()
     while true do
@@ -633,26 +633,24 @@ task.spawn(function()
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
         
         if char and hum and hrp then
-            -- Kiểm tra trạng thái bị hạ gục (K.O) hoặc máu thấp
             local bodyEffects = char:FindFirstChild("BodyEffects")
             local isKO = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
             local isLowHealth = hum.Health <= 15
 
             if (isKO or isLowHealth) and not teleporting then
                 teleporting = true
-                storedCFrame = hrp.CFrame -- Lưu vị trí hiện tại
-                hrp.CFrame = CFrame.new(safePosition) -- Dịch chuyển đến vị trí an toàn
+                storedCFrame = hrp.CFrame
+                hrp.CFrame = CFrame.new(safePosition)
                 warn("[Anti-Stomp] Detected KO or low health. Teleported to safe position.")
             elseif teleporting and hum.Health >= 20 then
-                hrp.CFrame = storedCFrame + Vector3.new(0, 2, 0) -- Quay lại vị trí cũ
+                hrp.CFrame = storedCFrame + Vector3.new(0, 2, 0)
                 teleporting = false
                 warn("[Anti-Stomp] Health restored. Returned to original position.")
             end
         end
         
-        task.wait(0.1) -- Tối ưu hóa, tránh kiểm tra quá nhanh
+        task.wait(0.1)
     end
-end)
 end)
 
 local flingConnectionStepped
