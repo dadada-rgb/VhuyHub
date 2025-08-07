@@ -1,12 +1,11 @@
-
 local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
 local lp = game.Players.LocalPlayer
 
 -- Danh sách animation (URL đầy đủ)
 local animations = {
-	C = "http://www.roblox.com/asset/?id=15609995579",
-	N = "http://www.roblox.com/asset/?id=14352343065",
+	[C] = "http://www.roblox.com/asset/?id=15609995579",
+	[N] = "http://www.roblox.com/asset/?id=14352343065",
 }
 
 local currentTrack = nil
