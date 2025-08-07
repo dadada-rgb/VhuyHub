@@ -218,6 +218,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/re
 
 -- Load script theo PlaceId
 local placeId = game.PlaceId
+
 local scriptUrls = {
 	[9872472334] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
 	[10662542523] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
@@ -225,11 +226,16 @@ local scriptUrls = {
 	[10324346056] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
 	[10530697691] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
 	[10808838353] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
-	[142823291] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2",
+	[142823291]   = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2",
 	[13772394625] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball",
-        [6839171747] = "https://raw.githubusercontent.com/DarkDoorsKing/Project/main/Doors.lua",
+	[6839171747]  = "https://raw.githubusercontent.com/DarkDoorsKing/Project/main/Doors.lua",
 }
 
+-- Lấy URL dựa vào PlaceId
 local url = scriptUrls[placeId] or "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"
+
+-- Chạy script tương ứng
 loadstring(game:HttpGet(url))()
+
+-- Gửi thông báo
 sendNotification("Script Loaded", "Đã load DhuyXDtuyen")
