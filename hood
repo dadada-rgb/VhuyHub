@@ -689,7 +689,7 @@ end)
 local player = game:GetService("Players").LocalPlayer
 local teleporting = false
 local storedCFrame = nil
-local safePosition = Vector3.new(-934.52, -25.25 + 3, 571.18) -- Vị trí armor shop an toàn
+local safePosition = Vector3.new(99999, 99999, 99999) -- Vị trí armor shop an toàn
 
 task.spawn(function()
     while true do
