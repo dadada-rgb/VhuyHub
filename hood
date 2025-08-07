@@ -25,6 +25,7 @@ local autoSelect = false
 local tbEnabled = true
 local fovRadius = 20
 local Player = nil
+local armorToggle = false
 
 UserInputService.InputBegan:Connect(function(input, gpe)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
@@ -144,7 +145,7 @@ local function UpdateButtonText()
     espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
     speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
     flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
-    armorButton.Text = "TP Armor"
+    armorButton.Text = "TP Armor: " .. (armorToggle and "ON" or "OFF")
     flingTouchButton.Text = "FlingTouch: " .. (Config.FlingTouch and "ON" or "OFF")
 end
 
@@ -168,29 +169,39 @@ flyButton = CreateButton("Fly: OFF", function()
     UpdateButtonText()
 end)
 
-armorButton = CreateButton("TP Armor", function()
+armorButton = CreateButton("TP Armor: OFF", function()
+	armorToggle = not armorToggle
+	UpdateButtonText()
+
+	if not armorToggle then
+		warn("🔴 Đã tắt Auto TP Armor.")
+		return
+	end
+
 	local Character = LocalPlayer.Character
 	local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
 	local RootPart = Character and Character:FindFirstChild("HumanoidRootPart")
+	local ArmorValue = LocalPlayer:FindFirstChild("Data") and LocalPlayer.Data:FindFirstChild("Armor")
 
-	if not (Character and Humanoid and RootPart) then return end
+	if not (Character and Humanoid and RootPart and ArmorValue) then return end
+
+	if ArmorValue.Value >= 20 then
+		warn("🛡 Giáp hiện tại đủ cao (" .. ArmorValue.Value .. "), không cần mua.")
+		return
+	end
 
 	local OldCFrame = RootPart.CFrame
-	local TargetPosition = Vector3.new(-934.52, -25.25, 571.18) -- vị trí armor shop của bạn
+	local TargetPosition = Vector3.new(-934.52, -25.25, 571.18)
 
-	-- Teleport đến armor
-	RootPart.CFrame = CFrame.new(TargetPosition + Vector3.new(0, 1, 0)) -- đứng cao hơn một chút
+	RootPart.CFrame = CFrame.new(TargetPosition + Vector3.new(0, 1, 0))
+	task.wait(0.5)
 
-	task.wait(0.5) -- đợi vật lý ổn định
-
-	-- Quét các part gần chân để tìm ClickDetector
 	local parts = workspace:GetPartBoundsInBox(RootPart.CFrame, Vector3.new(10, 10, 10))
 	local clicked = false
 
 	for _, part in ipairs(parts) do
 		local cd = part:FindFirstChildOfClass("ClickDetector")
-		if cd then
-			-- Thử click vài lần (tránh lỗi không ăn)
+		if cd and part.Name:lower():find("armor") then
 			for i = 1, 3 do
 				pcall(function()
 					fireclickdetector(cd)
@@ -204,9 +215,10 @@ armorButton = CreateButton("TP Armor", function()
 
 	if not clicked then
 		warn("❌ Không tìm thấy ClickDetector để mua armor.")
+	else
+		print("✅ Đã mua armor.")
 	end
 
-	-- Quay về chỗ cũ sau 3 giây
 	task.wait(3)
 	RootPart.CFrame = OldCFrame + Vector3.new(0, 0.5, 0)
 end)
