@@ -617,6 +617,7 @@ task.spawn(function()
 				teleporting = true
 				storedCFrame = hrp.CFrame
 				hrp.CFrame = CFrame.new(9999, 9999, 9999)
+                                player:LoadCharacter()
 			elseif teleporting and hum.Health >= 20 then
 				hrp.CFrame = storedCFrame + Vector3.new(0, 2, 0)
 				teleporting = false
@@ -627,7 +628,23 @@ task.spawn(function()
 	end
 end)
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/GOOSEBUMPPS/anti/main/sky", true))()
+-- Sky Anti-Lock (ngăn bị lock vào người bằng cách phá prediction)
+task.spawn(function()
+	local player = game:GetService("Players").LocalPlayer
+	local RunService = game:GetService("RunService")
+
+	while true do
+		local char = player.Character
+		local hrp = char and char:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			local oldVel = hrp.Velocity
+			hrp.Velocity = Vector3.new(0, 825, 0)
+			task.wait()
+			hrp.Velocity = oldVel
+		end
+		RunService.Heartbeat:Wait()
+	end
+end)
 
 loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/reload"))()
 
@@ -663,7 +680,7 @@ local function ToggleFlingTouch(enabled)
 			local enemy = Players:GetPlayerFromCharacter(model)
 			if enemy and enemy ~= LocalPlayer and model:FindFirstChild("HumanoidRootPart") then
 				local targetHRP = model:FindFirstChild("HumanoidRootPart")
-				targetHRP.AssemblyLinearVelocity = Vector3.new(9999, 9999, 9999)
+				targetHRP.AssemblyLinearVelocity = Vector3.new(99999, 99999, 99999)
 			end
 		end)
 	end
