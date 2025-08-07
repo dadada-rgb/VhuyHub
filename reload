@@ -1,38 +1,32 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local currentTool = nil
 
-local reloadRemote = ReplicatedStorage:WaitForChild("MainEvent")
-
--- Kiểm tra Tool có phải là súng
+-- Hàm kiểm tra Tool có phải là súng và có thuộc tính Ammo
 local function isGun(tool)
-	return tool and tool:FindFirstChild("Ammo") ~= nil
+	if not tool then return false end
+	return tool:FindFirstChild("Ammo") ~= nil
 end
 
--- Hàm reload nếu hết đạn
+-- Hàm reload nếu Ammo = 0
 local function checkAmmoAndReload()
-	if currentTool and isGun(currentTool) then
+	if not currentTool then return end
+	if isGun(currentTool) then
 		local ammo = currentTool:FindFirstChild("Ammo")
 		if ammo and ammo:IsA("IntValue") and ammo.Value <= 0 then
-			-- Gọi RemoteEvent reload
-			pcall(function()
-				reloadRemote:FireServer("Reload", currentTool)
-			end)
-			task.wait(1) -- tránh spam quá nhanh
+			-- Giả lập nhấn phím R
+			VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.R, false, game)
+			task.wait(0.1)
+			VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.R, false, game)
 		end
 	end
 end
 
--- Cập nhật khi cầm Tool
-local function onToolEquipped(tool)
-	currentTool = tool
-end
-
--- Theo dõi khi trang bị
+-- Theo dõi khi trang bị Tool
 player.CharacterAdded:Connect(function(char)
 	character = char
 end)
@@ -43,13 +37,13 @@ end)
 
 player.Backpack.ChildAdded:Connect(function(tool)
 	tool.Equipped:Connect(function()
-		onToolEquipped(tool)
+		currentTool = tool
 	end)
 end)
 
 player.Character.ChildAdded:Connect(function(tool)
 	if tool:IsA("Tool") then
-		onToolEquipped(tool)
+		currentTool = tool
 	end
 end)
 
@@ -59,7 +53,7 @@ player.Character.ChildRemoved:Connect(function(tool)
 	end
 end)
 
--- Kiểm tra mỗi 0.5 giây
+-- Kiểm tra liên tục mỗi 0.5 giây
 while true do
 	checkAmmoAndReload()
 	task.wait(0.5)
