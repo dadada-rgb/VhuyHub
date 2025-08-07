@@ -628,19 +628,18 @@ task.spawn(function()
 	end
 end)
 
--- Sky Anti-Lock (ngăn bị lock vào người bằng cách phá prediction)
 task.spawn(function()
-	local player = game:GetService("Players").LocalPlayer
-	local RunService = game:GetService("RunService")
-
 	while true do
-		local char = player.Character
+		local char = LocalPlayer.Character
 		local hrp = char and char:FindFirstChild("HumanoidRootPart")
 		if hrp then
-			local oldVel = hrp.Velocity
-			hrp.Velocity = Vector3.new(0, 825, 0)
-			task.wait()
-			hrp.Velocity = oldVel
+			-- Giữ nguyên vị trí, chỉ làm nhiễu velocity
+			local spoof = Vector3.new(
+				math.random(-50, 50),
+				math.random(-50, 50),
+				math.random(-50, 50)
+		 )
+			hrp.Velocity = spoof
 		end
 		RunService.Heartbeat:Wait()
 	end
@@ -685,20 +684,6 @@ local function ToggleFlingTouch(enabled)
 		end)
 	end
 end
-
-task.spawn(function()
-	while true do
-		local char = LocalPlayer.Character
-		local hrp = char and char:FindFirstChild("HumanoidRootPart")
-		if hrp and hrp.Position.Y <= -1000 then
-			-- Teleport đến vị trí armor
-			hrp.CFrame = CFrame.new(-934.52, -25.25 + 3, 571.18) -- cao hơn mặt đất để không bị stuck
-			warn("[AntiVoid] Detected void fall. Teleported to Armor.")
-			task.wait(2) -- delay tránh spam
-		end
-		task.wait(0.25)
-	end
-end)
 
 -- Dọn dẹp khi thoát
 game:BindToClose(function()
