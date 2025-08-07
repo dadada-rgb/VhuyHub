@@ -1,3 +1,7 @@
+loadstring(game:HttpGet("https://raw.githubusercontent.com/GOOSEBUMPPS/anti/main/sky", true))()
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/reload"))()
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -614,11 +618,6 @@ task.spawn(function()
 		task.wait(0.1)
 	end
 end)
-
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/GOOSEBUMPPS/anti/main/sky", true))()
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/reload"))()
 
 local flingConnectionStepped
 local flingConnectionTouch
