@@ -272,7 +272,10 @@ local tpAndStompButton = CreateButton("TP + Aim + AutoStomp", function()
 		local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 		if not root then return end
 		local oldPos = root.CFrame
-		root.CFrame = target.Character.HumanoidRootPart.CFrame + Vector3.new(0, 2.5, 0)
+		local torso = target.Character:FindFirstChild("LowerTorso") or target.Character:FindFirstChild("Torso") or target.Character:FindFirstChild("HumanoidRootPart")
+		if torso then
+			root.CFrame = torso.CFrame + Vector3.new(0, 2.5, 0)
+		end
 
 		-- Đợi ổn định và stomp
 		task.wait(0.2)
@@ -280,8 +283,7 @@ local tpAndStompButton = CreateButton("TP + Aim + AutoStomp", function()
 		task.wait(0.1)
 		VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 
-		-- Tránh spam, đợi 0.5s rồi quay về
-		task.wait(0.5)
+		task.wait(1.5)
 		root.CFrame = oldPos + Vector3.new(0, 3, 0)
 	end
 
@@ -485,7 +487,7 @@ end)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.KeyCode == Enum.KeyCode.T then
-		TeleportAndStompLogic()
+		tpAndStompButton:MouseButton1Click:Fire()
 	end
 end)
 
@@ -683,65 +685,6 @@ task.spawn(function()
         task.wait(math.random(12, 15))
     end
 end)
-
-local function TeleportAndStompLogic()
-	local closestKO, closestAlive = nil, nil
-	local minDistKO, minDistAlive = math.huge, math.huge
-	local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
-
-	for name, selected in pairs(Config.SelectedPlayers) do
-		if selected then
-			local plr = Players:FindFirstChild(name)
-			if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-				local pos = plr.Character.HumanoidRootPart.Position
-				local dist = (myPos - pos).Magnitude
-				local body = plr.Character:FindFirstChild("BodyEffects")
-				local isKO = body and body:FindFirstChild("K.O") and body["K.O"].Value
-				if isKO then
-					if dist < minDistKO then
-						closestKO = plr
-						minDistKO = dist
-					end
-				else
-					if dist < minDistAlive then
-						closestAlive = plr
-						minDistAlive = dist
-					end
-				end
-			end
-		end
-	end
-
-	local function stompTarget(target)
-		if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then return end
-		local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-		if not root then return end
-		local oldPos = root.CFrame
-		local torso = target.Character:FindFirstChild("LowerTorso") or target.Character:FindFirstChild("Torso") or target.Character:FindFirstChild("HumanoidRootPart")
-		if torso then
-			root.CFrame = torso.CFrame + Vector3.new(0, 2.5, 0)
-		end
-
-		task.wait(0.2)
-		VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-		task.wait(0.1)
-		VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-
-		task.wait(0.5)
-		root.CFrame = oldPos + Vector3.new(0, 3, 0)
-	end
-
-	if closestKO then
-		stompTarget(closestKO)
-	elseif closestAlive then
-		local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-		if root then
-			local pos = closestAlive.Character.HumanoidRootPart.Position
-			root.CFrame = CFrame.new(pos + Vector3.new(0, 50, 0))
-			Config.AimbotEnabled = true
-		end
-	end
-end
 
 local player = game:GetService("Players").LocalPlayer
 local teleporting = false
