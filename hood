@@ -18,7 +18,8 @@ local Config = {
     SelectedPlayers = {},
     FlySpeed = 35,
     SpeedAmount = 30,
-    FlingTouch = false
+    FlingTouch = false,
+    CustomPing = nil -- Thêm biến lưu ping tùy chỉnh
 }
 
 local autoSelect = false
@@ -86,6 +87,34 @@ MenuTitle.Font = Enum.Font.SourceSans
 MenuTitle.TextSize = 14
 MenuTitle.Parent = MenuFrame
 Instance.new("UICorner", MenuTitle).CornerRadius = UDim.new(0, 8)
+
+-- TextBox để chỉnh ping
+local PingBox = Instance.new("TextBox")
+PingBox.Size = UDim2.new(0, 60, 0, 20)
+PingBox.Position = UDim2.new(1, -70, 0, 0)
+PingBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+PingBox.BackgroundTransparency = 0.2
+PingBox.TextColor3 = Color3.fromRGB(0, 0, 0)
+PingBox.TextSize = 12
+PingBox.Font = Enum.Font.SourceSans
+PingBox.PlaceholderText = "Ping (ms)"
+PingBox.Text = ""
+PingBox.Parent = MenuTitle
+Instance.new("UICorner", PingBox).CornerRadius = UDim.new(0, 4)
+
+-- Xử lý khi nhập ping
+PingBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local input = tonumber(PingBox.Text)
+        if input and input >= 0 then
+            Config.CustomPing = math.clamp(input, 10, 1000) -- Giới hạn ping hợp lý
+            PingBox.Text = tostring(Config.CustomPing)
+        else
+            Config.CustomPing = nil
+            PingBox.Text = ""
+        end
+    end
+end)
 
 -- Frame danh sách người chơi (bên trái)
 local PlayerListFrame = Instance.new("Frame")
@@ -213,10 +242,9 @@ end)
 
 flingTouchButton = CreateButton("Fling Touch: OFF", function()
 	Config.FlingTouch = not Config.FlingTouch
-        ToggleFlingTouch(Config.FlingTouch)
+    ToggleFlingTouch(Config.FlingTouch)
 	UpdateButtonText()
 end)
-
 
 -- Khởi tạo ScreenGui cho ESP
 local espGui = Instance.new("ScreenGui")
@@ -472,32 +500,35 @@ local function GetBestTargetPart()
 end
 
 getgenv().Aimbot = {
-	Status = true,
-	Hitpart = "HumanoidRootPart",
+    Status = true,
+    Hitpart = "HumanoidRootPart",
 }
 
 local function GetPing()
-	local stats = game:GetService("Stats"):FindFirstChild("Network")
-	local data = stats and stats:FindFirstChild("DataPing")
-	return data and math.clamp(data:GetValue(), 10, 300) or 40
+    if Config.CustomPing then
+        return Config.CustomPing
+    end
+    local stats = game:GetService("Stats"):FindFirstChild("Network")
+    local data = stats and stats:FindFirstChild("DataPing")
+    return data and math.clamp(data:GetValue(), 10, 300) or 40
 end
 
 local function GetPredictedPosition(part)
-	if not part or not part:IsA("BasePart") then return part.Position end
+    if not part or not part:IsA("BasePart") then return part.Position end
 
-	local velocity = part.Velocity
-	local origin = Camera.CFrame.Position
-	local distance = (part.Position - origin).Magnitude
-	local ping = GetPing()
+    local velocity = part.Velocity
+    local origin = Camera.CFrame.Position
+    local distance = (part.Position - origin).Magnitude
+    local ping = GetPing()
 
-	-- Dự đoán thời gian đạn bay (ms → s)
-	local delay = ping / 1000
+    -- Dự đoán thời gian đạn bay (ms → s)
+    local delay = ping / 1000
 
-	-- Cộng thêm khoảng cách để prediction xa hơn nếu cần
-	local distanceFactor = math.clamp(distance / 100, 1, 3)
-	local predictedPos = part.Position + velocity * delay * distanceFactor
+    -- Cộng thêm khoảng cách để prediction xa hơn nếu cần
+    local distanceFactor = math.clamp(distance / 100, 1, 3)
+    local predictedPos = part.Position + velocity * delay * distanceFactor
 
-	return predictedPos
+    return predictedPos
 end
 
 local function IsObstructed(origin, targetPos)
@@ -590,6 +621,8 @@ task.spawn(function()
     end
 end)
 
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/reload"))()
+
 local player = game:GetService("Players").LocalPlayer
 local teleporting = false
 local storedCFrame = nil
@@ -614,8 +647,6 @@ task.spawn(function()
 		task.wait(0.1)
 	end
 end)
-
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/reload"))()
 
 local flingConnectionStepped
 local flingConnectionTouch
