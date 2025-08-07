@@ -1,3 +1,4 @@
+
 local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
 local lp = game.Players.LocalPlayer
@@ -54,7 +55,18 @@ local function setup(char)
 	end)
 end
 
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote"))()
+-- Nếu đã có character
+if lp.Character then
+	setup(lp.Character)
+end
+
+-- Khi respawn
+lp.CharacterAdded:Connect(function(char)
+	currentTrack = nil
+	currentKey = nil
+	task.wait(0.2)
+	setup(char)
+end)
 
 -- Hiện thông báo
 local function sendNotification(title, text)
@@ -200,6 +212,8 @@ button.MouseButton1Click:Connect(function()
 	currentTrack = track
 	currentKey = "C"
 end)
+
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote"))()
 
 -- Load script theo PlaceId
 local placeId = game.PlaceId
