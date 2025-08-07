@@ -1,5 +1,3 @@
-loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote"))()
-
 local rs = game:GetService("RunService")
 local uis = game:GetService("UserInputService")
 local lp = game.Players.LocalPlayer
@@ -214,51 +212,72 @@ button.MouseButton1Click:Connect(function()
 	currentKey = "C"
 end)
 
-local player = game.Players.LocalPlayer
-
-local zombieAnims = {
-	Idle = 6161589290,
-	Walk = 6161561193,
-	Run = 6161636826,
-	Jump = 6161619978,
-	Fall = 6161574767,
-	Climb = 6161553182,
-	Swim = 6161651097,
-	SwimIdle = 6161651097,
+local zombieAnimations = {
+    W = "http://www.roblox.com/asset/?id=619537468",   -- Zombie Walk
+    R = "http://www.roblox.com/asset/?id=619537040",   -- Zombie Run
+    I = "http://www.roblox.com/asset/?id=619529337",   -- Zombie Idle
+    J = "http://www.roblox.com/asset/?id=619537949",   -- Zombie Jump
+    F = "http://www.roblox.com/asset/?id=619538272",   -- Zombie Fall
+    C = "http://www.roblox.com/asset/?id=619538762",   -- Zombie Climb
+    S = "http://www.roblox.com/asset/?id=619538980",   -- Zombie Swim
+    SI = "http://www.roblox.com/asset/?id=619539188"   -- Zombie Swim Idle
 }
 
-local function applyZombieAnimations(character)
-	local animate = character:FindFirstChild("Animate")
-	if not animate then return end
+local currentTrack = nil
+local animator = nil
 
-	local function replace(animName, id)
-		if animate:FindFirstChild(animName) and animate[animName]:FindFirstChild("Animation") then
-			animate[animName].Animation.AnimationId = "rbxassetid://" .. id
-		end
-	end
+-- Hàm thiết lập nhân vật
+local function setup(char)
+    local hum = char:WaitForChild("Humanoid", 5)
+    if not hum then return end
 
-	replace("idle", zombieAnims.Idle)
-	replace("walk", zombieAnims.Walk)
-	replace("run", zombieAnims.Run)
-	replace("jump", zombieAnims.Jump)
-	replace("fall", zombieAnims.Fall)
-	replace("climb", zombieAnims.Climb)
-	replace("swim", zombieAnims.Swim)
-	replace("swimidle", zombieAnims.SwimIdle)
+    animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
+
+    -- Dừng animation khi nhân vật di chuyển
+    local renderConnection
+    renderConnection = rs.RenderStepped:Connect(function()
+        if currentTrack and hum.MoveDirection.Magnitude > 0 then
+            currentTrack:Stop()
+            currentTrack = nil
+        end
+    end)
+
+    -- Phát animation khi nhấn phím
+    local inputConnection
+    inputConnection = uis.InputBegan:Connect(function(input)
+        local key = input.KeyCode.Name
+        local animId = zombieAnimations[key]
+        if animId and hum.MoveDirection.Magnitude == 0 then
+            if currentTrack then
+                currentTrack:Stop()
+                currentTrack = nil
+            end
+            local anim = Instance.new("Animation")
+            anim.AnimationId = animId
+            local track = animator:LoadAnimation(anim)
+            track:Play()
+            currentTrack = track
+        end
+    end)
+
+    -- Ngắt kết nối khi nhân vật bị hủy
+    char.AncestryChanged:Connect(function()
+        if renderConnection then renderConnection:Disconnect() end
+        if inputConnection then inputConnection:Disconnect() end
+    end)
 end
 
--- Áp dụng khi spawn
-player.CharacterAdded:Connect(function(char)
-	char:WaitForChild("Humanoid")
-	char:WaitForChild("Animate")
-	task.wait(0.1)
-	applyZombieAnimations(char)
+-- Kiểm tra nhân vật hiện tại
+if lp.Character then
+    setup(lp.Character)
+end
+
+-- Khi nhân vật respawn
+lp.CharacterAdded:Connect(function(char)
+    currentTrack = nil
+    task.wait(0.2)
+    setup(char)
 end)
-
--- Áp dụng nếu đang sống
-if player.Character then
-	applyZombieAnimations(player.Character)
-end
 
 -- Load script theo PlaceId
 local placeId = game.PlaceId
