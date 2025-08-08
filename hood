@@ -17,7 +17,7 @@ local Config = {
     ShiftAmount = 0.5,
     SelectedPlayers = {},
     FlySpeed = 35,
-    SpeedAmount = 30,
+    SpeedAmount = 20,
     CustomPing = nil -- Thêm biến lưu ping tùy chỉnh
 }
 
@@ -50,7 +50,7 @@ local MenuFrame = Instance.new("Frame")
 MenuFrame.Size = UDim2.new(0, 250, 0, 200)
 MenuFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
 MenuFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-MenuFrame.BackgroundTransparency = 0.7
+MenuFrame.BackgroundTransparency = 0.3
 MenuFrame.Active = true
 MenuFrame.Draggable = true
 MenuFrame.Parent = ScreenGui
@@ -58,12 +58,12 @@ Instance.new("UICorner", MenuFrame).CornerRadius = UDim.new(0, 8)
 
 -- Nút ẩn/hiện Frame
 local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 40, 0, 40)
+ToggleButton.Size = UDim2.new(0, 20, 0, 20)
 ToggleButton.Position = UDim2.new(0, 10, 0, 10)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-ToggleButton.Text = ">"
+ToggleButton.Text = "show"
 ToggleButton.TextColor3 = Color3.fromRGB(0, 0, 0)
-ToggleButton.TextSize = 20
+ToggleButton.TextSize = 14
 ToggleButton.Font = Enum.Font.SourceSansBold
 ToggleButton.Active = true
 ToggleButton.Draggable = true
@@ -73,7 +73,7 @@ Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 8)
 -- Xử lý ẩn/hiện Frame
 ToggleButton.MouseButton1Click:Connect(function()
     MenuFrame.Visible = not MenuFrame.Visible
-    ToggleButton.Text = MenuFrame.Visible and ">" or "<"
+    ToggleButton.Text = MenuFrame.Visible and "show" or "hidd"
 end)
 
 -- Tiêu đề Frame
@@ -566,7 +566,7 @@ end
 
 getgenv().Aimbot = {
     Status = true,
-    Hitpart = "HumanoidRootPart",
+    Hitpart = "Head",
 }
 
 local function GetPing()
