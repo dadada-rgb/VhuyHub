@@ -283,7 +283,7 @@ local tpAndStompButton = CreateButton("TP + Aim + AutoStomp", function()
 		VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
 
 		-- Tránh spam, đợi 0.5s rồi quay về
-		task.wait(0.5)
+		task.wait(1.5)
 		root.CFrame = oldPos + Vector3.new(0, 3, 0)
 	end
 
