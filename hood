@@ -636,10 +636,6 @@ local function GetClosestValidPlayer()
     return closestPlayer
 end
 
--- Add variables to store original camera settings
-local originalCameraType = Camera.CameraType
-local isFirstPerson = false
-
 RunService.RenderStepped:Connect(function(deltaTime)
     -- Existing ESP, Speed, and Fly updates
     UpdateESP()
@@ -656,25 +652,21 @@ RunService.RenderStepped:Connect(function(deltaTime)
                 -- Aim at the predicted position
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
                 
-                -- Switch to LockFirstPerson for mobile only
-                if UserInputService.TouchEnabled and not isFirstPerson then
-                    originalCameraType = Camera.CameraType
+                -- Switch to LockFirstPerson for mobile
+                if UserInputService.TouchEnabled then
                     Camera.CameraType = Enum.CameraType.LockFirstPerson
-                    isFirstPerson = true
                 end
             end
         else
-            -- Revert to original camera settings for mobile when no target
-            if UserInputService.TouchEnabled and isFirstPerson then
-                Camera.CameraType = originalCameraType
-                isFirstPerson = false
+            -- Revert to third-person for mobile when no target
+            if UserInputService.TouchEnabled then
+                Camera.CameraType = Enum.CameraType.Classic
             end
         end
     else
-        -- Ensure camera reverts if aimbot is disabled
-        if UserInputService.TouchEnabled and isFirstPerson then
-            Camera.CameraType = originalCameraType
-            isFirstPerson = false
+        -- Ensure camera reverts to third-person if aimbot is disabled
+        if UserInputService.TouchEnabled then
+            Camera.CameraType = Enum.CameraType.Classic
         end
     end
 
