@@ -663,7 +663,7 @@ RunService.RenderStepped:Connect(function(deltaTime)
     UpdateSpeed()
     UpdateFly(deltaTime)
 
-    -- Aimbot logic (giữ nguyên nhưng thay đổi phần camera)
+    -- Aimbot logic
     if Config.AimbotEnabled and getgenv().Aimbot.Status then
         Player = GetClosestValidPlayer()
         if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
@@ -672,6 +672,9 @@ RunService.RenderStepped:Connect(function(deltaTime)
             if not IsObstructed(Camera.CFrame.Position, predictedPos) then
                 -- Aim at the predicted position
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
+            end
+        end
+    end
 
     -- Existing TriggerBot logic
     if tbEnabled then
