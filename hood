@@ -414,16 +414,30 @@ local function UpdateSpeed()
     end
 end
 
--- Logic Fly từ v.txt
+-- Logic Fly theo hướng nhìn
 local function UpdateFly(deltaTime)
     if Config.FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local root = LocalPlayer.Character.HumanoidRootPart
-        local moveDirection = LocalPlayer.Character.Humanoid.MoveDirection
+        local humanoid = LocalPlayer.Character.Humanoid
+        local camera = Workspace.CurrentCamera
+        local moveDirection = humanoid.MoveDirection -- Hướng di chuyển ngang (WASD hoặc joystick)
         local flySpeed = Config.FlySpeed
-        local vertical = UserInputService:IsKeyDown(Enum.KeyCode.Space) and flySpeed / 8 or UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and -flySpeed / 8 or 0
-        root.CFrame = root.CFrame + moveDirection * deltaTime * flySpeed * 10
-        root.CFrame = root.CFrame + Vector3.new(0, vertical, 0)
-        root.Velocity = root.Velocity * Vector3.new(1, 0, 1) + Vector3.new(0, 1.9, 0)
+
+        -- Lấy hướng nhìn của camera
+        local lookDirection = camera.CFrame.LookVector
+        -- Loại bỏ thành phần Y để giữ hướng ngang nếu cần
+        local horizontalLook = Vector3.new(lookDirection.X, 0, lookDirection.Z).Unit
+        -- Kết hợp hướng nhìn đầy đủ (bao gồm cả độ cao)
+        local fullLookDirection = lookDirection * flySpeed * deltaTime * 10
+
+        -- Kết hợp di chuyển ngang từ MoveDirection
+        local horizontalMove = moveDirection * flySpeed * deltaTime * 10
+
+        -- Di chuyển nhân vật
+        root.CFrame = root.CFrame + horizontalMove + fullLookDirection
+
+        -- Giữ nhân vật ổn định (ngăn rơi tự do)
+        root.Velocity = Vector3.new(root.Velocity.X, 0, root.Velocity.Z)
     end
 end
 
