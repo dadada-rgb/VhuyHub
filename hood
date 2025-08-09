@@ -545,14 +545,10 @@ local function distToCursor(part)
 
     local m
     if UserInputService.TouchEnabled then
-        -- Nếu đang ở shiftlock thì lấy tâm màn hình
-        if game.Players.LocalPlayer.DevMouseLock then
-            m = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-        else
-            -- Lấy vị trí chạm
-            m = UserInputService:GetMouseLocation()
-        end
+        -- Mobile: luôn lấy tâm màn hình
+        m = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     else
+        -- PC: dùng vị trí chuột
         m = UserInputService:GetMouseLocation()
     end
 
@@ -677,21 +673,6 @@ RunService.RenderStepped:Connect(function(deltaTime)
                 -- Aim at the predicted position
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
 
-                -- Nếu đang ở mobile, tự bật ShiftLock
-                if UserInputService.TouchEnabled then
-                    pcall(function()
-                        -- Bật cho phép ShiftLock
-                        game.Players.LocalPlayer.DevEnableMouseLock = true
-                        -- Nếu bị tắt thì bật lại
-                        if not game.Players.LocalPlayer.DevMouseLock then
-                            game.Players.LocalPlayer.DevMouseLock = true
-                        end
-                    end)
-                end
-            end
-        end
-    end
-
     -- Existing TriggerBot logic
     if tbEnabled then
         local part = GetBestTargetPart()
@@ -783,7 +764,7 @@ task.spawn(function()
                 end
             end
         end
-        task.wait(3) -- Small delay to prevent excessive CPU usage
+        task.wait(4)
     end
 end)
 
