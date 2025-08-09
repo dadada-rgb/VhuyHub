@@ -18,7 +18,7 @@ local Config = {
     SelectedPlayers = {},
     FlySpeed = 35,
     SpeedAmount = 20,
-    AutoStompEnabled = false,
+    AutoStompEnabled = true,
     CustomPing = nil -- Thêm biến lưu ping tùy chỉnh
 }
 
@@ -311,7 +311,7 @@ local tpAndStompButton = CreateButton("TP + Aim + AutoStomp", function()
 	end
 end)
 
-autoStompButton = CreateButton("AutoStomp: OFF", function()
+autoStompButton = CreateButton("AutoStomp: ON", function()
     Config.AutoStompEnabled = not Config.AutoStompEnabled
     UpdateButtonText()
 end)
@@ -542,7 +542,20 @@ end
 local function distToCursor(part)
     local v, vis = Camera:WorldToViewportPoint(part.Position)
     if not vis then return math.huge end
-    local m = UserInputService:GetMouseLocation()
+
+    local m
+    if UserInputService.TouchEnabled then
+        -- Nếu đang ở shiftlock thì lấy tâm màn hình
+        if game.Players.LocalPlayer.DevMouseLock then
+            m = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        else
+            -- Lấy vị trí chạm
+            m = UserInputService:GetMouseLocation()
+        end
+    else
+        m = UserInputService:GetMouseLocation()
+    end
+
     return (Vector2.new(v.X, v.Y) - Vector2.new(m.X, m.Y)).Magnitude
 end
 
@@ -654,7 +667,7 @@ RunService.RenderStepped:Connect(function(deltaTime)
     UpdateSpeed()
     UpdateFly(deltaTime)
 
-    -- Aimbot and camera perspective logic
+    -- Aimbot logic (giữ nguyên nhưng thay đổi phần camera)
     if Config.AimbotEnabled and getgenv().Aimbot.Status then
         Player = GetClosestValidPlayer()
         if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
@@ -663,22 +676,19 @@ RunService.RenderStepped:Connect(function(deltaTime)
             if not IsObstructed(Camera.CFrame.Position, predictedPos) then
                 -- Aim at the predicted position
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
-                
-                -- Switch to LockFirstPerson for mobile
+
+                -- Nếu đang ở mobile, tự bật ShiftLock
                 if UserInputService.TouchEnabled then
-                    Camera.CameraType = Enum.CameraType.LockFirstPerson
+                    pcall(function()
+                        -- Bật cho phép ShiftLock
+                        game.Players.LocalPlayer.DevEnableMouseLock = true
+                        -- Nếu bị tắt thì bật lại
+                        if not game.Players.LocalPlayer.DevMouseLock then
+                            game.Players.LocalPlayer.DevMouseLock = true
+                        end
+                    end)
                 end
             end
-        else
-            -- Revert to third-person for mobile when no target
-            if UserInputService.TouchEnabled then
-                Camera.CameraType = Enum.CameraType.Classic
-            end
-        end
-    else
-        -- Ensure camera reverts to third-person if aimbot is disabled
-        if UserInputService.TouchEnabled then
-            Camera.CameraType = Enum.CameraType.Classic
         end
     end
 
@@ -729,6 +739,51 @@ task.spawn(function()
     while true do
         UpdatePlayerList()
         task.wait(math.random(12, 15))
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if Config.AutoStompEnabled then
+            local closestKO, minDistKO = nil, math.huge
+            local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+
+            -- Find the closest K.O.'d player
+            for name, selected in pairs(Config.SelectedPlayers) do
+                if selected then
+                    local plr = Players:FindFirstChild(name)
+                    if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                        local pos = plr.Character.HumanoidRootPart.Position
+                        local dist = (myPos - pos).Magnitude
+                        local body = plr.Character:FindFirstChild("BodyEffects")
+                        local isKO = body and body:FindFirstChild("K.O") and body["K.O"].Value
+                        if isKO and dist < minDistKO then
+                            closestKO = plr
+                            minDistKO = dist
+                        end
+                    end
+                end
+            end
+
+            -- Stomp the closest K.O.'d player
+            if closestKO then
+                local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local oldPos = root.CFrame
+                    local torso = closestKO.Character:FindFirstChild("LowerTorso") or closestKO.Character:FindFirstChild("Torso") or closestKO.Character:FindFirstChild("HumanoidRootPart")
+                    if torso then
+                        root.CFrame = torso.CFrame + Vector3.new(0, 2.5, 0)
+                        task.wait(0.2)
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                        task.wait(0.1)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                        task.wait(1.5)
+                        root.CFrame = oldPos + Vector3.new(0, 3, 0)
+                    end
+                end
+            end
+        end
+        task.wait(3) -- Small delay to prevent excessive CPU usage
     end
 end)
 
