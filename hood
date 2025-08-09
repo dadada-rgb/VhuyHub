@@ -711,63 +711,58 @@ Connect(Players.PlayerRemoving, function(player)
     UpdatePlayerList()
 end)
 
--- Vòng lặp chính
+local lastStompTime = 0
+local stompCooldown = 1.5 -- Thời gian chờ giữa các lần stomp (giảm từ 4s để mượt hơn)
+
 RunService.RenderStepped:Connect(function(deltaTime)
+    -- Các cập nhật hiện có
     UpdateESP()
     UpdateSpeed()
     UpdateFly(deltaTime)
-end)
 
--- Cập nhật danh sách người chơi định kỳ
-task.spawn(function()
-    while true do
-        UpdatePlayerList()
-        task.wait(math.random(12, 15))
-    end
-end)
+    -- Logic AutoStomp
+    if Config.AutoStompEnabled then
+        local currentTime = tick()
+        if currentTime - lastStompTime < stompCooldown then return end
 
-task.spawn(function()
-    while true do
-        if Config.AutoStompEnabled then
-            local closestKO, minDistKO = nil, math.huge
-            local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+        local closestKO, minDistKO = nil, math.huge
+        local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
 
-            -- Find the closest K.O.'d player
-            for name, selected in pairs(Config.SelectedPlayers) do
-                if selected then
-                    local plr = Players:FindFirstChild(name)
-                    if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                        local pos = plr.Character.HumanoidRootPart.Position
-                        local dist = (myPos - pos).Magnitude
-                        local body = plr.Character:FindFirstChild("BodyEffects")
-                        local isKO = body and body:FindFirstChild("K.O") and body["K.O"].Value
-                        if isKO and dist < minDistKO then
-                            closestKO = plr
-                            minDistKO = dist
-                        end
-                    end
-                end
-            end
-
-            -- Stomp the closest K.O.'d player
-            if closestKO then
-                local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if root then
-                    local oldPos = root.CFrame
-                    local torso = closestKO.Character:FindFirstChild("LowerTorso") or closestKO.Character:FindFirstChild("Torso") or closestKO.Character:FindFirstChild("HumanoidRootPart")
-                    if torso then
-                        root.CFrame = torso.CFrame + Vector3.new(0, 2.5, 0)
-                        task.wait(0.2)
-                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                        task.wait(0.1)
-                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                        task.wait(1.5)
-                        root.CFrame = oldPos + Vector3.new(0, 3, 0)
+        -- Tìm người chơi K.O gần nhất
+        for name, selected in pairs(Config.SelectedPlayers) do
+            if selected then
+                local plr = Players:FindFirstChild(name)
+                if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                    local pos = plr.Character.HumanoidRootPart.Position
+                    local dist = (myPos - pos).Magnitude
+                    local body = plr.Character:FindFirstChild("BodyEffects")
+                    local isKO = body and body:FindFirstChild("K.O") and body["K.O"].Value
+                    if isKO and dist < minDistKO then
+                        closestKO = plr
+                        minDistKO = dist
                     end
                 end
             end
         end
-        task.wait(4)
+
+        -- Thực hiện stomp
+        if closestKO then
+            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                local oldPos = root.CFrame
+                local torso = closestKO.Character:FindFirstChild("LowerTorso") or closestKO.Character:FindFirstChild("Torso") or closestKO.Character:FindFirstChild("HumanoidRootPart")
+                if torso then
+                    root.CFrame = torso.CFrame + Vector3.new(0, 2.5, 0)
+                    task.wait(0.2)
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                    task.wait(0.1)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                    task.wait(0.5) -- Giảm thời gian chờ để mượt hơn
+                    root.CFrame = oldPos + Vector3.new(0, 3, 0)
+                    lastStompTime = currentTime
+                end
+            end
+        end
     end
 end)
 
