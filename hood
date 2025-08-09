@@ -18,6 +18,7 @@ local Config = {
     SelectedPlayers = {},
     FlySpeed = 35,
     SpeedAmount = 20,
+    AutoStompEnabled = false,
     CustomPing = nil -- Thêm biến lưu ping tùy chỉnh
 }
 
@@ -138,16 +139,23 @@ UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 end)
 
 -- Frame nút chức năng (bên phải)
-local ButtonFrame = Instance.new("Frame")
+local ButtonFrame = Instance.new("ScrollingFrame")
 ButtonFrame.Size = UDim2.new(0.5, -5, 1, -25)
 ButtonFrame.Position = UDim2.new(0.5, 0, 0, 20)
 ButtonFrame.BackgroundTransparency = 1
+ButtonFrame.ScrollBarThickness = 3
+ButtonFrame.CanvasSize = UDim2.new(0, 0, 0, 0) -- Will be updated dynamically
 ButtonFrame.Parent = MenuFrame
 
 local ButtonLayout = Instance.new("UIListLayout")
 ButtonLayout.SortOrder = Enum.SortOrder.LayoutOrder
 ButtonLayout.Padding = UDim.new(0, 5)
 ButtonLayout.Parent = ButtonFrame
+
+-- Update CanvasSize dynamically based on button count
+ButtonLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ButtonFrame.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout.AbsoluteContentSize.Y)
+end)
 
 -- Hàm tạo nút
 local function CreateButton(name, callback)
@@ -165,15 +173,14 @@ local function CreateButton(name, callback)
     return button
 end
 
--- Tạo các nút chức năng
-local aimbotButton, espButton, speedButton, flyButton, armorButton, tpAndStompButton
 local function UpdateButtonText()
     aimbotButton.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
     espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
     speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
     flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
     armorButton.Text = "TP Armor"
-    tpAndStompButton.Text = "autostomp"
+    tpAndStompButton.Text = "TP + Aim + AutoStomp"
+    autoStompButton.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
 end
 
 aimbotButton = CreateButton("Aimbot: OFF", function()
@@ -302,6 +309,11 @@ local tpAndStompButton = CreateButton("TP + Aim + AutoStomp", function()
 			end
 		end
 	end
+end)
+
+local autoStompButton = CreateButton("AutoStomp: OFF", function()
+    Config.AutoStompEnabled = not Config.AutoStompEnabled
+    UpdateButtonText()
 end)
 
 -- Khởi tạo ScreenGui cho ESP
@@ -717,6 +729,51 @@ task.spawn(function()
     while true do
         UpdatePlayerList()
         task.wait(math.random(12, 15))
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if Config.AutoStompEnabled then
+            local closestKO, minDistKO = nil, math.huge
+            local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+
+            -- Find the closest K.O.'d player
+            for name, selected in pairs(Config.SelectedPlayers) do
+                if selected then
+                    local plr = Players:FindFirstChild(name)
+                    if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                        local pos = plr.Character.HumanoidRootPart.Position
+                        local dist = (myPos - pos).Magnitude
+                        local body = plr.Character:FindFirstChild("BodyEffects")
+                        local isKO = body and body:FindFirstChild("K.O") and body["K.O"].Value
+                        if isKO and dist < minDistKO then
+                            closestKO = plr
+                            minDistKO = dist
+                        end
+                    end
+                end
+            end
+
+            -- Stomp the closest K.O.'d player
+            if closestKO then
+                local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local oldPos = root.CFrame
+                    local torso = closestKO.Character:FindFirstChild("LowerTorso") or closestKO.Character:FindFirstChild("Torso") or closestKO.Character:FindFirstChild("HumanoidRootPart")
+                    if torso then
+                        root.CFrame = torso.CFrame + Vector3.new(0, 2.5, 0)
+                        task.wait(0.2)
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                        task.wait(0.1)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                        task.wait(1.5)
+                        root.CFrame = oldPos + Vector3.new(0, 3, 0)
+                    end
+                end
+            end
+        end
+        task.wait(0.5) -- Small delay to prevent excessive CPU usage
     end
 end)
 
