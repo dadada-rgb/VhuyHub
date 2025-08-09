@@ -414,29 +414,26 @@ local function UpdateSpeed()
     end
 end
 
--- Logic Fly theo hướng nhìn
+-- Logic Fly theo hướng nhìn, không tự di chuyển
 local function UpdateFly(deltaTime)
     if Config.FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local root = LocalPlayer.Character.HumanoidRootPart
         local humanoid = LocalPlayer.Character.Humanoid
         local camera = Workspace.CurrentCamera
-        local moveDirection = humanoid.MoveDirection -- Hướng di chuyển ngang (WASD hoặc joystick)
+        local moveDirection = humanoid.MoveDirection -- Hướng di chuyển từ WASD/joystick
         local flySpeed = Config.FlySpeed
 
-        -- Lấy hướng nhìn của camera
-        local lookDirection = camera.CFrame.LookVector
-        -- Loại bỏ thành phần Y để giữ hướng ngang nếu cần
-        local horizontalLook = Vector3.new(lookDirection.X, 0, lookDirection.Z).Unit
-        -- Kết hợp hướng nhìn đầy đủ (bao gồm cả độ cao)
-        local fullLookDirection = lookDirection * flySpeed * deltaTime * 10
+        if moveDirection.Magnitude > 0 then
+            -- Lấy hướng nhìn của camera
+            local lookDirection = camera.CFrame.LookVector
+            -- Kết hợp hướng di chuyển với góc nhìn camera
+            local moveVector = lookDirection * moveDirection.Magnitude * flySpeed * deltaTime * 10
 
-        -- Kết hợp di chuyển ngang từ MoveDirection
-        local horizontalMove = moveDirection * flySpeed * deltaTime * 10
+            -- Di chuyển nhân vật theo hướng nhìn
+            root.CFrame = root.CFrame + moveVector
+        end
 
-        -- Di chuyển nhân vật
-        root.CFrame = root.CFrame + horizontalMove + fullLookDirection
-
-        -- Giữ nhân vật ổn định (ngăn rơi tự do)
+        -- Ngăn nhân vật rơi do trọng lực
         root.Velocity = Vector3.new(root.Velocity.X, 0, root.Velocity.Z)
     end
 end
@@ -639,18 +636,49 @@ local function GetClosestValidPlayer()
     return closestPlayer
 end
 
-RunService.RenderStepped:Connect(function()
+-- Add variables to store original camera settings
+local originalCameraType = Camera.CameraType
+local isFirstPerson = false
+
+RunService.RenderStepped:Connect(function(deltaTime)
+    -- Existing ESP, Speed, and Fly updates
+    UpdateESP()
+    UpdateSpeed()
+    UpdateFly(deltaTime)
+
+    -- Aimbot and camera perspective logic
     if Config.AimbotEnabled and getgenv().Aimbot.Status then
         Player = GetClosestValidPlayer()
         if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
             local part = Player.Character[getgenv().Aimbot.Hitpart]
             local predictedPos = GetPredictedPosition(part)
             if not IsObstructed(Camera.CFrame.Position, predictedPos) then
+                -- Aim at the predicted position
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
+                
+                -- Switch to LockFirstPerson for mobile only
+                if UserInputService.TouchEnabled and not isFirstPerson then
+                    originalCameraType = Camera.CameraType
+                    Camera.CameraType = Enum.CameraType.LockFirstPerson
+                    isFirstPerson = true
+                end
             end
+        else
+            -- Revert to original camera settings for mobile when no target
+            if UserInputService.TouchEnabled and isFirstPerson then
+                Camera.CameraType = originalCameraType
+                isFirstPerson = false
+            end
+        end
+    else
+        -- Ensure camera reverts if aimbot is disabled
+        if UserInputService.TouchEnabled and isFirstPerson then
+            Camera.CameraType = originalCameraType
+            isFirstPerson = false
         end
     end
 
+    -- Existing TriggerBot logic
     if tbEnabled then
         local part = GetBestTargetPart()
         if part then
