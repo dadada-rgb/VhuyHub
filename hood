@@ -311,7 +311,7 @@ local tpAndStompButton = CreateButton("TP + Aim + AutoStomp", function()
 	end
 end)
 
-local autoStompButton = CreateButton("AutoStomp: OFF", function()
+autoStompButton = CreateButton("AutoStomp: OFF", function()
     Config.AutoStompEnabled = not Config.AutoStompEnabled
     UpdateButtonText()
 end)
