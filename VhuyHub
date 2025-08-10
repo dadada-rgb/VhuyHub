@@ -15,7 +15,8 @@ local Config = {
     WalkSpeed = 16,
     JumpPower = 50,
     FlyEnabled = false,
-    FlySpeed = 50
+    FlySpeed = 50,
+    ClickTeleportEnabled = false
 }
 
 -- Biến lưu trạng thái Lighting cũ cho Fullbright
@@ -175,12 +176,12 @@ local function CreateSlider(name, min, max, default, callback)
     Instance.new("UICorner", track).CornerRadius = UDim.new(0, 3)
 
     local knob = Instance.new("TextButton")
-    knob.Size = UDim2.new(0, 10, 0, 15)
-    knob.Position = UDim2.new((default - min) / (max - min), -5, 0.25, -2.5)
+    knob.Size = UDim2.new(0, 15, 0, 15)
+    knob.Position = UDim2.new((default - min) / (max - min), -7.5, 0.25, -5)
     knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
     knob.Text = ""
     knob.Parent = sliderFrame
-    Instance.new("UICorner", knob).CornerRadius = UDim.new(0, 5)
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
 
     local dragging = false
     knob.MouseButton1Down:Connect(function()
@@ -194,7 +195,7 @@ local function CreateSlider(name, min, max, default, callback)
     UserInputService.InputChanged:Connect(function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local pos = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-            knob.Position = UDim2.new(pos, -5, knob.Position.Y.Scale, knob.Position.Y.Offset)
+            knob.Position = UDim2.new(pos, -7.5, knob.Position.Y.Scale, knob.Position.Y.Offset)
             local value = math.floor(min + pos * (max - min))
             label.Text = name .. ": " .. value
             callback(value)
@@ -265,6 +266,8 @@ local function UpdateButtonText()
     fullbrightButton.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
     noclipButton.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
     flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
+    flintTouchButton.Text = "FlingTouch: " .. (hiddenFling and "ON" or "OFF")
+    clickTeleportButton.Text = "ClickTeleport: " .. (Config.ClickTeleportEnabled and "ON" or "OFF")
 end
 
 espButton = CreateButton("ESP: OFF", function()
@@ -337,6 +340,121 @@ flyButton = CreateButton("Fly: OFF", function()
     UpdateButtonText()
 end)
 
+local hiddenFling = false
+local flingPower = 55000
+local movel = 0.1
+
+local function flingLoop()
+    local lp = Players.LocalPlayer
+    local RunService = game:GetService("RunService")
+    local hrp, c, vel
+    
+    task.spawn(function()
+        while true do
+            RunService.Heartbeat:Wait()
+            if hiddenFling then
+                while hiddenFling and not (c and c.Parent and hrp and hrp.Parent) do
+                    RunService.Heartbeat:Wait()
+                    c = lp.Character
+                    hrp = c and c:FindFirstChild("HumanoidRootPart")
+                end
+
+                if hiddenFling and hrp then
+                    vel = hrp.Velocity
+                    hrp.Velocity = vel * flingPower + Vector3.new(0, flingPower, 0)
+                    RunService.RenderStepped:Wait()
+                    if hrp.Parent then
+                        hrp.Velocity = vel
+                    end
+                    RunService.Stepped:Wait()
+                    if hrp.Parent then
+                        hrp.Velocity = vel + Vector3.new(0, movel, 0)
+                        movel = movel * -1
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- Gọi hàm chạy nền
+flingLoop()
+
+flintTouchButton = CreateButton("FlingTouch: OFF", function()
+    hiddenFling = not hiddenFling
+    UpdateButtonText()
+end)
+
+clickTeleportButton = CreateButton("ClickTeleport: OFF", function()
+    Config.ClickTeleportEnabled = not Config.ClickTeleportEnabled
+    UpdateButtonText()
+    if Config.ClickTeleportEnabled then
+        local character = LocalPlayer.Character
+        if character then
+            createClickTeleportTool()
+        end
+    else
+        removeClickTeleportTool()
+    end
+end)
+
+local function createClickTeleportTool()
+    local tool = Instance.new("Tool")
+    tool.Name = "ClickTeleport"
+    tool.Parent = LocalPlayer.Backpack
+
+    tool.Activated:Connect(function()
+        local mouse = LocalPlayer:GetMouse()
+        local targetPos = mouse.Hit.Position
+        local character = LocalPlayer.Character
+        local root = character:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0)) -- +3 để tránh kẹt sàn
+        end
+    end)
+
+    -- Hỗ trợ di động
+    if UserInputService.TouchEnabled then
+        UserInputService.TouchTap:Connect(function(inputPositions, processed)
+            if not processed and tool.Parent == LocalPlayer.Character then
+                local touchPos = inputPositions[1]
+                local ray = Camera:ScreenPointToRay(touchPos.X, touchPos.Y)
+                local raycastParams = RaycastParams.new()
+                raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+                raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+                local result = Workspace:Raycast(ray.Origin, ray.Direction * 1000, raycastParams)
+                if result then
+                    local targetPos = result.Position
+                    local character = LocalPlayer.Character
+                    local root = character:FindFirstChild("HumanoidRootPart")
+                    if root then
+                        root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+                    end
+                end
+            end
+        end)
+    end
+end
+
+local function removeClickTeleportTool()
+    local backpack = LocalPlayer.Backpack
+    local character = LocalPlayer.Character
+    local toolInBackpack = backpack:FindFirstChild("ClickTeleport")
+    local toolInCharacter = character:FindFirstChild("ClickTeleport")
+    if toolInBackpack then
+        toolInBackpack:Destroy()
+    end
+    if toolInCharacter then
+        toolInCharacter:Destroy()
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    if Config.ClickTeleportEnabled then
+        createClickTeleportTool()
+    end
+end)
+
 -- === TẠO 3 TRANG ===
 local currentPage = 1
 
@@ -346,6 +464,15 @@ Page1.Size = UDim2.new(1, 0, 1, -30)
 Page1.Position = UDim2.new(0, 0, 0, 0)
 Page1.BackgroundTransparency = 1
 Page1.Parent = MenuFrame
+
+-- Thêm đường chia giữa bên trái và phải
+local Divider = Instance.new("Frame")
+Divider.Size = UDim2.new(0, 2, 1, 0)
+Divider.Position = UDim2.new(0.5, -1, 0, 0)
+Divider.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+Divider.BorderSizePixel = 0
+Divider.Parent = Page1
+Instance.new("UIStroke", Divider).Transparency = 0.5
 
 -- Chuyển toàn bộ SliderFrame và ButtonFrame vào Page1
 SliderFrame.Parent = Page1
@@ -519,9 +646,10 @@ end
 
 -- Tạo các script item
 CreateScriptItem("Evade", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade")
-CreateScriptItem("Murder Mystery 2", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2")
+CreateScriptItem("Hood", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2")
 CreateScriptItem("Blade Ball", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball")
 CreateScriptItem("Doors", "https://raw.githubusercontent.com/DarkDoorsKing/Project/main/Doors.lua")
+CreateScriptItem("Dahood", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood")
 
 -- Thanh chuyển trang
 local PageButtons = Instance.new("Frame")
@@ -533,7 +661,7 @@ PageButtons.Parent = MenuFrame
 local Btn1 = Instance.new("TextButton")
 Btn1.Size = UDim2.new(1/3, -2, 1, 0)
 Btn1.Position = UDim2.new(0, 0, 0, 0)
-Btn1.Text = "Trang 1"
+Btn1.Text = "Main"
 Btn1.BackgroundColor3 = Color3.fromRGB(200, 200, 255)
 Instance.new("UICorner", Btn1).CornerRadius = UDim.new(0, 4)
 Btn1.Parent = PageButtons
@@ -541,7 +669,7 @@ Btn1.Parent = PageButtons
 local Btn2 = Instance.new("TextButton")
 Btn2.Size = UDim2.new(1/3, -2, 1, 0)
 Btn2.Position = UDim2.new(1/3, 2, 0, 0)
-Btn2.Text = "Trang 2"
+Btn2.Text = "Executor"
 Btn2.BackgroundColor3 = Color3.fromRGB(200, 255, 200)
 Instance.new("UICorner", Btn2).CornerRadius = UDim.new(0, 4)
 Btn2.Parent = PageButtons
@@ -549,7 +677,7 @@ Btn2.Parent = PageButtons
 local Btn3 = Instance.new("TextButton")
 Btn3.Size = UDim2.new(1/3, -2, 1, 0)
 Btn3.Position = UDim2.new(2/3, 2, 0, 0)
-Btn3.Text = "Trang 3"
+Btn3.Text = "Script"
 Btn3.BackgroundColor3 = Color3.fromRGB(255, 200, 200)
 Instance.new("UICorner", Btn3).CornerRadius = UDim.new(0, 4)
 Btn3.Parent = PageButtons
@@ -672,7 +800,7 @@ local function UpdateESP()
     end
 end
 
--- Fly logic supporting PC and Mobile
+-- Fly logic
 local flyBv, flyBg
 local flyKeys = {f = 0, b = 0, l = 0, r = 0, up = 0, down = 0}
 
@@ -769,19 +897,6 @@ LocalPlayer.CharacterAdded:Connect(function(char)
         startFly()
     end
 end)
-    flyButton.MouseButton1Click:Connect(function()
-
-LocalPlayer.CharacterAdded:Connect(function(char)
-    char:WaitForChild("Humanoid").WalkSpeed = Config.WalkSpeed
-    char:WaitForChild("Humanoid").JumpPower = Config.JumpPower
-    char:WaitForChild("Humanoid").UseJumpPower = true
-end)
-
-if LocalPlayer.Character then
-    LocalPlayer.Character:WaitForChild("Humanoid").WalkSpeed = Config.WalkSpeed
-    LocalPlayer.Character:WaitForChild("Humanoid").JumpPower = Config.JumpPower
-    LocalPlayer.Character:WaitForChild("Humanoid").UseJumpPower = true
-end
 
 RunService.RenderStepped:Connect(function()
     UpdateESP()
