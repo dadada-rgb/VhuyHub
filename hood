@@ -48,6 +48,71 @@ local function checkAmmoAndReload()
     end
 end
 
+-- Thêm hàm thông báo K.O ngay đây
+local function ShowKONotification(playerName)
+    sendnotify(playerName .. " downed!", 3)
+end
+
+-- Hàm dịch chuyển đến người gần nhất trong danh sách
+local function TeleportToClosest()
+    local closestKO, closestAlive = nil, nil
+    local minDistKO, minDistAlive = math.huge, math.huge
+    local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+
+    if not myPos then return end
+
+    -- Tìm người gần nhất bị K.O hoặc còn sống
+    for name, selected in pairs(Config.SelectedPlayers) do
+        if selected then
+            local plr = Players:FindFirstChild(name)
+            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local pos = plr.Character.HumanoidRootPart.Position
+                local dist = (myPos - pos).Magnitude
+                local body = plr.Character:FindFirstChild("BodyEffects")
+                local isKO = body and body:FindFirstChild("K.O") and body["K.O"].Value
+                if isKO then
+                    if dist < minDistKO then
+                        closestKO = plr
+                        minDistKO = dist
+                    end
+                else
+                    if dist < minDistAlive then
+                        closestAlive = plr
+                        minDistAlive = dist
+                    end
+                end
+            end
+        end
+    end
+
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local oldPos = root.CFrame
+
+    -- Ưu tiên người bị K.O
+    if closestKO then
+        local torso = closestKO.Character:FindFirstChild("LowerTorso") or closestKO.Character:FindFirstChild("Torso") or closestKO.Character:FindFirstChild("HumanoidRootPart")
+        if torso then
+            -- Dịch chuyển đến LowerTorso
+            root.CFrame = torso.CFrame
+            -- Tự động stomp
+            task.wait(0.2)
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            -- Quay lại vị trí cũ sau khi stomp
+            task.wait(1.5)
+            root.CFrame = oldPos + Vector3.new(0, 3, 0)
+        end
+    elseif closestAlive then
+        local torso = closestAlive.Character:FindFirstChild("LowerTorso") or closestAlive.Character:FindFirstChild("Torso") or closestAlive.Character:FindFirstChild("HumanoidRootPart")
+        if torso then
+            -- Dịch chuyển cách 30 studs phía trên
+            root.CFrame = torso.CFrame + Vector3.new(0, 30, 0)
+        end
+    end
+end
+
 UserInputService.InputBegan:Connect(function(input, gpe)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		Config.AimbotEnabled = true
@@ -262,7 +327,7 @@ armorButton = CreateButton("TP Armor", function()
 	end
 
 	-- Quay về chỗ cũ sau 3 giây
-	task.wait(3)
+	task.wait(2)
 	RootPart.CFrame = OldCFrame + Vector3.new(0, 0.5, 0)
 end)
 
@@ -519,6 +584,13 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.T then
+        TeleportToClosest()
+    end
+end)
+
 -- TriggerBot logic
 local hitParts = {
     "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "LeftUpperArm", "LeftLowerArm", "LeftHand",
@@ -697,6 +769,18 @@ local function Connect(event, callback)
     return connection
 end
 
+Connect(Players.PlayerAdded, function(player)
+    task.wait(math.random(2, 3))
+    RemoveESP(player)
+    UpdatePlayerList()
+end)
+
+Connect(Players.PlayerRemoving, function(player)
+    RemoveESP(player)
+    Config.SelectedPlayers[player.Name] = nil
+    UpdatePlayerList()
+end)
+
 -- Theo dõi khi trang bị hoặc bỏ trang bị Tool
 LocalPlayer.CharacterAdded:Connect(function(char)
     character = char
@@ -724,17 +808,25 @@ LocalPlayer.Character.ChildRemoved:Connect(function(tool)
     end
 end)
 
-Connect(Players.PlayerAdded, function(player)
-    task.wait(math.random(2, 3))
-    RemoveESP(player)
-    UpdatePlayerList()
-end)
-
-Connect(Players.PlayerRemoving, function(player)
-    RemoveESP(player)
-    Config.SelectedPlayers[player.Name] = nil
-    UpdatePlayerList()
-end)
+-- Thêm đoạn theo dõi K.O ngay đây
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        local character = player.Character
+        if character then
+            local bodyEffects = character:FindFirstChild("BodyEffects")
+            if bodyEffects then
+                local koValue = bodyEffects:FindFirstChild("K.O")
+                if koValue then
+                    koValue:GetPropertyChangedSignal("Value"):Connect(function()
+                        if koValue.Value and Config.SelectedPlayers[player.Name] then
+                            ShowKONotification(player.DisplayName)
+                        end
+                    end)
+                end
+            end
+        end
+    end
+end
 
 -- Vòng lặp chính
 RunService.RenderStepped:Connect(function(deltaTime)
