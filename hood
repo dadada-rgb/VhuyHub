@@ -15,14 +15,14 @@ local Config = {
     SpeedEnabled = false,
     FlyEnabled = false,
     AimbotEnabled = false,
-    FullbrightEnabled = false, -- Thêm trạng thái Fullbright
-    NoclipEnabled = false, -- Thêm trạng thái Noclip
+    FullbrightEnabled = false,
+    NoclipEnabled = false, 
     ShiftAmount = 0.5,
     SelectedPlayers = {},
     FlySpeed = 35,
     SpeedAmount = 20,
     AutoStompEnabled = false,
-    CustomPing = nil -- Thêm biến lưu ping tùy chỉnh
+    CustomPing = nil 
 }
 
 local autoSelect = false
@@ -177,59 +177,100 @@ UserInputService.InputEnded:Connect(function(input, gpe)
 	end
 end)
 
--- Tạo ScreenGui chính
+local TweenService = game:GetService("TweenService")
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+
+-- ===== ScreenGui chính =====
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = tostring(math.random(1e6, 1e7))
 ScreenGui.ResetOnSpawn = false
 ScreenGui.Enabled = true
 ScreenGui.Parent = PlayerGui
 
--- Frame chính (hồng pastel)
+-- ===== Frame chính =====
 local MenuFrame = Instance.new("Frame")
-MenuFrame.Size = UDim2.new(0, 250, 0, 200)
-MenuFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
+MenuFrame.Size = UDim2.new(0, 270, 0, 220)
+MenuFrame.Position = UDim2.new(0.05, 0, 0.25, 0)
 MenuFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-MenuFrame.BackgroundTransparency = 0.3
 MenuFrame.Active = true
 MenuFrame.Draggable = true
 MenuFrame.Parent = ScreenGui
-Instance.new("UICorner", MenuFrame).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", MenuFrame).CornerRadius = UDim.new(0, 10)
 
--- Nút ẩn/hiện Frame
+-- Gradient nền
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new{
+	ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 200, 200)),
+	ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 150, 150))
+}
+gradient.Rotation = 90
+gradient.Parent = MenuFrame
+
+-- Viền
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 2
+stroke.Color = Color3.fromRGB(255, 255, 255)
+stroke.Parent = MenuFrame
+
+-- ===== Nút Toggle Show/Hide =====
 local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 20, 0, 20)
+ToggleButton.Size = UDim2.new(0, 60, 0, 25)
 ToggleButton.Position = UDim2.new(0, 10, 0, 10)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-ToggleButton.Text = "show"
-ToggleButton.TextColor3 = Color3.fromRGB(0, 0, 0)
-ToggleButton.TextSize = 14
+ToggleButton.Text = "SHOW"
+ToggleButton.TextColor3 = Color3.new(0, 0, 0)
 ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.TextSize = 14
 ToggleButton.Active = true
 ToggleButton.Draggable = true
 ToggleButton.Parent = ScreenGui
 Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 8)
 
--- Xử lý ẩn/hiện Frame
+-- Hover/click animation
+local function AnimateButton(btn)
+	btn.MouseEnter:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 200, 200)}):Play()
+	end)
+	btn.MouseLeave:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 179, 186)}):Play()
+	end)
+	btn.MouseButton1Click:Connect(function()
+		TweenService:Create(btn, TweenInfo.new(0.1), {Size = btn.Size + UDim2.new(0, 2, 0, 2)}):Play()
+		task.wait(0.1)
+		TweenService:Create(btn, TweenInfo.new(0.1), {Size = btn.Size - UDim2.new(0, 2, 0, 2)}):Play()
+	end)
+end
+AnimateButton(ToggleButton)
+
+-- Show/hide với tween
 ToggleButton.MouseButton1Click:Connect(function()
-    MenuFrame.Visible = not MenuFrame.Visible
-    ToggleButton.Text = MenuFrame.Visible and "show" or "hidd"
+	local targetSize = MenuFrame.Visible and UDim2.new(0, 0, 0, 0) or UDim2.new(0, 270, 0, 220)
+	local tween = TweenService:Create(MenuFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize})
+	if not MenuFrame.Visible then
+		MenuFrame.Visible = true
+		tween:Play()
+	else
+		tween:Play()
+		tween.Completed:Wait()
+		MenuFrame.Visible = false
+	end
+	ToggleButton.Text = MenuFrame.Visible and "HIDE" or "SHOW"
 end)
 
--- Tiêu đề Frame
+-- ===== Tiêu đề & Ping/Clock =====
 local MenuTitle = Instance.new("TextLabel")
-MenuTitle.Size = UDim2.new(1, 0, 0, 20)
-MenuTitle.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+MenuTitle.Size = UDim2.new(1, 0, 0, 25)
+MenuTitle.BackgroundTransparency = 1
 MenuTitle.Text = "DhuyxDTuyen"
-MenuTitle.TextColor3 = Color3.fromRGB(0, 0, 0)
-MenuTitle.Font = Enum.Font.SourceSans
-MenuTitle.TextSize = 14
+MenuTitle.TextColor3 = Color3.new(0, 0, 0)
+MenuTitle.Font = Enum.Font.SourceSansBold
+MenuTitle.TextSize = 16
 MenuTitle.Parent = MenuFrame
-Instance.new("UICorner", MenuTitle).CornerRadius = UDim.new(0, 8)
 
--- TextBox để chỉnh ping
+-- Ô nhập ping (PingBox) ở tiêu đề
 local PingBox = Instance.new("TextBox")
-PingBox.Size = UDim2.new(0, 60, 0, 20)
-PingBox.Position = UDim2.new(1, -70, 0, 0)
+PingBox.Size = UDim2.new(0, 70, 0, 20)
+PingBox.Position = UDim2.new(1, -75, 0, 2) -- sát bên phải tiêu đề
 PingBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 PingBox.BackgroundTransparency = 0.2
 PingBox.TextColor3 = Color3.fromRGB(0, 0, 0)
@@ -237,21 +278,41 @@ PingBox.TextSize = 12
 PingBox.Font = Enum.Font.SourceSans
 PingBox.PlaceholderText = "Ping (ms)"
 PingBox.Text = ""
+PingBox.ClearTextOnFocus = false
 PingBox.Parent = MenuTitle
 Instance.new("UICorner", PingBox).CornerRadius = UDim.new(0, 4)
 
 -- Xử lý khi nhập ping
 PingBox.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        local input = tonumber(PingBox.Text)
-        if input and input >= 0 then
-            Config.CustomPing = math.clamp(input, 10, 1000) -- Giới hạn ping hợp lý
-            PingBox.Text = tostring(Config.CustomPing)
-        else
-            Config.CustomPing = nil
-            PingBox.Text = ""
-        end
-    end
+	if enterPressed then
+		local input = tonumber(PingBox.Text)
+		if input and input >= 0 then
+			Config.CustomPing = math.clamp(input, 10, 1000) -- giới hạn ping hợp lý
+			PingBox.Text = tostring(Config.CustomPing)
+		else
+			Config.CustomPing = nil
+			PingBox.Text = ""
+		end
+	end
+end)
+
+-- Khung ping & giờ
+local PingClock = Instance.new("TextLabel")
+PingClock.Size = UDim2.new(0, 200, 0, 20)
+PingClock.Position = UDim2.new(0, 5, 0, -25)
+PingClock.BackgroundTransparency = 1
+PingClock.TextColor3 = Color3.new(0, 0, 0)
+PingClock.Font = Enum.Font.SourceSans
+PingClock.TextSize = 14
+PingClock.Parent = MenuFrame
+
+-- Update giờ + ping
+task.spawn(function()
+	while task.wait(1) do
+		local ping = Config.CustomPing or math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+		local timeStr = os.date("%H:%M:%S")
+		PingClock.Text = string.format("Ping: %d ms | %s", ping, timeStr)
+	end
 end)
 
 -- Frame danh sách người chơi (bên trái)
@@ -318,7 +379,6 @@ local function UpdateButtonText()
     flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
     fullbrightButton.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
     noclipButton.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
-    armorButton.Text = "TP Armor"
     tpAndStompButton.Text = "TP + Aim + AutoStomp"
 end
 
@@ -409,48 +469,56 @@ LocalPlayer.CharacterAdded:Connect(function(newCharacter)
     end
 end)
 
-armorButton = CreateButton("TP Armor", function()
-	local Character = LocalPlayer.Character
-	local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
-	local RootPart = Character and Character:FindFirstChild("HumanoidRootPart")
-
-	if not (Character and Humanoid and RootPart) then return end
-
-	local OldCFrame = RootPart.CFrame
-	local TargetPosition = Vector3.new(-934.52, -25.25, 571.18) -- vị trí armor shop của bạn
-
-	-- Teleport đến armor
-	RootPart.CFrame = CFrame.new(TargetPosition + Vector3.new(0, 1, 0)) -- đứng cao hơn một chút
-
-	task.wait(0.5) -- đợi vật lý ổn định
-
-	-- Quét các part gần chân để tìm ClickDetector
-	local parts = workspace:GetPartBoundsInBox(RootPart.CFrame, Vector3.new(10, 10, 10))
-	local clicked = false
-
-	for _, part in ipairs(parts) do
-		local cd = part:FindFirstChildOfClass("ClickDetector")
-		if cd then
-			-- Thử click vài lần (tránh lỗi không ăn)
-			for i = 1, 3 do
-				pcall(function()
-					fireclickdetector(cd)
-				end)
-				task.wait(0.1)
-			end
-			clicked = true
-			break
-		end
-	end
-
-	if not clicked then
-		warn("❌ Không tìm thấy ClickDetector để mua armor.")
-	end
-
-	-- Quay về chỗ cũ sau 3 giây
-	task.wait(2)
-	RootPart.CFrame = OldCFrame + Vector3.new(0, 0.5, 0)
+triggerBotButton = CreateButton("TriggerBot: " .. (tbEnabled and "ON" or "OFF"), function()
+    tbEnabled = not tbEnabled
+    triggerBotButton.Text = "TriggerBot: " .. (tbEnabled and "ON" or "OFF")
 end)
+
+local hiddenFling = false
+local flingPower = 55000
+local movel = 0.1
+
+local function flingLoop()
+    local lp = Players.LocalPlayer
+    local RunService = game:GetService("RunService")
+    local hrp, c, vel
+    
+    task.spawn(function()
+        while true do
+            RunService.Heartbeat:Wait()
+            if hiddenFling then
+                while hiddenFling and not (c and c.Parent and hrp and hrp.Parent) do
+                    RunService.Heartbeat:Wait()
+                    c = lp.Character
+                    hrp = c and c:FindFirstChild("HumanoidRootPart")
+                end
+
+                if hiddenFling and hrp then
+                    vel = hrp.Velocity
+                    hrp.Velocity = vel * flingPower + Vector3.new(0, flingPower, 0)
+                    RunService.RenderStepped:Wait()
+                    if hrp.Parent then
+                        hrp.Velocity = vel
+                    end
+                    RunService.Stepped:Wait()
+                    if hrp.Parent then
+                        hrp.Velocity = vel + Vector3.new(0, movel, 0)
+                        movel = movel * -1
+                    end
+                end
+            end
+        end
+    end)
+end
+
+-- Gọi hàm chạy nền
+flingLoop()
+
+flintTouchButton = CreateButton("FlintTouch: OFF", function()
+    hiddenFling = not hiddenFling
+    flintTouchButton.Text = "FlintTouch: " .. (hiddenFling and "ON" or "OFF")
+end)
+
 
 local tpAndStompButton = CreateButton("TP + Aim + AutoStomp", function()
 	local closestKO, closestAlive = nil, nil
@@ -517,7 +585,7 @@ local tpAndStompButton = CreateButton("TP + Aim + AutoStomp", function()
 	end
 end)
 
--- === TẠO 2 TRANG ===
+-- === TẠO 3 TRANG ===
 local currentPage = 1
 
 -- Frame Trang 1 (hiện nội dung gốc)
@@ -539,23 +607,55 @@ Page2.BackgroundTransparency = 1
 Page2.Visible = false
 Page2.Parent = MenuFrame
 
--- ScrollingFrame chứa code
+-- ScrollingFrame chứa CodeBox để hỗ trợ kéo ngang và dọc
+local CodeScroll = Instance.new("ScrollingFrame")
+CodeScroll.Size = UDim2.new(1, -10, 1, -70)  -- Giảm chiều cao để dành chỗ cho nút
+CodeScroll.Position = UDim2.new(0, 5, 0, 35)  -- Di chuyển xuống để tránh che MenuTitle và PingBox
+CodeScroll.BackgroundTransparency = 0.2
+CodeScroll.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+CodeScroll.ScrollBarThickness = 6
+CodeScroll.ScrollingDirection = Enum.ScrollingDirection.XY  -- Hỗ trợ kéo ngang và dọc
+CodeScroll.CanvasSize = UDim2.new(0, 0, 0, 0)  -- Sẽ cập nhật động
+CodeScroll.ScrollBarImageTransparency = 0  -- Đảm bảo thanh cuộn hiển thị rõ
+CodeScroll.Parent = Page2
+Instance.new("UICorner", CodeScroll).CornerRadius = UDim.new(0, 4)
+
+-- TextBox chứa code
 local CodeBox = Instance.new("TextBox")
-CodeBox.Size = UDim2.new(1, -10, 1, -40)
+CodeBox.Size = UDim2.new(0, 1000, 0, 1000)  -- Kích thước lớn để kích hoạt thanh cuộn
 CodeBox.Position = UDim2.new(0, 5, 0, 5)
 CodeBox.MultiLine = true
 CodeBox.ClearTextOnFocus = false
-CodeBox.TextWrapped = true
+CodeBox.TextWrapped = false  -- Tắt TextWrapped để hỗ trợ kéo ngang
 CodeBox.TextYAlignment = Enum.TextYAlignment.Top
 CodeBox.TextXAlignment = Enum.TextXAlignment.Left
-CodeBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-CodeBox.BackgroundTransparency = 0.2
+CodeBox.BackgroundTransparency = 1
 CodeBox.Font = Enum.Font.Code
 CodeBox.TextSize = 14
 CodeBox.TextColor3 = Color3.fromRGB(0, 0, 0)
-CodeBox.Text = "-- Nhập script của bạn vào đây"
-Instance.new("UICorner", CodeBox).CornerRadius = UDim.new(0, 4)
-CodeBox.Parent = Page2
+CodeBox.Text = "-- Nhập script của bạn vào đây --"
+CodeBox.Parent = CodeScroll
+
+-- Cập nhật CanvasSize động cho CodeScroll dựa trên nội dung TextBox
+local TextService = game:GetService("TextService")
+CodeBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local textBounds = TextService:GetTextSize(
+        CodeBox.Text,
+        CodeBox.TextSize,
+        CodeBox.Font,
+        Vector2.new(1000, 1000)  -- Kích thước lớn để tính toán chính xác
+    )
+    CodeScroll.CanvasSize = UDim2.new(0, math.max(textBounds.X + 30, CodeScroll.AbsoluteSize.X), 0, math.max(textBounds.Y + 30, CodeScroll.AbsoluteSize.Y))
+end)
+
+-- Kích hoạt CanvasSize ban đầu
+local initialTextBounds = TextService:GetTextSize(
+    CodeBox.Text,
+    CodeBox.TextSize,
+    CodeBox.Font,
+    Vector2.new(1000, 1000)
+)
+CodeScroll.CanvasSize = UDim2.new(0, math.max(initialTextBounds.X + 30, CodeScroll.AbsoluteSize.X), 0, math.max(initialTextBounds.Y + 30, CodeScroll.AbsoluteSize.Y))
 
 -- Nút Execute
 local ExecuteBtn = Instance.new("TextButton")
@@ -597,7 +697,81 @@ ClearBtn.MouseButton1Click:Connect(function()
     CodeBox.Text = ""
 end)
 
--- Thanh chuyển trang
+-- Frame Trang 3 (script hub)
+local Page3 = Instance.new("Frame")
+Page3.Size = UDim2.new(1, 0, 1, -30)
+Page3.Position = UDim2.new(0, 0, 0, 0)
+Page3.BackgroundTransparency = 1
+Page3.Visible = false
+Page3.Parent = MenuFrame
+
+-- ScrollingFrame cho Trang 3 để hỗ trợ kéo dọc và ngang
+local ScriptHubScroll = Instance.new("ScrollingFrame")
+ScriptHubScroll.Size = UDim2.new(1, -10, 1, -70)  -- Giảm chiều cao để dành chỗ cho nút
+ScriptHubScroll.Position = UDim2.new(0, 5, 0, 35)  -- Di chuyển xuống để tránh che MenuTitle và PingBox
+ScriptHubScroll.BackgroundTransparency = 1
+ScriptHubScroll.ScrollBarThickness = 6
+ScriptHubScroll.ScrollingDirection = Enum.ScrollingDirection.XY
+ScriptHubScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScriptHubScroll.ScrollBarImageTransparency = 0
+ScriptHubScroll.Parent = Page3
+
+local ScriptListLayout = Instance.new("UIListLayout")
+ScriptListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ScriptListLayout.Padding = UDim.new(0, 5)
+ScriptListLayout.FillDirection = Enum.FillDirection.Vertical
+ScriptListLayout.Parent = ScriptHubScroll
+
+-- Cập nhật CanvasSize động cho ScriptHubScroll
+ScriptListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ScriptHubScroll.CanvasSize = UDim2.new(0, ScriptListLayout.AbsoluteContentSize.X, 0, ScriptListLayout.AbsoluteContentSize.Y)
+end)
+
+-- Hàm tạo item script hub
+local function CreateScriptItem(name, url)
+    local itemFrame = Instance.new("Frame")
+    itemFrame.Size = UDim2.new(1, 0, 0, 30)
+    itemFrame.BackgroundTransparency = 0.2
+    itemFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    itemFrame.Parent = ScriptHubScroll
+    Instance.new("UICorner", itemFrame).CornerRadius = UDim.new(0, 4)
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(0.7, 0, 1, 0)
+    nameLabel.Position = UDim2.new(0, 5, 0, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = name
+    nameLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
+    nameLabel.TextSize = 14
+    nameLabel.Font = Enum.Font.SourceSansBold
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Parent = itemFrame
+
+    local runBtn = Instance.new("TextButton")
+    runBtn.Size = UDim2.new(0.3, -10, 1, -4)
+    runBtn.Position = UDim2.new(0.7, 5, 0, 2)
+    runBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
+    runBtn.Text = "Run"
+    runBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    runBtn.TextSize = 14
+    runBtn.Font = Enum.Font.SourceSansBold
+    runBtn.Parent = itemFrame
+    Instance.new("UICorner", runBtn).CornerRadius = UDim.new(0, 4)
+
+    runBtn.MouseButton1Click:Connect(function()
+        loadstring(game:HttpGet(url))()
+    end)
+
+    return itemFrame
+end
+
+-- Tạo các script item
+CreateScriptItem("Evade", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade")
+CreateScriptItem("Murder Mystery 2", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2")
+CreateScriptItem("Blade Ball", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball")
+CreateScriptItem("Doors", "https://raw.githubusercontent.com/DarkDoorsKing/Project/main/Doors.lua")
+
+-- Thanh chuyển trang (điều chỉnh cho 3 nút)
 local PageButtons = Instance.new("Frame")
 PageButtons.Size = UDim2.new(1, 0, 0, 30)
 PageButtons.Position = UDim2.new(0, 0, 1, -30)
@@ -605,7 +779,7 @@ PageButtons.BackgroundTransparency = 1
 PageButtons.Parent = MenuFrame
 
 local Btn1 = Instance.new("TextButton")
-Btn1.Size = UDim2.new(0.5, -2, 1, 0)
+Btn1.Size = UDim2.new(1/3, -2, 1, 0)
 Btn1.Position = UDim2.new(0, 0, 0, 0)
 Btn1.Text = "Trang 1"
 Btn1.BackgroundColor3 = Color3.fromRGB(200, 200, 255)
@@ -613,23 +787,42 @@ Instance.new("UICorner", Btn1).CornerRadius = UDim.new(0, 4)
 Btn1.Parent = PageButtons
 
 local Btn2 = Instance.new("TextButton")
-Btn2.Size = UDim2.new(0.5, -2, 1, 0)
-Btn2.Position = UDim2.new(0.5, 2, 0, 0)
+Btn2.Size = UDim2.new(1/3, -2, 1, 0)
+Btn2.Position = UDim2.new(1/3, 2, 0, 0)
 Btn2.Text = "Trang 2"
 Btn2.BackgroundColor3 = Color3.fromRGB(200, 255, 200)
 Instance.new("UICorner", Btn2).CornerRadius = UDim.new(0, 4)
 Btn2.Parent = PageButtons
 
+local Btn3 = Instance.new("TextButton")
+Btn3.Size = UDim2.new(1/3, -2, 1, 0)
+Btn3.Position = UDim2.new(2/3, 2, 0, 0)
+Btn3.Text = "Trang 3"
+Btn3.BackgroundColor3 = Color3.fromRGB(255, 200, 200)
+Instance.new("UICorner", Btn3).CornerRadius = UDim.new(0, 4)
+Btn3.Parent = PageButtons
+
 -- Sự kiện chuyển trang
+local function ShowPage(page)
+    Page1.Visible = (page == 1)
+    Page2.Visible = (page == 2)
+    Page3.Visible = (page == 3)
+end
+
 Btn1.MouseButton1Click:Connect(function()
-    Page1.Visible = true
-    Page2.Visible = false
+    ShowPage(1)
 end)
 
 Btn2.MouseButton1Click:Connect(function()
-    Page1.Visible = false
-    Page2.Visible = true
+    ShowPage(2)
 end)
+
+Btn3.MouseButton1Click:Connect(function()
+    ShowPage(3)
+end)
+
+-- Đặt BackgroundTransparency của MenuFrame = 0
+MenuFrame.BackgroundTransparency = 0
 
 -- Khởi tạo ScreenGui cho ESP
 local espGui = Instance.new("ScreenGui")
