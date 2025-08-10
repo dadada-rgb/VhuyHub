@@ -173,93 +173,15 @@ local function CreateButton(name, callback)
     return button
 end
 
-local tpAndStompButton = Instance.new("TextButton")
-tpAndStompButton.Size = UDim2.new(0, 30, 0, 30) -- Changed size to 30x30
-tpAndStompButton.Position = UDim2.new(0, 40, 0, 10) -- Position it near the ToggleButton (adjust as needed)
-tpAndStompButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186) -- Pink pastel like ToggleButton
-tpAndStompButton.Text = "TP"
-tpAndStompButton.TextColor3 = Color3.fromRGB(0, 0, 0)
-tpAndStompButton.TextSize = 12 -- Slightly smaller text to fit
-tpAndStompButton.Font = Enum.Font.SourceSansBold
-tpAndStompButton.Active = true
-tpAndStompButton.Draggable = true -- Make it draggable
-tpAndStompButton.Parent = ScreenGui -- Parent to ScreenGui, not ButtonFrame
-Instance.new("UICorner", tpAndStompButton).CornerRadius = UDim.new(0, 8) -- Rounded corners like ToggleButton
-
 local function UpdateButtonText()
     aimbotButton.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
     espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
     speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
     flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
     armorButton.Text = "TP Armor"
-    tpButton.Text = "TP Player"
+    tpAndStompButton.Text = "TP + Aim + AutoStomp"
     autoStompButton.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
 end
-
-tpAndStompButton.MouseButton1Click:Connect(function()
-    local closestKO, closestAlive = nil, nil
-    local minDistKO, minDistAlive = math.huge, math.huge
-    local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
-
-    for name, selected in pairs(Config.SelectedPlayers) do
-        if selected then
-            local plr = Players:FindFirstChild(name)
-            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local pos = plr.Character.HumanoidRootPart.Position
-                local dist = (myPos - pos).Magnitude
-                local body = plr.Character:FindFirstChild("BodyEffects")
-                local isKO = body and body:FindFirstChild("K.O") and body["K.O"].Value
-                if isKO then
-                    if dist < minDistKO then
-                        closestKO = plr
-                        minDistKO = dist
-                    end
-                else
-                    if dist < minDistAlive then
-                        closestAlive = plr
-                        minDistAlive = dist
-                    end
-                end
-            end
-        end
-    end
-
-    local function stompTarget(target)
-        if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then return end
-        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-        local oldPos = root.CFrame
-        local torso = target.Character:FindFirstChild("LowerTorso") or target.Character:FindFirstChild("Torso") or target.Character:FindFirstChild("HumanoidRootPart")
-        if torso then
-            root.CFrame = torso.CFrame + Vector3.new(0, 2.5, 0)
-        end
-        -- Đợi ổn định và stomp
-        task.wait(0.2)
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-        task.wait(0.1)
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-
-        -- Tránh spam, đợi 0.5s rồi quay về
-        task.wait(1.5)
-        root.CFrame = oldPos + Vector3.new(0, 3, 0)
-    end
-
-    if closestKO then
-        stompTarget(closestKO)
-    else
-        if closestAlive then
-            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                local pos = closestAlive.Character.HumanoidRootPart.Position
-                root.CFrame = CFrame.new(pos + Vector3.new(0, 50, 0))
-
-                -- Bật aimbot
-                Config.AimbotEnabled = true
-                UpdateButtonText()
-            end
-        end
-    end
-end)
 
 aimbotButton = CreateButton("Aimbot: OFF", function()
     Config.AimbotEnabled = not Config.AimbotEnabled
@@ -324,7 +246,7 @@ armorButton = CreateButton("TP Armor", function()
 	RootPart.CFrame = OldCFrame + Vector3.new(0, 0.5, 0)
 end)
 
-local tpAndStompButton = CreateButton("TP Player", function()
+local tpAndStompButton = CreateButton("TP + Aim + AutoStomp", function()
 	local closestKO, closestAlive = nil, nil
 	local minDistKO, minDistAlive = math.huge, math.huge
 	local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
@@ -588,7 +510,7 @@ end)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.KeyCode == Enum.KeyCode.T then
-		    tpButton:Activate()
+		    tpAndStompButton:Activate()
 	end
 end)
 
@@ -790,7 +712,7 @@ Connect(Players.PlayerRemoving, function(player)
 end)
 
 local lastStompTime = 0
-local stompCooldown = 4
+local stompCooldown = 1.5 -- Thời gian chờ giữa các lần stomp (giảm từ 4s để mượt hơn)
 
 RunService.RenderStepped:Connect(function(deltaTime)
     -- Các cập nhật hiện có
