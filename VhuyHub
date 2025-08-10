@@ -1,991 +1,230 @@
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Workspace = game:GetService("Workspace")
-local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-local Lighting = game:GetService("Lighting")
+local rs = game:GetService("RunService")
+local uis = game:GetService("UserInputService")
+local lp = game.Players.LocalPlayer
 local TweenService = game:GetService("TweenService")
 
--- Configuration
-local Config = {
-    ESPEnabled = false,
-    FullbrightEnabled = false,
-    NoclipEnabled = false,
-    WalkSpeed = 16,
-    JumpPower = 50,
-    FlyEnabled = false,
-    FlySpeed = 50,
-    ClickTeleportEnabled = false
+-- Danh sách animation
+local animations = {
+	C = "http://www.roblox.com/asset/?id=15609995579",
+	N = "http://www.roblox.com/asset/?id=14352343065",
 }
 
--- Save original lighting settings
-local oldLighting = {
-    Brightness = Lighting.Brightness,
-    GlobalShadows = Lighting.GlobalShadows,
-    FogEnd = Lighting.FogEnd,
-    Ambient = Lighting.Ambient,
-    OutdoorAmbient = Lighting.OutdoorAmbient,
-    ClockTime = Lighting.ClockTime
+local currentTrack = nil
+local currentKey = nil
+local renderConnection = nil
+local inputConnection = nil
+
+-- Hàm thiết lập nhân vật
+local function setup(char)
+	local hum = char:WaitForChild("Humanoid", 5)
+	if not hum then return end
+
+	local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
+
+	-- Ngắt kết nối cũ
+	if renderConnection then renderConnection:Disconnect() end
+	if inputConnection then inputConnection:Disconnect() end
+
+	-- Dừng animation khi di chuyển
+	renderConnection = rs.RenderStepped:Connect(function()
+		if currentTrack and hum.MoveDirection.Magnitude > 0 then
+			currentTrack:Stop()
+			currentTrack = nil
+			currentKey = nil
+		end
+	end)
+
+	-- Phát animation khi nhấn phím
+	inputConnection = uis.InputBegan:Connect(function(input)
+		local key = input.KeyCode.Name
+		local animId = animations[key]
+		if animId and hum.MoveDirection.Magnitude == 0 then
+			if currentTrack then
+				currentTrack:Stop()
+				currentTrack = nil
+				currentKey = nil
+			end
+			local anim = Instance.new("Animation")
+			anim.AnimationId = animId
+			local track = animator:LoadAnimation(anim)
+			track:Play()
+			currentTrack = track
+			currentKey = key
+		end
+	end)
+end
+
+-- Kiểm tra character hiện tại
+if lp.Character then
+	setup(lp.Character)
+end
+
+-- Khi nhân vật respawn
+lp.CharacterAdded:Connect(function(char)
+	currentTrack = nil
+	currentKey = nil
+	task.wait(0.2)
+	setup(char)
+end)
+
+-- Hàm gửi thông báo
+local function sendNotification(title, text)
+	game:GetService("StarterGui"):SetCore("SendNotification", {
+		Title = title,
+		Text = text,
+		Duration = 3
+	})
+end
+
+-- Tạo hiệu ứng mờ nền
+local blur = Instance.new("BlurEffect")
+blur.Size = 20
+blur.Parent = game.Lighting
+
+-- Tạo GUI intro
+local gui = Instance.new("ScreenGui")
+gui.Name = "VhuyIntroGui"
+gui.IgnoreGuiInset = true
+gui.ResetOnSpawn = false
+gui.DisplayOrder = 99999
+gui.Parent = game:GetService("CoreGui")
+
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.new(0, 0, 0)
+bg.BackgroundTransparency = 1
+bg.Parent = gui
+
+local title = Instance.new("TextLabel")
+title.AnchorPoint = Vector2.new(0.5, 0.5)
+title.Position = UDim2.new(0.5, 0, 0.5, 0)
+title.Size = UDim2.new(0, 300, 0, 100)
+title.Text = "DhuyxDtuyen"
+title.Font = Enum.Font.GothamBlack
+title.TextColor3 = Color3.fromRGB(255, 179, 186)
+title.TextScaled = true
+title.TextTransparency = 1
+title.BackgroundTransparency = 1
+title.Parent = gui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = title
+
+-- Hiệu ứng fade in
+TweenService:Create(title, TweenInfo.new(1), {TextTransparency = 0}):Play()
+TweenService:Create(bg, TweenInfo.new(1), {BackgroundTransparency = 0.5}):Play()
+
+-- Fade out sau 3 giây
+task.delay(4, function()
+	TweenService:Create(title, TweenInfo.new(1), {TextTransparency = 1}):Play()
+	TweenService:Create(bg, TweenInfo.new(1), {BackgroundTransparency = 1}):Play()
+	task.delay(1, function()
+		gui:Destroy()
+		blur:Destroy()
+	end)
+end)
+
+-- Tạo GUI nút C
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CButtonGui"
+screenGui.ResetOnSpawn = false
+screenGui.IgnoreGuiInset = true
+screenGui.Parent = game.CoreGui
+
+local button = Instance.new("TextButton")
+button.Name = "PlayCButton"
+button.Size = UDim2.new(0, 40, 0, 40)
+button.Position = UDim2.new(0, 10, 0, 300)
+button.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+button.Text = "C"
+button.TextColor3 = Color3.new(0, 0, 0)
+button.TextScaled = true
+button.AutoButtonColor = true
+button.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(1, 0)
+uiCorner.Parent = button
+
+local dragging = false
+local dragStart, startPos
+
+local function update(input)
+	local delta = input.Position - dragStart
+	button.Position = UDim2.new(
+		startPos.X.Scale, startPos.X.Offset + delta.X,
+		startPos.Y.Scale, startPos.Y.Offset + delta.Y
+	)
+end
+
+button.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = button.Position
+		input.Changed:Connect(function()
+			if input.UserInputState == Enum.UserInputState.End then
+				dragging = false
+			end
+		end)
+	end
+end)
+
+uis.InputChanged:Connect(function(input)
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		update(input)
+	end
+end)
+
+-- Phát animation C khi nhấn nút
+button.MouseButton1Click:Connect(function()
+	local char = lp.Character
+	if not char then return end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum or hum.MoveDirection.Magnitude > 0 then return end
+
+	local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
+	local anim = Instance.new("Animation")
+	anim.AnimationId = animations["C"]
+	local track = animator:LoadAnimation(anim)
+
+	if currentTrack then
+		currentTrack:Stop()
+	end
+
+	track:Play()
+	currentTrack = track
+	currentKey = "C"
+end)
+
+-- Tải script theo PlaceId với kiểm tra lỗi
+local placeId = game.PlaceId
+local scriptUrls = {
+	[9872472334] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10662542523] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10324347967] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10324346056] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10530697691] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[10808838353] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
+	[142823291] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2",
+	[13772394625] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball",
+	[6839171747] = "https://raw.githubusercontent.com/DarkDoorsKing/Project/main/Doors.lua",
 }
 
--- Noclip connection
-local noclipConnection = nil
+local url = scriptUrls[placeId] or "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"
 
--- Main ScreenGui
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = tostring(math.random(1e6, 1e7))
-ScreenGui.ResetOnSpawn = false
-ScreenGui.Enabled = true
-ScreenGui.Parent = PlayerGui
-
--- Main Frame
-local MenuFrame = Instance.new("Frame")
-MenuFrame.Size = UDim2.new(0, 270, 0, 220)
-MenuFrame.Position = UDim2.new(0.05, 0, 0.25, 0)
-MenuFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-MenuFrame.BackgroundTransparency = 0
-MenuFrame.Active = true
-MenuFrame.Draggable = true
-MenuFrame.Parent = ScreenGui
-Instance.new("UICorner", MenuFrame).CornerRadius = UDim.new(0, 10)
-
--- Gradient
-local gradient = Instance.new("UIGradient")
-gradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 200, 200)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 150, 150))
-}
-gradient.Rotation = 90
-gradient.Parent = MenuFrame
-
--- Stroke
-local stroke = Instance.new("UIStroke")
-stroke.Thickness = 2
-stroke.Color = Color3.fromRGB(255, 255, 255)
-stroke.Parent = MenuFrame
-
--- Toggle Show/Hide Button
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 60, 0, 25)
-ToggleButton.Position = UDim2.new(0, 10, 0, 10)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-ToggleButton.Text = "SHOW"
-ToggleButton.TextColor3 = Color3.new(0, 0, 0)
-ToggleButton.Font = Enum.Font.SourceSansBold
-ToggleButton.TextSize = 14
-ToggleButton.Active = true
-ToggleButton.Draggable = true
-ToggleButton.Parent = ScreenGui
-Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 8)
-
--- Button animation
-local function AnimateButton(btn)
-    btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 200, 200)}):Play()
-    end)
-    btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 179, 186)}):Play()
-    end)
-    btn.MouseButton1Click:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.1), {Size = btn.Size + UDim2.new(0, 2, 0, 2)}):Play()
-        task.wait(0.1)
-        TweenService:Create(btn, TweenInfo.new(0.1), {Size = btn.Size - UDim2.new(0, 2, 0, 2)}):Play()
-    end)
-end
-AnimateButton(ToggleButton)
-
--- Toggle menu visibility
-ToggleButton.MouseButton1Click:Connect(function()
-    local targetSize = MenuFrame.Visible and UDim2.new(0, 0, 0, 0) or UDim2.new(0, 270, 0, 220)
-    local tween = TweenService:Create(MenuFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize})
-    if not MenuFrame.Visible then
-        MenuFrame.Visible = true
-        tween:Play()
-    else
-        tween:Play()
-        tween.Completed:Wait()
-        MenuFrame.Visible = false
-    end
-    ToggleButton.Text = MenuFrame.Visible and "HIDE" or "SHOW"
+-- Tải và chạy script với xử lý lỗi
+local success, result = pcall(function()
+	return loadstring(game:HttpGet(url))()
 end)
-
--- Title & Clock
-local MenuTitle = Instance.new("TextLabel")
-MenuTitle.Size = UDim2.new(1, 0, 0, 25)
-MenuTitle.BackgroundTransparency = 1
-MenuTitle.Text = "DhuyxDTuyen"
-MenuTitle.TextColor3 = Color3.new(0, 0, 0)
-MenuTitle.Font = Enum.Font.SourceSansBold
-MenuTitle.TextSize = 16
-MenuTitle.Parent = MenuFrame
-
-local Clock = Instance.new("TextLabel")
-Clock.Size = UDim2.new(0, 100, 0, 20)
-Clock.Position = UDim2.new(1, -105, 0, 2)
-Clock.BackgroundTransparency = 1
-Clock.TextColor3 = Color3.new(0, 0, 0)
-Clock.Font = Enum.Font.SourceSans
-Clock.TextSize = 14
-Clock.TextXAlignment = Enum.TextXAlignment.Right
-Clock.Parent = MenuTitle
-
-task.spawn(function()
-    while task.wait(1) do
-        Clock.Text = string.format("Time: %s", os.date("%H:%M:%S"))
-    end
-end)
-
--- Slider Frame
-local SliderFrame = Instance.new("Frame")
-SliderFrame.Size = UDim2.new(0.5, -5, 1, -25)
-SliderFrame.Position = UDim2.new(0, 5, 0, 20)
-SliderFrame.BackgroundTransparency = 1
-SliderFrame.Parent = MenuFrame
-
-local SliderLayout = Instance.new("UIListLayout")
-SliderLayout.SortOrder = Enum.SortOrder.LayoutOrder
-SliderLayout.Padding = UDim.new(0, 10)
-SliderLayout.Parent = SliderFrame
-
--- Create Slider Function
-local function CreateSlider(name, min, max, default, callback)
-    local sliderFrame = Instance.new("Frame")
-    sliderFrame.Size = UDim2.new(1, 0, 0, 30)
-    sliderFrame.BackgroundTransparency = 1
-    sliderFrame.Parent = SliderFrame
-
-    local label = Instance.new("TextLabel")
-    label.Size = UDim2.new(1, 0, 0, 15)
-    label.BackgroundTransparency = 1
-    label.Text = name .. ": " .. default
-    label.TextColor3 = Color3.new(0, 0, 0)
-    label.TextSize = 12
-    label.Parent = sliderFrame
-
-    local track = Instance.new("Frame")
-    track.Size = UDim2.new(1, 0, 0, 5)
-    track.Position = UDim2.new(0, 0, 0.5, 0)
-    track.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
-    track.Parent = sliderFrame
-    Instance.new("UICorner", track).CornerRadius = UDim.new(0, 3)
-
-    local knob = Instance.new("TextButton")
-    knob.Size = UDim2.new(0, 15, 0, 15)
-    knob.Position = UDim2.new((default - min) / (max - min), -7.5, 0.25, -5)
-    knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    knob.Text = ""
-    knob.Parent = sliderFrame
-    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
-
-    local dragging = false
-    knob.MouseButton1Down:Connect(function()
-        dragging = true
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            local pos = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-            knob.Position = UDim2.new(pos, -7.5, knob.Position.Y.Scale, knob.Position.Y.Offset)
-            local value = math.floor(min + pos * (max - min))
-            label.Text = name .. ": " .. value
-            callback(value)
-        end
-    end)
-    return sliderFrame
+if success then
+	sendNotification("Script Loaded", "Đã load script cho PlaceId: " .. placeId)
+else
+	sendNotification("Script Error", "Lỗi khi tải script: " .. tostring(result))
 end
 
--- Sliders
-CreateSlider("WalkSpeed", 1, 300, Config.WalkSpeed, function(value)
-    Config.WalkSpeed = value
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.WalkSpeed = value
-    end
-end)
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/fling"))()
 
-CreateSlider("JumpPower", 1, 600, Config.JumpPower, function(value)
-    Config.JumpPower = value
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-        LocalPlayer.Character.Humanoid.UseJumpPower = true
-        LocalPlayer.Character.Humanoid.JumpPower = value
-    end
-end)
-
--- Button Frame
-local ButtonFrame = Instance.new("ScrollingFrame")
-ButtonFrame.Size = UDim2.new(0.5, -5, 1, -25)
-ButtonFrame.Position = UDim2.new(0.5, 0, 0, 20)
-ButtonFrame.BackgroundTransparency = 1
-ButtonFrame.ScrollBarThickness = 3
-ButtonFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-ButtonFrame.Parent = MenuFrame
-
-local ButtonLayout = Instance.new("UIListLayout")
-ButtonLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ButtonLayout.Padding = UDim.new(0, 5)
-ButtonLayout.Parent = ButtonFrame
-
-ButtonLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    ButtonFrame.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout.AbsoluteContentSize.Y)
-end)
-
--- Create Button Function
-local function CreateButton(name, callback)
-    local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, -10, 0, 25)
-    button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    button.BackgroundTransparency = 0.2
-    button.TextColor3 = Color3.fromRGB(0, 0, 0)
-    button.TextSize = 12
-    button.Font = Enum.Font.SourceSans
-    button.Text = name
-    button.Parent = ButtonFrame
-    button.MouseButton1Click:Connect(callback)
-    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 4)
-    AnimateButton(button)
-    return button
-end
-
--- Update Button Text
-local espButton, fullbrightButton, noclipButton, clickTeleportButton
-local function UpdateButtonText()
-    espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
-    fullbrightButton.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
-    noclipButton.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
-    clickTeleportButton.Text = "ClickTeleport: " .. (Config.ClickTeleportEnabled and "ON" or "OFF")
-end
-
--- Buttons
-espButton = CreateButton("ESP: OFF", function()
-    Config.ESPEnabled = not Config.ESPEnabled
-    UpdateButtonText()
-end)
-
-fullbrightButton = CreateButton("Fullbright: OFF", function()
-    Config.FullbrightEnabled = not Config.FullbrightEnabled
-    if Config.FullbrightEnabled then
-        Lighting.Brightness = 2
-        Lighting.GlobalShadows = false
-        Lighting.FogEnd = 999999
-        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
-        Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
-        Lighting.ClockTime = 12
-    else
-        Lighting.Brightness = oldLighting.Brightness
-        Lighting.GlobalShadows = oldLighting.GlobalShadows
-        Lighting.FogEnd = oldLighting.FogEnd
-        Lighting.Ambient = oldLighting.Ambient
-        Lighting.OutdoorAmbient = oldLighting.OutdoorAmbient
-        Lighting.ClockTime = oldLighting.ClockTime
-    end
-    UpdateButtonText()
-end)
-
-noclipButton = CreateButton("Noclip: OFF", function()
-    Config.NoclipEnabled = not Config.NoclipEnabled
-    if Config.NoclipEnabled then
-        if noclipConnection then noclipConnection:Disconnect() end
-        noclipConnection = RunService.Stepped:Connect(function()
-            local character = LocalPlayer.Character
-            if character then
-                for _, part in pairs(character:GetDescendants()) do
-                    if part:IsA("BasePart") and part.CanCollide then
-                        part.CanCollide = false
-                    end
-                end
-            end
-        end)
-    else
-        if noclipConnection then
-            noclipConnection:Disconnect()
-            noclipConnection = nil
-        end
-        local character = LocalPlayer.Character
-        if character then
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = true
-                end
-            end
-        end
-    end
-    UpdateButtonText()
-end)
-
-LocalPlayer.CharacterAdded:Connect(function(newCharacter)
-    if Config.NoclipEnabled then
-        Config.NoclipEnabled = false
-        wait(0.5)
-        Config.NoclipEnabled = true
-        noclipButton:MouseButton1Click()
-    end
-end)
-
--- ClickTeleport
-clickTeleportButton = CreateButton("ClickTeleport: OFF", function()
-    Config.ClickTeleportEnabled = not Config.ClickTeleportEnabled
-    UpdateButtonText()
-    if Config.ClickTeleportEnabled then
-        local character = LocalPlayer.Character
-        if character then
-            createClickTeleportTool()
-        end
-    else
-        removeClickTeleportTool()
-    end
-end)
-
-local function createClickTeleportTool()
-    local tool = Instance.new("Tool")
-    tool.Name = "ClickTeleport"
-    tool.Parent = LocalPlayer.Backpack
-
-    tool.Activated:Connect(function()
-        local mouse = LocalPlayer:GetMouse()
-        local targetPos = mouse.Hit.Position
-        local character = LocalPlayer.Character
-        local root = character and character:FindFirstChild("HumanoidRootPart")
-        if root then
-            root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
-        end
-    end)
-
-    if UserInputService.TouchEnabled then
-        UserInputService.TouchTap:Connect(function(inputPositions, processed)
-            if not processed and tool.Parent == LocalPlayer.Character then
-                local touchPos = inputPositions[1]
-                local ray = Camera:ScreenPointToRay(touchPos.X, touchPos.Y)
-                local raycastParams = RaycastParams.new()
-                raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-                raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-                local result = Workspace:Raycast(ray.Origin, ray.Direction * 1000, raycastParams)
-                if result then
-                    local targetPos = result.Position
-                    local character = LocalPlayer.Character
-                    local root = character and character:FindFirstChild("HumanoidRootPart")
-                    if root then
-                        root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
-                    end
-                end
-            end
-        end)
-    end
-end
-
-local function removeClickTeleportTool()
-    local backpack = LocalPlayer.Backpack
-    local character = LocalPlayer.Character
-    local toolInBackpack = backpack and backpack:FindFirstChild("ClickTeleport")
-    local toolInCharacter = character and character:FindFirstChild("ClickTeleport")
-    if toolInBackpack then
-        toolInBackpack:Destroy()
-    end
-    if toolInCharacter then
-        toolInCharacter:Destroy()
-    end
-end
-
-LocalPlayer.CharacterAdded:Connect(function(newCharacter)
-    if Config.ClickTeleportEnabled then
-        wait(0.5)
-        createClickTeleportTool()
-    end
-end)
-
--- Fly GUI V3
-local flyGui = Instance.new("ScreenGui")
-flyGui.Name = "FlyGui"
-flyGui.Parent = PlayerGui
-flyGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-flyGui.ResetOnSpawn = false
-
-local FlyFrame = Instance.new("Frame")
-FlyFrame.Parent = flyGui
-FlyFrame.BackgroundColor3 = Color3.fromRGB(163, 255, 137)
-FlyFrame.BorderColor3 = Color3.fromRGB(103, 221, 213)
-FlyFrame.Position = UDim2.new(0.1, 0, 0.38, 0)
-FlyFrame.Size = UDim2.new(0, 190, 0, 57)
-FlyFrame.Active = true
-FlyFrame.Draggable = true
-
-local up = Instance.new("TextButton")
-up.Name = "up"
-up.Parent = FlyFrame
-up.BackgroundColor3 = Color3.fromRGB(79, 255, 152)
-up.Size = UDim2.new(0, 44, 0, 28)
-up.Font = Enum.Font.SourceSans
-up.Text = "UP"
-up.TextColor3 = Color3.fromRGB(0, 0, 0)
-up.TextSize = 14
-
-local down = Instance.new("TextButton")
-down.Name = "down"
-down.Parent = FlyFrame
-down.BackgroundColor3 = Color3.fromRGB(215, 255, 121)
-down.Position = UDim2.new(0, 0, 0.491228074, 0)
-down.Size = UDim2.new(0, 44, 0, 28)
-down.Font = Enum.Font.SourceSans
-down.Text = "DOWN"
-down.TextColor3 = Color3.fromRGB(0, 0, 0)
-down.TextSize = 14
-
-local onof = Instance.new("TextButton")
-onof.Name = "onof"
-onof.Parent = FlyFrame
-onof.BackgroundColor3 = Color3.fromRGB(255, 249, 74)
-onof.Position = UDim2.new(0.702823281, 0, 0.491228074, 0)
-onof.Size = UDim2.new(0, 56, 0, 28)
-onof.Font = Enum.Font.SourceSans
-onof.Text = "Fly: OFF"
-onof.TextColor3 = Color3.fromRGB(0, 0, 0)
-onof.TextSize = 14
-
-local FlyTitle = Instance.new("TextLabel")
-FlyTitle.Parent = FlyFrame
-FlyTitle.BackgroundColor3 = Color3.fromRGB(242, 60, 255)
-FlyTitle.Position = UDim2.new(0.469327301, 0, 0, 0)
-FlyTitle.Size = UDim2.new(0, 100, 0, 28)
-FlyTitle.Font = Enum.Font.SourceSans
-FlyTitle.Text = "FLY GUI V3"
-FlyTitle.TextColor3 = Color3.fromRGB(0, 0, 0)
-FlyTitle.TextScaled = true
-FlyTitle.TextSize = 14
-FlyTitle.TextWrapped = true
-
-local plus = Instance.new("TextButton")
-plus.Name = "plus"
-plus.Parent = FlyFrame
-plus.BackgroundColor3 = Color3.fromRGB(133, 145, 255)
-plus.Position = UDim2.new(0.231578946, 0, 0, 0)
-plus.Size = UDim2.new(0, 45, 0, 28)
-plus.Font = Enum.Font.SourceSans
-plus.Text = "+"
-plus.TextColor3 = Color3.fromRGB(0, 0, 0)
-plus.TextScaled = true
-plus.TextSize = 14
-plus.TextWrapped = true
-
-local speed = Instance.new("TextLabel")
-speed.Name = "speed"
-speed.Parent = FlyFrame
-speed.BackgroundColor3 = Color3.fromRGB(255, 85, 0)
-speed.Position = UDim2.new(0.468421042, 0, 0.491228074, 0)
-speed.Size = UDim2.new(0, 44, 0, 28)
-speed.Font = Enum.Font.SourceSans
-speed.Text = "1"
-speed.TextColor3 = Color3.fromRGB(0, 0, 0)
-speed.TextScaled = true
-speed.TextSize = 14
-speed.TextWrapped = true
-
-local mine = Instance.new("TextButton")
-mine.Name = "mine"
-mine.Parent = FlyFrame
-mine.BackgroundColor3 = Color3.fromRGB(123, 255, 247)
-mine.Position = UDim2.new(0.231578946, 0, 0.491228074, 0)
-mine.Size = UDim2.new(0, 45, 0, 29)
-mine.Font = Enum.Font.SourceSans
-mine.Text = "-"
-mine.TextColor3 = Color3.fromRGB(0, 0, 0)
-mine.TextScaled = true
-mine.TextSize = 14
-mine.TextWrapped = true
-
-local closebutton = Instance.new("TextButton")
-closebutton.Name = "Close"
-closebutton.Parent = FlyFrame
-closebutton.BackgroundColor3 = Color3.fromRGB(225, 25, 0)
-closebutton.Font = Enum.Font.SourceSans
-closebutton.Size = UDim2.new(0, 45, 0, 28)
-closebutton.Text = "X"
-closebutton.TextSize = 30
-closebutton.Position = UDim2.new(0, 0, -1, 27)
-
-local mini = Instance.new("TextButton")
-mini.Name = "minimize"
-mini.Parent = FlyFrame
-mini.BackgroundColor3 = Color3.fromRGB(192, 150, 230)
-mini.Font = Enum.Font.SourceSans
-mini.Size = UDim2.new(0, 45, 0, 28)
-mini.Text = "-"
-mini.TextSize = 40
-mini.Position = UDim2.new(0, 44, -1, 27)
-
-local mini2 = Instance.new("TextButton")
-mini2.Name = "minimize2"
-mini2.Parent = FlyFrame
-mini2.BackgroundColor3 = Color3.fromRGB(192, 150, 230)
-mini2.Font = Enum.Font.SourceSans
-mini2.Size = UDim2.new(0, 45, 0, 28)
-mini2.Text = "+"
-mini2.TextSize = 40
-mini2.Position = UDim2.new(0, 44, -1, 57)
-mini2.Visible = false
-
-local speeds = 1
-local nowe = false
-local tpwalking = false
-
-game:GetService("StarterGui"):SetCore("SendNotification", {
-    Title = "FLY GUI V3",
-    Text = "BY XNEO",
-    Icon = "rbxthumb://type=Asset&id=5107182114&w=150&h=150",
-    Duration = 5
-})
-
-onof.MouseButton1Down:Connect(function()
-    nowe = not nowe
-    onof.Text = "Fly: " .. (nowe and "ON" or "OFF")
-    Config.FlyEnabled = nowe
-    UpdateButtonText()
-
-    if not nowe then
-        local speaker = LocalPlayer
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, true)
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, true)
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying, true)
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, true)
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, true)
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed, true)
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, true)
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, true)
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, true)
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, true)
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics, true)
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.StrafingNoPhysics, true)
-        speaker.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, true)
-        speaker.Character.Humanoid:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
-        speaker.Character.Animate.Disabled = false
-    else
-        for i = 1, speeds do
-            spawn(function()
-                local hb = RunService.Heartbeat
-                tpwalking = true
-                local chr = LocalPlayer.Character
-                local hum = chr and chr:FindFirstChildWhichIsA("Humanoid")
-                while tpwalking and hb:Wait() and chr and hum and hum.Parent do
-                    if hum.MoveDirection.Magnitude > 0 then
-                        chr:TranslateBy(hum.MoveDirection)
-                    end
-                end
-            end)
-        end
-        LocalPlayer.Character.Animate.Disabled = true
-        local Char = LocalPlayer.Character
-        local Hum = Char:FindFirstChildOfClass("Humanoid") or Char:FindFirstChildOfClass("AnimationController")
-        for _, v in next, Hum:GetPlayingAnimationTracks() do
-            v:AdjustSpeed(0)
-        end
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Climbing, false)
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.FallingDown, false)
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Flying, false)
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Freefall, false)
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.GettingUp, false)
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Landed, false)
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Physics, false)
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.PlatformStanding, false)
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Ragdoll, false)
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Running, false)
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.RunningNoPhysics, false)
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.StrafingNoPhysics, false)
-        LocalPlayer.Character.Humanoid:SetStateEnabled(Enum.HumanoidStateType.Swimming, false)
-        LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Swimming)
-    end
-
-    if LocalPlayer.Character:FindFirstChildOfClass("Humanoid").RigType == Enum.HumanoidRigType.R6 then
-        local plr = LocalPlayer
-        local torso = plr.Character.Torso
-        local flying = true
-        local deb = true
-        local ctrl = {f = 0, b = 0, l = 0, r = 0}
-        local lastctrl = {f = 0, b = 0, l = 0, r = 0}
-        local maxspeed = 50
-        local speed = 0
-
-        local bg = Instance.new("BodyGyro", torso)
-        bg.P = 9e4
-        bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
-        bg.cframe = torso.CFrame
-        local bv = Instance.new("BodyVelocity", torso)
-        bv.velocity = Vector3.new(0, 0.1, 0)
-        bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
-        if nowe then
-            plr.Character.Humanoid.PlatformStand = true
-        end
-        while nowe and plr.Character.Humanoid.Health > 0 do
-            RunService.RenderStepped:Wait()
-            if ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0 then
-                speed = speed + 0.5 + (speed / maxspeed)
-                if speed > maxspeed then
-                    speed = maxspeed
-                end
-            elseif not (ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0) and speed ~= 0 then
-                speed = speed - 1
-                if speed < 0 then
-                    speed = 0
-                end
-            end
-            if (ctrl.l + ctrl.r) ~= 0 or (ctrl.f + ctrl.b) ~= 0 then
-                bv.velocity = ((Workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f + ctrl.b)) + 
-                    ((Workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l + ctrl.r, (ctrl.f + ctrl.b) * 0.2, 0).p) - 
-                    Workspace.CurrentCamera.CoordinateFrame.p)) * speed
-                lastctrl = {f = ctrl.f, b = ctrl.b, l = ctrl.l, r = ctrl.r}
-            elseif (ctrl.l + ctrl.r) == 0 and (ctrl.f + ctrl.b) == 0 and speed ~= 0 then
-                bv.velocity = ((Workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f + lastctrl.b)) + 
-                    ((Workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l + lastctrl.r, (lastctrl.f + lastctrl.b) * 0.2, 0).p) - 
-                    Workspace.CurrentCamera.CoordinateFrame.p)) * speed
-            else
-                bv.velocity = Vector3.new(0, 0, 0)
-            end
-            bg.cframe = Workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f + ctrl.b) * 50 * speed / maxspeed), 0, 0)
-        end
-        ctrl = {f = 0, b = 0, l = 0, r = 0}
-        lastctrl = {f = 0, b = 0, l = 0, r = 0}
-        speed = 0
-        bg:Destroy()
-        bv:Destroy()
-        plr.Character.Humanoid.PlatformStand = false
-        plr.Character.Animate.Disabled = false
-        tpwalking = false
-    else
-        local plr = LocalPlayer
-        local UpperTorso = plr.Character.UpperTorso
-        local flying = true
-        local deb = true
-        local ctrl = {f = 0, b = 0, l = 0, r = 0}
-        local lastctrl = {f = 0, b = 0, l = 0, r = 0}
-        local maxspeed = 50
-        local speed = 0
-
-        local bg = Instance.new("BodyGyro", UpperTorso)
-        bg.P = 9e4
-        bg.maxTorque = Vector3.new(9e9, 9e9, 9e9)
-        bg.cframe = UpperTorso.CFrame
-        local bv = Instance.new("BodyVelocity", UpperTorso)
-        bv.velocity = Vector3.new(0, 0.1, 0)
-        bv.maxForce = Vector3.new(9e9, 9e9, 9e9)
-        if nowe then
-            plr.Character.Humanoid.PlatformStand = true
-        end
-        while nowe and plr.Character.Humanoid.Health > 0 do
-            wait()
-            if ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0 then
-                speed = speed + 0.5 + (speed / maxspeed)
-                if speed > maxspeed then
-                    speed = maxspeed
-                end
-            elseif not (ctrl.l + ctrl.r ~= 0 or ctrl.f + ctrl.b ~= 0) and speed ~= 0 then
-                speed = speed - 1
-                if speed < 0 then
-                    speed = 0
-                end
-            end
-            if (ctrl.l + ctrl.r) ~= 0 or (ctrl.f + ctrl.b) ~= 0 then
-                bv.velocity = ((Workspace.CurrentCamera.CoordinateFrame.lookVector * (ctrl.f + ctrl.b)) + 
-                    ((Workspace.CurrentCamera.CoordinateFrame * CFrame.new(ctrl.l + ctrl.r, (ctrl.f + ctrl.b) * 0.2, 0).p) - 
-                    Workspace.CurrentCamera.CoordinateFrame.p)) * speed
-                lastctrl = {f = ctrl.f, b = ctrl.b, l = ctrl.l, r = ctrl.r}
-            elseif (ctrl.l + ctrl.r) == 0 and (ctrl.f + ctrl.b) == 0 and speed ~= 0 then
-                bv.velocity = ((Workspace.CurrentCamera.CoordinateFrame.lookVector * (lastctrl.f + lastctrl.b)) + 
-                    ((Workspace.CurrentCamera.CoordinateFrame * CFrame.new(lastctrl.l + lastctrl.r, (lastctrl.f + lastctrl.b) * 0.2, 0).p) - 
-                    Workspace.CurrentCamera.CoordinateFrame.p)) * speed
-            else
-                bv.velocity = Vector3.new(0, 0, 0)
-            end
-            bg.cframe = Workspace.CurrentCamera.CoordinateFrame * CFrame.Angles(-math.rad((ctrl.f + ctrl.b) * 50 * speed / maxspeed), 0, 0)
-        end
-        ctrl = {f = 0, b = 0, l = 0, r = 0}
-        lastctrl = {f = 0, b = 0, l = 0, r = 0}
-        speed = 0
-        bg:Destroy()
-        bv:Destroy()
-        plr.Character.Humanoid.PlatformStand = false
-        plr.Character.Animate.Disabled = false
-        tpwalking = false
-    end
-end)
-
-UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.KeyCode == Enum.KeyCode.W then ctrl.f = 1
-    elseif input.KeyCode == Enum.KeyCode.S then ctrl.b = 1
-    elseif input.KeyCode == Enum.KeyCode.A then ctrl.l = 1
-    elseif input.KeyCode == Enum.KeyCode.D then ctrl.r = 1
-    end
-end)
-
-UserInputService.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.W then ctrl.f = 0
-    elseif input.KeyCode == Enum.KeyCode.S then ctrl.b = 0
-    elseif input.KeyCode == Enum.KeyCode.A then ctrl.l = 0
-    elseif input.KeyCode == Enum.KeyCode.D then ctrl.r = 0
-    end
-end)
-
-local tis
-up.MouseButton1Down:Connect(function()
-    tis = up.MouseEnter:Connect(function()
-        while tis do
-            wait()
-            if LocalPlayer.Character and LocalPlayer.Character.HumanoidRootPart then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 1, 0)
-            end
-        end
-    end)
-end)
-
-up.MouseLeave:Connect(function()
-    if tis then
-        tis:Disconnect()
-        tis = nil
-    end
-end)
-
-local dis
-down.MouseButton1Down:Connect(function()
-    dis = down.MouseEnter:Connect(function()
-        while dis do
-            wait()
-            if LocalPlayer.Character and LocalPlayer.Character.HumanoidRootPart then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, -1, 0)
-            end
-        end
-    end)
-end)
-
-down.MouseLeave:Connect(function()
-    if dis then
-        dis:Disconnect()
-        dis = nil
-    end
-end)
-
-plus.MouseButton1Down:Connect(function()
-    speeds = speeds + 1
-    speed.Text = tostring(speeds)
-    if nowe then
-        tpwalking = false
-        for i = 1, speeds do
-            spawn(function()
-                local hb = RunService.Heartbeat
-                tpwalking = true
-                local chr = LocalPlayer.Character
-                local hum = chr and chr:FindFirstChildWhichIsA("Humanoid")
-                while tpwalking and hb:Wait() and chr and hum and hum.Parent do
-                    if hum.MoveDirection.Magnitude > 0 then
-                        chr:TranslateBy(hum.MoveDirection)
-                    end
-                end
-            end)
-        end
-    end
-end)
-
-mine.MouseButton1Down:Connect(function()
-    if speeds == 1 then
-        speed.Text = "cannot be less than 1"
-        wait(1)
-        speed.Text = tostring(speeds)
-    else
-        speeds = speeds - 1
-        speed.Text = tostring(speeds)
-        if nowe then
-            tpwalking = false
-            for i = 1, speeds do
-                spawn(function()
-                    local hb = RunService.Heartbeat
-                    tpwalking = true
-                    local chr = LocalPlayer.Character
-                    local hum = chr and chr:FindFirstChildWhichIsA("Humanoid")
-                    while tpwalking and hb:Wait() and chr and hum and hum.Parent do
-                        if hum.MoveDirection.Magnitude > 0 then
-                            chr:TranslateBy(hum.MoveDirection)
-                        end
-                    end
-                end)
-            end
-        end
-    end
-end)
-
-closebutton.MouseButton1Click:Connect(function()
-    flyGui:Destroy()
-end)
-
-mini.MouseButton1Click:Connect(function()
-    up.Visible = false
-    down.Visible = false
-    onof.Visible = false
-    plus.Visible = false
-    speed.Visible = false
-    mine.Visible = false
-    mini.Visible = false
-    mini2.Visible = true
-    FlyFrame.BackgroundTransparency = 1
-    closebutton.Position = UDim2.new(0, 0, -1, 57)
-end)
-
-mini2.MouseButton1Click:Connect(function()
-    up.Visible = true
-    down.Visible = true
-    onof.Visible = true
-    plus.Visible = true
-    speed.Visible = true
-    mine.Visible = true
-    mini.Visible = true
-    mini2.Visible = false
-    FlyFrame.BackgroundTransparency = 0
-    closebutton.Position = UDim2.new(0, 0, -1, 27)
-end)
-
-LocalPlayer.CharacterAdded:Connect(function(char)
-    wait(0.7)
-    if LocalPlayer.Character then
-        LocalPlayer.Character.Humanoid.PlatformStand = false
-        LocalPlayer.Character.Animate.Disabled = false
-    end
-    if Config.FlyEnabled then
-        wait(0.5)
-        onof:MouseButton1Click()
-    end
-end)
-
--- ESP Logic (Updated)
-local espGui = Instance.new("ScreenGui")
-espGui.Name = "SafeESP"
-espGui.ResetOnSpawn = false
-espGui.IgnoreGuiInset = true
-espGui.Parent = PlayerGui
-
-local ESPs = {}
-
-local function IsValidTarget(player)
-    return player and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character:FindFirstChild("HumanoidRootPart")
-end
-
-local function CreateESP(player)
-    if ESPs[player] or player == LocalPlayer then return end
-    local label = Instance.new("TextLabel")
-    label.BackgroundTransparency = 1
-    label.TextColor3 = Color3.fromRGB(255, 255, 255)
-    label.TextSize = 14
-    label.Font = Enum.Font.GothamBlack
-    label.Text = player.DisplayName
-    label.TextStrokeTransparency = 0.7
-    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
-    label.Size = UDim2.new(0, 200, 0, 20)
-    label.AnchorPoint = Vector2.new(0.5, 0.5)
-    label.Position = UDim2.new(0.5, 0, 0.5, 0)
-    label.Visible = false
-    label.Parent = espGui
-
-    local highlight = Instance.new("Highlight")
-    highlight.Enabled = false
-    highlight.FillTransparency = 0.7
-    highlight.OutlineTransparency = 0.3
-    highlight.FillColor = Color3.fromRGB(255, 255, 255)
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-    highlight.Adornee = player.Character
-    highlight.Parent = espGui
-
-    ESPs[player] = { label = label, highlight = highlight }
-end
-
-local function RemoveESP(player)
-    if ESPs[player] then
-        pcall(function()
-            ESPs[player].label:Destroy()
-            ESPs[player].highlight:Destroy()
-        end)
-        ESPs[player] = nil
-    end
-end
-
-local function UpdateESP()
-    if not Config.ESPEnabled then
-        for _, v in pairs(ESPs) do
-            v.label.Visible = false
-            v.highlight.Enabled = false
-        end
-        return
-    end
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and IsValidTarget(player) then
-            local character = player.Character
-            local head = character:FindFirstChild("Head")
-            if head then
-                CreateESP(player)
-                local headPos = head.Position
-                local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
-                local esp = ESPs[player]
-                if esp then
-                    if onScreen then
-                        esp.label.Visible = true
-                        esp.label.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y - 20)
-                        esp.highlight.Enabled = true
-                    else
-                        esp.label.Visible = false
-                        esp.highlight.Enabled = false
-                    end
-                end
-            else
-                RemoveESP(player)
-            end
-        else
-            RemoveESP(player)
-        end
-    end
-end
-
-RunService.RenderStepped:Connect(UpdateESP)
-
--- Player Events
-local Connections = {}
-local function Connect(event, callback)
-    local connection = event:Connect(callback)
-    table.insert(Connections, connection)
-    return connection
-end
-
-Connect(Players.PlayerAdded, function(player)
-    task.wait(math.random(2, 3))
-    RemoveESP(player)
-end)
-
-Connect(Players.PlayerRemoving, function(player)
-    RemoveESP(player)
-end)
-
--- Cleanup
-game:BindToClose(function()
-    for _, connection in pairs(Connections) do
-        pcall(function() connection:Disconnect() end)
-    end
-    for _, esp in pairs(ESPs) do
-        pcall(function()
-            esp.label:Destroy()
-            esp.highlight:Destroy()
-        end)
-    end
-    pcall(function() if ScreenGui and ScreenGui.Parent then ScreenGui:Destroy() end end)
-    pcall(function() if espGui and espGui.Parent then espGui:Destroy() end end)
-    pcall(function() if flyGui and flyGui.Parent then flyGui:Destroy() end end)
-    if noclipConnection then
-        noclipConnection:Disconnect()
-    end
-    Lighting.Brightness = oldLighting.Brightness
-    Lighting.GlobalShadows = oldLighting.GlobalShadows
-    Lighting.FogEnd = oldLighting.FogEnd
-    Lighting.Ambient = oldLighting.Ambient
-    Lighting.OutdoorAmbient = oldLighting.OutdoorAmbient
-    Lighting.ClockTime = oldLighting.ClockTime
-end)
+-- Thông báo khởi tạo
+sendNotification("Script Loaded", "Đã load DhuyXDtuyen")
