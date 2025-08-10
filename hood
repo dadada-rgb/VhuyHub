@@ -20,6 +20,8 @@ local Config = {
     SpeedAmount = 20,
     AutoStompEnabled = true,
     CustomPing = nil -- Thêm biến lưu ping tùy chỉnh
+    FullbrightEnabled = false, -- Thêm trạng thái Fullbright
+    NoclipEnabled = false, -- Thêm trạng thái Noclip
 }
 
 local autoSelect = false
@@ -28,6 +30,994 @@ local fovRadius = 20
 local Player = nil
 
 local currentTool = nil
+
+local oldLighting = {
+    Brightness = Lighting.Brightness,
+    GlobalShadows = Lighting.GlobalShadows,
+    FogEnd = Lighting.FogEnd,
+    Ambient = Lighting.Ambient,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+    ClockTime = Lighting.ClockTime
+}
+
+-- Kết nối cho Noclip
+local noclipConnection = nil
+
+-- Hàm kiểm tra Tool có phải là súng và có thuộc tính Ammo
+local function isGun(tool)
+    if not tool then return false end
+    return tool:FindFirstChild("Ammo") ~= nil
+end
+
+-- Hàm reload nếu Ammo = 0
+local function checkAmmoAndReload()
+    if not currentTool then return end
+    if isGun(currentTool) then
+        local ammo = currentTool:FindFirstChild("Ammo")
+        if ammo and ammo:IsA("IntValue") and ammo.Value <= 0 then
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.R, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.R, false, game)
+        end
+    end
+end
+
+-- Thêm hàm thông báo K.O ngay đây
+local function ShowKONotification(playerName)
+    sendnotify(playerName .. " downed!", 3)
+end
+
+-- Hàm dịch chuyển đến người gần nhất trong danh sách
+local function TeleportToClosest()
+    local closestKO, closestAlive = nil, nil
+    local minDistKO, minDistAlive = math.huge, math.huge
+    local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+
+    if not myPos then return end
+
+    -- Tìm người gần nhất bị K.O hoặc còn sống
+    for name, selected in pairs(Config.SelectedPlayers) do
+        if selected then
+            local plr = Players:FindFirstChild(name)
+            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local pos = plr.Character.HumanoidRootPart.Position
+                local dist = (myPos - pos).Magnitude
+                local body = plr.Character:FindFirstChild("BodyEffects")
+                local isKO = body and body:FindFirstChild("K.O") and body["K.O"].Value
+                if isKO then
+                    if dist < minDistKO then
+                        closestKO = plr
+                        minDistKO = dist
+                    end
+                else
+                    if dist < minDistAlive then
+                        closestAlive = plr
+                        minDistAlive = dist
+                    end
+                end
+            end
+        end
+    end
+
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local oldPos = root.CFrame
+
+    -- Ưu tiên người bị K.O
+    if closestKO then
+        local torso = closestKO.Character:FindFirstChild("LowerTorso") or closestKO.Character:FindFirstChild("Torso") or closestKO.Character:FindFirstChild("HumanoidRootPart")
+        if torso then
+            -- Dịch chuyển đến LowerTorso
+            root.CFrame = torso.CFrame
+            -- Tự động stomp
+            task.wait(0.2)
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            -- Quay lại vị trí cũ sau khi stomp
+            task.wait(1.5)
+            root.CFrame = oldPos + Vector3.new(0, 3, 0)
+        end
+    elseif closestAlive then
+        local torso = closestAlive.Character:FindFirstChild("LowerTorso") or closestAlive.Character:FindFirstChild("Torso") or closestAlive.Character:FindFirstChild("HumanoidRootPart")
+        if torso then
+            -- Dịch chuyển cách 30 studs phía trên
+            root.CFrame = torso.CFrame + Vector3.new(0, 30, 0)
+        end
+    end
+end
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		Config.AimbotEnabled = true
+	end
+end)
+
+UserInputService.InputEnded:Connect(function(input, gpe)
+	if input.UserInputType == Enum.UserInputType.MouseButton2 then
+		Config.AimbotEnabled = false
+	end
+end)
+
+-- Tạo ScreenGui chính
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = tostring(math.random(1e6, 1e7))
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Enabled = true
+ScreenGui.Parent = PlayerGui
+
+-- Frame chính (hồng pastel)
+local MenuFrame = Instance.new("Frame")
+MenuFrame.Size = UDim2.new(0, 250, 0, 200)
+MenuFrame.Position = UDim2.new(0.1, 0, 0.3, 0)
+MenuFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+MenuFrame.BackgroundTransparency = 0.3
+MenuFrame.Active = true
+MenuFrame.Draggable = true
+MenuFrame.Parent = ScreenGui
+Instance.new("UICorner", MenuFrame).CornerRadius = UDim.new(0, 8)
+
+-- Nút ẩn/hiện Frame
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 20, 0, 20)
+ToggleButton.Position = UDim2.new(0, 10, 0, 10)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+ToggleButton.Text = "show"
+ToggleButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+ToggleButton.TextSize = 14
+ToggleButton.Font = Enum.Font.SourceSansBold
+ToggleButton.Active = true
+ToggleButton.Draggable = true
+ToggleButton.Parent = ScreenGui
+Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 8)
+
+-- Xử lý ẩn/hiện Frame
+ToggleButton.MouseButton1Click:Connect(function()
+    MenuFrame.Visible = not MenuFrame.Visible
+    ToggleButton.Text = MenuFrame.Visible and "show" or "hidd"
+end)
+
+-- Tiêu đề Frame
+local MenuTitle = Instance.new("TextLabel")
+MenuTitle.Size = UDim2.new(1, 0, 0, 20)
+MenuTitle.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+MenuTitle.Text = "DhuyxDTuyen"
+MenuTitle.TextColor3 = Color3.fromRGB(0, 0, 0)
+MenuTitle.Font = Enum.Font.SourceSans
+MenuTitle.TextSize = 14
+MenuTitle.Parent = MenuFrame
+Instance.new("UICorner", MenuTitle).CornerRadius = UDim.new(0, 8)
+
+-- TextBox để chỉnh ping
+local PingBox = Instance.new("TextBox")
+PingBox.Size = UDim2.new(0, 60, 0, 20)
+PingBox.Position = UDim2.new(1, -70, 0, 0)
+PingBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+PingBox.BackgroundTransparency = 0.2
+PingBox.TextColor3 = Color3.fromRGB(0, 0, 0)
+PingBox.TextSize = 12
+PingBox.Font = Enum.Font.SourceSans
+PingBox.PlaceholderText = "Ping (ms)"
+PingBox.Text = ""
+PingBox.Parent = MenuTitle
+Instance.new("UICorner", PingBox).CornerRadius = UDim.new(0, 4)
+
+-- Xử lý khi nhập ping
+PingBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local input = tonumber(PingBox.Text)
+        if input and input >= 0 then
+            Config.CustomPing = math.clamp(input, 10, 1000) -- Giới hạn ping hợp lý
+            PingBox.Text = tostring(Config.CustomPing)
+        else
+            Config.CustomPing = nil
+            PingBox.Text = ""
+        end
+    end
+end)
+
+-- Frame danh sách người chơi (bên trái)
+local PlayerListFrame = Instance.new("Frame")
+PlayerListFrame.Size = UDim2.new(0.5, -5, 1, -25)
+PlayerListFrame.Position = UDim2.new(0, 5, 0, 20)
+PlayerListFrame.BackgroundTransparency = 1
+PlayerListFrame.Parent = MenuFrame
+
+local PlayerList = Instance.new("ScrollingFrame")
+PlayerList.Size = UDim2.new(1, 0, 1, 0)
+PlayerList.CanvasSize = UDim2.new(0, 0, 0, 0)
+PlayerList.ScrollBarThickness = 3
+PlayerList.BackgroundTransparency = 1
+PlayerList.Parent = PlayerListFrame
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 3)
+UIListLayout.Parent = PlayerList
+UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    PlayerList.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
+end)
+
+-- Frame nút chức năng (bên phải)
+local ButtonFrame = Instance.new("ScrollingFrame")
+ButtonFrame.Size = UDim2.new(0.5, -5, 1, -25)
+ButtonFrame.Position = UDim2.new(0.5, 0, 0, 20)
+ButtonFrame.BackgroundTransparency = 1
+ButtonFrame.ScrollBarThickness = 3
+ButtonFrame.CanvasSize = UDim2.new(0, 0, 0, 0) -- Will be updated dynamically
+ButtonFrame.Parent = MenuFrame
+
+local ButtonLayout = Instance.new("UIListLayout")
+ButtonLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ButtonLayout.Padding = UDim.new(0, 5)
+ButtonLayout.Parent = ButtonFrame
+
+-- Update CanvasSize dynamically based on button count
+ButtonLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ButtonFrame.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout.AbsoluteContentSize.Y)
+end)
+
+-- Hàm tạo nút
+local function CreateButton(name, callback)
+    local button = Instance.new("TextButton")
+    button.Size = UDim2.new(1, -10, 0, 25)
+    button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    button.BackgroundTransparency = 0.2
+    button.TextColor3 = Color3.fromRGB(0, 0, 0)
+    button.TextSize = 12
+    button.Font = Enum.Font.SourceSans
+    button.Text = name
+    button.Parent = ButtonFrame
+    button.MouseButton1Click:Connect(callback)
+    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 4)
+    return button
+end
+
+local function UpdateButtonText()
+    aimbotButton.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
+    espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
+    speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
+    flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
+    fullbrightButton.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
+    noclipButton.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
+    armorButton.Text = "TP Armor"
+    tpAndStompButton.Text = "TP + Aim + AutoStomp"
+end
+
+aimbotButton = CreateButton("Aimbot: OFF", function()
+    Config.AimbotEnabled = not Config.AimbotEnabled
+    UpdateButtonText()
+end)
+
+espButton = CreateButton("ESP: OFF", function()
+    Config.ESPEnabled = not Config.ESPEnabled
+    UpdateButtonText()
+end)
+
+speedButton = CreateButton("Speed: OFF", function()
+    Config.SpeedEnabled = not Config.SpeedEnabled
+    UpdateButtonText()
+end)
+
+flyButton = CreateButton("Fly: OFF", function()
+    Config.FlyEnabled = not Config.FlyEnabled
+    UpdateButtonText()
+end)
+
+fullbrightButton = CreateButton("Fullbright: OFF", function()
+    Config.FullbrightEnabled = not Config.FullbrightEnabled
+    if Config.FullbrightEnabled then
+        -- Bật Fullbright (thay đổi Lighting để tránh patch thông thường)
+        Lighting.Brightness = 2
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 999999
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+        Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+        Lighting.ClockTime = 12
+    else
+        -- Tắt Fullbright và khôi phục trạng thái cũ
+        Lighting.Brightness = oldLighting.Brightness
+        Lighting.GlobalShadows = oldLighting.GlobalShadows
+        Lighting.FogEnd = oldLighting.FogEnd
+        Lighting.Ambient = oldLighting.Ambient
+        Lighting.OutdoorAmbient = oldLighting.OutdoorAmbient
+        Lighting.ClockTime = oldLighting.ClockTime
+    end
+    UpdateButtonText()
+end)
+
+noclipButton = CreateButton("Noclip: OFF", function()
+    Config.NoclipEnabled = not Config.NoclipEnabled
+    if Config.NoclipEnabled then
+        -- Bật Noclip (sử dụng Stepped để tránh patch, chỉ áp dụng cho nhân vật hiện tại)
+        if noclipConnection then noclipConnection:Disconnect() end
+        noclipConnection = RunService.Stepped:Connect(function()
+            local character = LocalPlayer.Character
+            if character then
+                for _, part in pairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") and part.CanCollide then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+    else
+        -- Tắt Noclip
+        if noclipConnection then
+            noclipConnection:Disconnect()
+            noclipConnection = nil
+        end
+        -- Khôi phục CanCollide (tránh để lại trạng thái)
+        local character = LocalPlayer.Character
+        if character then
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+    end
+    UpdateButtonText()
+end)
+
+-- Xử lý Noclip khi nhân vật respawn (để tránh mất hiệu lực)
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    if Config.NoclipEnabled then
+        -- Tắt tạm và bật lại để áp dụng cho nhân vật mới
+        Config.NoclipEnabled = false
+        wait(0.5) -- Đợi nhân vật load
+        Config.NoclipEnabled = true
+        noclipButton:MouseButton1Click() -- Simulate toggle to re-enable
+    end
+end)
+
+armorButton = CreateButton("TP Armor", function()
+	local Character = LocalPlayer.Character
+	local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
+	local RootPart = Character and Character:FindFirstChild("HumanoidRootPart")
+
+	if not (Character and Humanoid and RootPart) then return end
+
+	local OldCFrame = RootPart.CFrame
+	local TargetPosition = Vector3.new(-934.52, -25.25, 571.18) -- vị trí armor shop của bạn
+
+	-- Teleport đến armor
+	RootPart.CFrame = CFrame.new(TargetPosition + Vector3.new(0, 1, 0)) -- đứng cao hơn một chút
+
+	task.wait(0.5) -- đợi vật lý ổn định
+
+	-- Quét các part gần chân để tìm ClickDetector
+	local parts = workspace:GetPartBoundsInBox(RootPart.CFrame, Vector3.new(10, 10, 10))
+	local clicked = false
+
+	for _, part in ipairs(parts) do
+		local cd = part:FindFirstChildOfClass("ClickDetector")
+		if cd then
+			-- Thử click vài lần (tránh lỗi không ăn)
+			for i = 1, 3 do
+				pcall(function()
+					fireclickdetector(cd)
+				end)
+				task.wait(0.1)
+			end
+			clicked = true
+			break
+		end
+	end
+
+	if not clicked then
+		warn("❌ Không tìm thấy ClickDetector để mua armor.")
+	end
+
+	-- Quay về chỗ cũ sau 3 giây
+	task.wait(2)
+	RootPart.CFrame = OldCFrame + Vector3.new(0, 0.5, 0)
+end)
+
+local tpAndStompButton = CreateButton("TP + Aim + AutoStomp", function()
+	local closestKO, closestAlive = nil, nil
+	local minDistKO, minDistAlive = math.huge, math.huge
+	local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+
+	for name, selected in pairs(Config.SelectedPlayers) do
+		if selected then
+			local plr = Players:FindFirstChild(name)
+			if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+				local pos = plr.Character.HumanoidRootPart.Position
+				local dist = (myPos - pos).Magnitude
+				local body = plr.Character:FindFirstChild("BodyEffects")
+				local isKO = body and body:FindFirstChild("K.O") and body["K.O"].Value
+				if isKO then
+					if dist < minDistKO then
+						closestKO = plr
+						minDistKO = dist
+					end
+				else
+					if dist < minDistAlive then
+						closestAlive = plr
+						minDistAlive = dist
+					end
+				end
+			end
+		end
+	end
+
+	local function stompTarget(target)
+		if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then return end
+		local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+		if not root then return end
+		local oldPos = root.CFrame
+		local torso = target.Character:FindFirstChild("LowerTorso") or target.Character:FindFirstChild("Torso") or target.Character:FindFirstChild("HumanoidRootPart")
+		if torso then
+			root.CFrame = torso.CFrame + Vector3.new(0, 2.5, 0)
+		end
+		-- Đợi ổn định và stomp
+		task.wait(0.2)
+		VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+		task.wait(0.1)
+		VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+
+		-- Tránh spam, đợi 0.5s rồi quay về
+		task.wait(1.5)
+		root.CFrame = oldPos + Vector3.new(0, 3, 0)
+	end
+
+	if closestKO then
+		stompTarget(closestKO)
+	else
+		if closestAlive then
+			local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+			if root then
+				local pos = closestAlive.Character.HumanoidRootPart.Position
+				root.CFrame = CFrame.new(pos + Vector3.new(0, 50, 0))
+
+				-- Bật aimbot
+				Config.AimbotEnabled = true
+				UpdateButtonText()
+			end
+		end
+	end
+end)
+
+-- Khởi tạo ScreenGui cho ESP
+local espGui = Instance.new("ScreenGui")
+espGui.Name = "SafeESP"
+espGui.ResetOnSpawn = false
+espGui.IgnoreGuiInset = true
+espGui.Parent = PlayerGui
+
+-- Danh sách ESP
+local ESPs = {}
+
+-- Kiểm tra trạng thái người chơi
+local function IsValidTarget(player)
+    if not player or not player.Character or not player.Character:FindFirstChild("Humanoid") or not player.Character:FindFirstChild("HumanoidRootPart") then return false end
+    local bodyEffects = player.Character:FindFirstChild("BodyEffects")
+    local isKO = bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value
+    local isGrabbed = player.Character:FindFirstChild("GRABBING_CONSTRAINT") ~= nil
+    return not (isKO or isGrabbed)
+end
+
+-- Tạo ESP
+local function CreateESP(player)
+    if ESPs[player] or player == LocalPlayer then return end
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.TextColor3 = Color3.fromRGB(200, 200, 200)
+    label.TextSize = 14
+    label.Font = Enum.Font.GothamBlack
+    label.Text = player.DisplayName
+    label.TextStrokeTransparency = 0.7
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.Size = UDim2.new(0, 200, 0, 20)
+    label.AnchorPoint = Vector2.new(0.5, 0.5)
+    label.Position = UDim2.new(0.5, 0, 0.5, 0)
+    label.Visible = false
+    label.Parent = espGui
+
+    local highlight = Instance.new("Highlight")
+    highlight.Enabled = false
+    highlight.FillTransparency = 0.7
+    highlight.OutlineTransparency = 0.3
+    highlight.FillColor = Color3.fromRGB(200, 200, 200)
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    highlight.Adornee = player.Character
+    highlight.Parent = espGui
+
+    ESPs[player] = { label = label, highlight = highlight }
+end
+
+-- Xóa ESP
+local function RemoveESP(player)
+    if ESPs[player] then
+        pcall(function()
+            ESPs[player].label:Destroy()
+            ESPs[player].highlight:Destroy()
+        end)
+        ESPs[player] = nil
+    end
+end
+
+-- Cập nhật ESP
+local function UpdateESP()
+    if not Config.ESPEnabled then
+        for _, v in pairs(ESPs) do
+            v.label.Visible = false
+            v.highlight.Enabled = false
+        end
+        return
+    end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and IsValidTarget(player) then
+            local character = player.Character
+            local head = character:FindFirstChild("Head")
+            if head then
+                CreateESP(player)
+                local headPos = head.Position
+                local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
+                local esp = ESPs[player]
+                if esp then
+                    local isSelected = Config.SelectedPlayers[player.Name]
+                    esp.label.TextColor3 = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(200, 200, 200)
+                    esp.highlight.FillColor = isSelected and Color3.fromRGB(255, 179, 186) or Color3.fromRGB(200, 200, 200)
+                    if onScreen then
+                        esp.label.Visible = true
+                        esp.label.Position = UDim2.new(0, screenPos.X, 0, screenPos.Y - 20)
+                        esp.highlight.Enabled = true
+                    else
+                        esp.label.Visible = false
+                        esp.highlight.Enabled = false
+                    end
+                end
+            else
+                RemoveESP(player)
+            end
+        else
+            RemoveESP(player)
+        end
+    end
+end
+
+-- Logic Speed từ v.txt
+local function UpdateSpeed()
+    if Config.SpeedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local root = LocalPlayer.Character.HumanoidRootPart
+        local humanoid = LocalPlayer.Character.Humanoid
+        local moveDirection = humanoid.MoveDirection
+        local speedAmount = Config.SpeedAmount / 8
+        root.CFrame = root.CFrame + moveDirection * speedAmount
+    end
+end
+
+-- Logic Fly từ v.txt
+local function UpdateFly(deltaTime)
+    if Config.FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local root = LocalPlayer.Character.HumanoidRootPart
+        local moveDirection = LocalPlayer.Character.Humanoid.MoveDirection
+        local flySpeed = Config.FlySpeed
+        local vertical = UserInputService:IsKeyDown(Enum.KeyCode.Space) and flySpeed / 8 or UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and -flySpeed / 8 or 0
+        root.CFrame = root.CFrame + moveDirection * deltaTime * flySpeed * 10
+        root.CFrame = root.CFrame + Vector3.new(0, vertical, 0)
+        root.Velocity = root.Velocity * Vector3.new(1, 0, 1) + Vector3.new(0, 1.9, 0)
+    end
+end
+
+-- Cập nhật danh sách người chơi
+local function UpdatePlayerList()
+    for _, cd in pairs(PlayerList:GetChildren()) do
+        if cd:IsA("TextButton") then cd:Destroy() end
+    end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local button = Instance.new("TextButton")
+            button.Size = UDim2.new(1, -4, 0, 18)
+            button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            button.BackgroundTransparency = 0.2
+            button.TextColor3 = Color3.fromRGB(0, 0, 0)
+            button.TextSize = 12
+            button.Font = Enum.Font.SourceSans
+            button.AutoButtonColor = false
+            button.Parent = PlayerList
+            local function UpdateButtonText()
+                local isSelected = Config.SelectedPlayers[player.Name]
+                button.Text = (isSelected and "✓ " or "") .. player.DisplayName
+            end
+            button.MouseButton1Click:Connect(function()
+                Config.SelectedPlayers[player.Name] = not Config.SelectedPlayers[player.Name]
+                UpdateButtonText()
+            end)
+            UpdateButtonText()
+        end
+    end
+end
+
+-- Xử lý input
+UserInputService.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if input.KeyCode == Enum.KeyCode.RightShift then
+        ScreenGui.Enabled = not ScreenGui.Enabled
+    elseif input.KeyCode == Enum.KeyCode.Y then
+        autoSelect = not autoSelect
+        if autoSelect then
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= LocalPlayer then
+                    Config.SelectedPlayers[player.Name] = true
+                end
+            end
+        else
+            Config.SelectedPlayers = {}
+        end
+        UpdatePlayerList()
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.Z then
+		Config.SpeedEnabled = not Config.SpeedEnabled
+		UpdateButtonText()
+	end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.Q then
+		Config.FlyEnabled = not Config.FlyEnabled
+		UpdateButtonText()
+	end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == Enum.KeyCode.T then
+        TeleportToClosest()
+    end
+end)
+
+-- TriggerBot logic
+local hitParts = {
+    "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "LeftUpperArm", "LeftLowerArm", "LeftHand",
+    "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+    "RightUpperLeg", "RightLowerLeg", "RightFoot", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"
+}
+
+local function validPart(p)
+    if not p or not p.Parent or not p.Parent:FindFirstChild("Humanoid") then return false end
+    local player = Players:GetPlayerFromCharacter(p.Parent)
+    if not player or not Config.SelectedPlayers[player.Name] then return false end
+    for _, n in ipairs(hitParts) do
+        if p.Name:lower() == n:lower() then return true end
+    end
+    return false
+end
+
+local function distToCursor(part)
+    local v, vis = Camera:WorldToViewportPoint(part.Position)
+    if not vis then return math.huge end
+
+    local m
+    if UserInputService.TouchEnabled then
+        -- Mobile: luôn lấy tâm màn hình
+        m = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    else
+        -- PC: dùng vị trí chuột
+        m = UserInputService:GetMouseLocation()
+    end
+
+    return (Vector2.new(v.X, v.Y) - Vector2.new(m.X, m.Y)).Magnitude
+end
+
+local function click()
+    if UserInputService.TouchEnabled then
+        -- Giả lập chạm màn hình cho di động
+        local touchPos = UserInputService:GetMouseLocation()
+        VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.Begin, touchPos)
+        task.wait()
+        VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.End, touchPos)
+    else
+        -- Giữ logic click cho PC
+        if mouse1press then
+            mouse1press()
+            mouse1release()
+        elseif mouse1click then
+            mouse1click()
+        else
+            VirtualInputManager:Button1Down(Vector2.new(), Camera.CFrame)
+            task.wait()
+            VirtualInputManager:Button1Up(Vector2.new(), Camera.CFrame)
+        end
+    end
+end
+
+local function GetBestTargetPart()
+    local bestPart, bestDist = nil, fovRadius
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and IsValidTarget(plr) and plr.Character then
+            for _, partName in ipairs(hitParts) do
+                local part = plr.Character:FindFirstChild(partName)
+                if part and part:IsA("BasePart") then
+                    local dist = distToCursor(part)
+                    if dist < bestDist then
+                        bestPart = part
+                        bestDist = dist
+                    end
+                end
+            end
+        end
+    end
+    return bestPart
+end
+
+getgenv().Aimbot = {
+    Status = true,
+    Hitpart = "Head",
+}
+
+local function GetPing()
+    if Config.CustomPing then
+        return Config.CustomPing
+    end
+    local stats = game:GetService("Stats"):FindFirstChild("Network")
+    local data = stats and stats:FindFirstChild("DataPing")
+    return data and math.clamp(data:GetValue(), 10, 300) or 40
+end
+
+local function GetPredictedPosition(part)
+    if not part or not part:IsA("BasePart") then return part.Position end
+
+    local velocity = part.Velocity
+    local origin = Camera.CFrame.Position
+    local distance = (part.Position - origin).Magnitude
+    local ping = GetPing()
+
+    -- Dự đoán thời gian đạn bay (ms → s)
+    local delay = ping / 1000
+
+    -- Cộng thêm khoảng cách để prediction xa hơn nếu cần
+    local distanceFactor = math.clamp(distance / 100, 1, 3)
+    local predictedPos = part.Position + velocity * delay * distanceFactor
+
+    return predictedPos
+end
+
+local function IsObstructed(origin, targetPos)
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
+    local result = Workspace:Raycast(origin, (targetPos - origin), raycastParams)
+    if result and result.Instance and not result.Instance:IsDescendantOf(Player and Player.Character) then
+        return true
+    end
+    return false
+end
+
+local function GetClosestValidPlayer()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and IsValidTarget(plr) and plr.Character and plr.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
+            local pos, visible = Camera:WorldToViewportPoint(plr.Character[getgenv().Aimbot.Hitpart].Position)
+            if visible then
+                local dist = (Vector2.new(Mouse.X, Mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
+                if dist < shortestDistance then
+                    closestPlayer = plr
+                    shortestDistance = dist
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+RunService.RenderStepped:Connect(function(deltaTime)
+    -- Existing ESP, Speed, and Fly updates
+    UpdateESP()
+    UpdateSpeed()
+    UpdateFly(deltaTime)
+    checkAmmoAndReload()
+
+    -- Aimbot logic
+    if Config.AimbotEnabled and getgenv().Aimbot.Status then
+        Player = GetClosestValidPlayer()
+        if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
+            local part = Player.Character[getgenv().Aimbot.Hitpart]
+            local predictedPos = GetPredictedPosition(part)
+            if not IsObstructed(Camera.CFrame.Position, predictedPos) then
+                -- Aim at the predicted position
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
+            end
+        end
+    end
+
+    -- Existing TriggerBot logic
+    if tbEnabled then
+        local part = GetBestTargetPart()
+        if part then
+            task.spawn(function()
+                local cap = part
+                task.wait(0)
+                if tbEnabled and distToCursor(cap) <= fovRadius then
+                    click()
+                end
+            end)
+        end
+    end
+end)
+
+-- Xử lý sự kiện người chơi
+local Connections = {}
+local function Connect(event, callback)
+    local connection = event:Connect(callback)
+    table.insert(Connections, connection)
+    return connection
+end
+
+Connect(Players.PlayerAdded, function(player)
+    task.wait(math.random(2, 3))
+    RemoveESP(player)
+    UpdatePlayerList()
+end)
+
+Connect(Players.PlayerRemoving, function(player)
+    RemoveESP(player)
+    Config.SelectedPlayers[player.Name] = nil
+    UpdatePlayerList()
+end)
+
+-- Theo dõi khi trang bị hoặc bỏ trang bị Tool
+LocalPlayer.CharacterAdded:Connect(function(char)
+    character = char
+end)
+
+LocalPlayer:GetPropertyChangedSignal("Character"):Connect(function()
+    character = LocalPlayer.Character
+end)
+
+LocalPlayer.Backpack.ChildAdded:Connect(function(tool)
+    tool.Equipped:Connect(function()
+        currentTool = tool
+    end)
+end)
+
+LocalPlayer.Character.ChildAdded:Connect(function(tool)
+    if tool:IsA("Tool") then
+        currentTool = tool
+    end
+end)
+
+LocalPlayer.Character.ChildRemoved:Connect(function(tool)
+    if tool == currentTool then
+        currentTool = nil
+    end
+end)
+
+-- Thêm đoạn theo dõi K.O ngay đây
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        local character = player.Character
+        if character then
+            local bodyEffects = character:FindFirstChild("BodyEffects")
+            if bodyEffects then
+                local koValue = bodyEffects:FindFirstChild("K.O")
+                if koValue then
+                    koValue:GetPropertyChangedSignal("Value"):Connect(function()
+                        if koValue.Value and Config.SelectedPlayers[player.Name] then
+                            ShowKONotification(player.DisplayName)
+                        end
+                    end)
+                end
+            end
+        end
+    end
+end
+
+-- Vòng lặp chính
+RunService.RenderStepped:Connect(function(deltaTime)
+    UpdateESP()
+    UpdateSpeed()
+    UpdateFly(deltaTime)
+    checkAmmoAndReload()
+end)
+
+-- Cập nhật danh sách người chơi định kỳ
+task.spawn(function()
+    while true do
+        UpdatePlayerList()
+        task.wait(math.random(12, 15))
+    end
+end)
+
+task.spawn(function()
+    while true do
+        if Config.AutoStompEnabled then
+            local closestKO, minDistKO = nil, math.huge
+            local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+
+            -- Find the closest K.O.'d player
+            for name, selected in pairs(Config.SelectedPlayers) do
+                if selected then
+                    local plr = Players:FindFirstChild(name)
+                    if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                        local pos = plr.Character.HumanoidRootPart.Position
+                        local dist = (myPos - pos).Magnitude
+                        local body = plr.Character:FindFirstChild("BodyEffects")
+                        local isKO = body and body:FindFirstChild("K.O") and body["K.O"].Value
+                        if isKO and dist < minDistKO then
+                            closestKO = plr
+                            minDistKO = dist
+                        end
+                    end
+                end
+            end
+
+            -- Stomp the closest K.O.'d player
+            if closestKO then
+                local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local oldPos = root.CFrame
+                    local torso = closestKO.Character:FindFirstChild("LowerTorso") or closestKO.Character:FindFirstChild("Torso") or closestKO.Character:FindFirstChild("HumanoidRootPart")
+                    if torso then
+                        root.CFrame = torso.CFrame + Vector3.new(0, 2.5, 0)
+                        task.wait(0.2)
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                        task.wait(0.1)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                        task.wait(1.5)
+                        root.CFrame = oldPos + Vector3.new(0, 3, 0)
+                    end
+                end
+            end
+        end
+        task.wait(4) -- Small delay to prevent excessive CPU usage
+    end
+end)
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local Workspace = game:GetService("Workspace")
+local LocalPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+local Mouse = LocalPlayer:GetMouse()
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local Lighting = game:GetService("Lighting")
+
+-- Cấu hình
+local Config = {
+    ESPEnabled = false,
+    SpeedEnabled = false,
+    FlyEnabled = false,
+    AimbotEnabled = false,
+    FullbrightEnabled = false, -- Thêm trạng thái Fullbright
+    NoclipEnabled = false, -- Thêm trạng thái Noclip
+    ShiftAmount = 0.5,
+    SelectedPlayers = {},
+    FlySpeed = 35,
+    SpeedAmount = 20,
+    AutoStompEnabled = true,
+    CustomPing = nil -- Thêm biến lưu ping tùy chỉnh
+}
+
+local autoSelect = false
+local tbEnabled = true
+local fovRadius = 20
+local Player = nil
+
+local currentTool = nil
+
+-- Biến lưu trạng thái Lighting cũ cho Fullbright
+local oldLighting = {
+    Brightness = Lighting.Brightness,
+    GlobalShadows = Lighting.GlobalShadows,
+    FogEnd = Lighting.FogEnd,
+    Ambient = Lighting.Ambient,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+    ClockTime = Lighting.ClockTime
+}
+
+-- Kết nối cho Noclip
+local noclipConnection = nil
 
 -- Hàm kiểm tra Tool có phải là súng và có thuộc tính Ammo
 local function isGun(tool)
@@ -300,6 +1290,8 @@ local function UpdateButtonText()
     espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
     speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
     flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
+    fullbrightButton.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
+    noclipButton.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
     armorButton.Text = "TP Armor"
     tpAndStompButton.Text = "TP + Aim + AutoStomp"
 end
@@ -322,6 +1314,73 @@ end)
 flyButton = CreateButton("Fly: OFF", function()
     Config.FlyEnabled = not Config.FlyEnabled
     UpdateButtonText()
+end)
+
+fullbrightButton = CreateButton("Fullbright: OFF", function()
+    Config.FullbrightEnabled = not Config.FullbrightEnabled
+    if Config.FullbrightEnabled then
+        -- Bật Fullbright (thay đổi Lighting để tránh patch thông thường)
+        Lighting.Brightness = 2
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 999999
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+        Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+        Lighting.ClockTime = 12
+    else
+        -- Tắt Fullbright và khôi phục trạng thái cũ
+        Lighting.Brightness = oldLighting.Brightness
+        Lighting.GlobalShadows = oldLighting.GlobalShadows
+        Lighting.FogEnd = oldLighting.FogEnd
+        Lighting.Ambient = oldLighting.Ambient
+        Lighting.OutdoorAmbient = oldLighting.OutdoorAmbient
+        Lighting.ClockTime = oldLighting.ClockTime
+    end
+    UpdateButtonText()
+end)
+
+noclipButton = CreateButton("Noclip: OFF", function()
+    Config.NoclipEnabled = not Config.NoclipEnabled
+    if Config.NoclipEnabled then
+        -- Bật Noclip (sử dụng Stepped để tránh patch, chỉ áp dụng cho nhân vật hiện tại)
+        if noclipConnection then noclipConnection:Disconnect() end
+        noclipConnection = RunService.Stepped:Connect(function()
+            local character = LocalPlayer.Character
+            if character then
+                for _, part in pairs(character:GetDescendants()) do
+                    if part:IsA("BasePart") and part.CanCollide then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+    else
+        -- Tắt Noclip
+        if noclipConnection then
+            noclipConnection:Disconnect()
+            noclipConnection = nil
+        end
+        -- Khôi phục CanCollide (tránh để lại trạng thái)
+        local character = LocalPlayer.Character
+        if character then
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = true
+                end
+            end
+        end
+    end
+    UpdateButtonText()
+end)
+
+-- Xử lý Noclip khi nhân vật respawn (để tránh mất hiệu lực)
+LocalPlayer.CharacterAdded:Connect(function(newCharacter)
+    if Config.NoclipEnabled then
+        -- Tắt tạm và bật lại để áp dụng cho nhân vật mới
+        Config.NoclipEnabled = false
+        wait(0.5) -- Đợi nhân vật load
+        Config.NoclipEnabled = true
+        noclipButton:MouseButton1Click() -- Simulate toggle to re-enable
+    end
 end)
 
 armorButton = CreateButton("TP Armor", function()
@@ -939,4 +1998,15 @@ game:BindToClose(function()
     pcall(function() if ScreenGui and ScreenGui.Parent then ScreenGui:Destroy() end end)
     pcall(function() if espGui and espGui.Parent then espGui:Destroy() end end)
     pcall(function() if gui and gui.Parent then gui:Destroy() end end)
+    -- Tắt Noclip nếu đang bật
+    if noclipConnection then
+        noclipConnection:Disconnect()
+    end
+    -- Khôi phục Lighting
+    Lighting.Brightness = oldLighting.Brightness
+    Lighting.GlobalShadows = oldLighting.GlobalShadows
+    Lighting.FogEnd = oldLighting.FogEnd
+    Lighting.Ambient = oldLighting.Ambient
+    Lighting.OutdoorAmbient = oldLighting.OutdoorAmbient
+    Lighting.ClockTime = oldLighting.ClockTime
 end)
