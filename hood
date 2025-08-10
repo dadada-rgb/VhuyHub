@@ -588,7 +588,7 @@ end)
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	if gameProcessed then return end
 	if input.KeyCode == Enum.KeyCode.T then
-		    tpAndStompButton:Activate()
+		    tpButton:Activate()
 	end
 end)
 
