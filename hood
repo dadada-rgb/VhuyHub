@@ -9,21 +9,20 @@ local Mouse = LocalPlayer:GetMouse()
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Lighting = game:GetService("Lighting")
 
+-- Cấu hình
 local Config = {
     ESPEnabled = false,
     SpeedEnabled = false,
     FlyEnabled = false,
     AimbotEnabled = false,
-    FullbrightEnabled = false,
-    NoclipEnabled = false,
-    AntiStompEnabled = true, 
+    FullbrightEnabled = false, -- Thêm trạng thái Fullbright
+    NoclipEnabled = false, -- Thêm trạng thái Noclip
     ShiftAmount = 0.5,
     SelectedPlayers = {},
     FlySpeed = 35,
     SpeedAmount = 20,
-    AutoStompEnabled = true,
-    TriggerbotEnabled = true, -- Bật Triggerbot mặc định
-    CustomPing = nil
+    AutoStompEnabled = false,
+    CustomPing = nil -- Thêm biến lưu ping tùy chỉnh
 }
 
 local autoSelect = false
@@ -130,82 +129,39 @@ local function TeleportToClosest()
     end
 end
 
+-- Chức năng anti-stomp luôn hoạt động
 local function AntiStomp()
-    if not Config.AntiStompEnabled then return end
     local character = LocalPlayer.Character
     if not character then return end
-
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    local root = character:FindFirstChild("HumanoidRootPart")
-    if not humanoid or not root then return end
-
-    local bodyEffects = character:WaitForChild("BodyEffects", 5)
-    local koValue = bodyEffects and bodyEffects:FindFirstChild("K.O")
-    if not koValue then return end
-
-    local oldPos -- Lưu vị trí gốc
-    local isSafe = false -- Trạng thái an toàn
-
-    -- Giám sát máu để hành động trước K.O.
-    humanoid:GetPropertyChangedSignal("Health"):Connect(function()
-        if not Config.AntiStompEnabled then return end
-        if humanoid.Health <= 15 and not isSafe then -- Ngưỡng máu thấp
-            oldPos = root.CFrame
-            pcall(function()
-                root.CFrame = root.CFrame + Vector3.new(0, 500, 0) -- Di chuyển lên cao
-                root.Anchored = true
-                isSafe = true
-            end)
-        elseif humanoid.Health > 10 and isSafe then
-            -- Phục hồi vị trí khi máu hồi
-            pcall(function()
-                root.CFrame = oldPos + Vector3.new(0, 3, 0)
-                root.Anchored = false
-                isSafe = false
-                oldPos = nil
-            end)
-        end
-    end)
-
-    -- Xử lý trạng thái K.O. như phương án dự phòng
+    
+    local bodyEffects = character:WaitForChild("BodyEffects")
+    local koValue = bodyEffects:WaitForChild("K.O")
+    
+    local oldPos -- Lưu vị trí cũ
+    
     koValue:GetPropertyChangedSignal("Value"):Connect(function()
-        if not Config.AntiStompEnabled then return end
-        if koValue.Value and not isSafe then
-            -- Bị K.O., thử di chuyển
-            pcall(function()
-                oldPos = root.CFrame
-                root.CFrame = root.CFrame + Vector3.new(0, 500, 0)
-                root.Anchored = true
-                isSafe = true
-            end)
-            -- Thử buộc reset nếu teleport thất bại
-            task.spawn(function()
-                task.wait(0.5)
-                if koValue.Value then
-                    pcall(function()
-                        humanoid:ChangeState(Enum.HumanoidStateType.Dead) -- Buộc reset
-                    end)
-                end
-            end)
-        elseif not koValue.Value and isSafe then
-            -- Hết K.O., trở về vị trí gốc
-            pcall(function()
-                root.CFrame = oldPos + Vector3.new(0, 3, 0)
+        local root = character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        
+        if koValue.Value then
+            -- Bị K.O: Lưu vị trí cũ và teleport lên cao 500 studs để né stomp
+            oldPos = root.CFrame
+            root.CFrame = root.CFrame + Vector3.new(0, 500, 0)
+            root.Anchored = true  -- Neo để không rơi
+        else
+            -- Hết K.O: Quay lại vị trí cũ và bỏ neo
+            if oldPos then
+                root.CFrame = oldPos + Vector3.new(0, 3, 0)  -- +3 để tránh kẹt sàn
                 root.Anchored = false
-                isSafe = false
                 oldPos = nil
-            end)
+            end
         end
     end)
 end
 
-LocalPlayer.CharacterAdded:Connect(function()
-    if Config.AntiStompEnabled then
-        AntiStomp()
-    end
-end)
-
-if LocalPlayer.Character and Config.AntiStompEnabled then
+-- Gọi hàm khi nhân vật spawn hoặc reload
+LocalPlayer.CharacterAdded:Connect(AntiStomp)
+if LocalPlayer.Character then
     AntiStomp()
 end
 
@@ -364,9 +320,6 @@ local function UpdateButtonText()
     noclipButton.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
     armorButton.Text = "TP Armor"
     tpAndStompButton.Text = "TP + Aim + AutoStomp"
-    antiStompButton.Text = "Antistomp: " .. (Config.AntiStompEnabled and "ON" or "OFF")
-    triggerbotButton.Text = "TriggerBot: " .. (Config.TriggerbotEnabled and "ON" or "OFF")
-    autoStompButton.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF"
 end
 
 aimbotButton = CreateButton("Aimbot: OFF", function()
@@ -564,22 +517,118 @@ local tpAndStompButton = CreateButton("TP + Aim + AutoStomp", function()
 	end
 end)
 
-antiStompButton = CreateButton("AntiStomp: ON", function()
-    Config.AntiStompEnabled = not Config.AntiStompEnabled
-    if Config.AntiStompEnabled and LocalPlayer.Character then
-        AntiStomp() -- Kích hoạt lại cho nhân vật hiện tại
+-- === TẠO 2 TRANG ===
+local currentPage = 1
+
+-- Frame Trang 1 (hiện nội dung gốc)
+local Page1 = Instance.new("Frame")
+Page1.Size = UDim2.new(1, 0, 1, -30)
+Page1.Position = UDim2.new(0, 0, 0, 0)
+Page1.BackgroundTransparency = 1
+Page1.Parent = MenuFrame
+
+-- Chuyển toàn bộ PlayerListFrame và ButtonFrame vào Page1
+PlayerListFrame.Parent = Page1
+ButtonFrame.Parent = Page1
+
+-- Frame Trang 2 (executor)
+local Page2 = Instance.new("Frame")
+Page2.Size = UDim2.new(1, 0, 1, -30)
+Page2.Position = UDim2.new(0, 0, 0, 0)
+Page2.BackgroundTransparency = 1
+Page2.Visible = false
+Page2.Parent = MenuFrame
+
+-- ScrollingFrame chứa code
+local CodeBox = Instance.new("TextBox")
+CodeBox.Size = UDim2.new(1, -10, 1, -40)
+CodeBox.Position = UDim2.new(0, 5, 0, 5)
+CodeBox.MultiLine = true
+CodeBox.ClearTextOnFocus = false
+CodeBox.TextWrapped = true
+CodeBox.TextYAlignment = Enum.TextYAlignment.Top
+CodeBox.TextXAlignment = Enum.TextXAlignment.Left
+CodeBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+CodeBox.BackgroundTransparency = 0.2
+CodeBox.Font = Enum.Font.Code
+CodeBox.TextSize = 14
+CodeBox.TextColor3 = Color3.fromRGB(0, 0, 0)
+CodeBox.Text = "-- Nhập script của bạn vào đây"
+Instance.new("UICorner", CodeBox).CornerRadius = UDim.new(0, 4)
+CodeBox.Parent = Page2
+
+-- Nút Execute
+local ExecuteBtn = Instance.new("TextButton")
+ExecuteBtn.Size = UDim2.new(0.5, -7, 0, 30)
+ExecuteBtn.Position = UDim2.new(0, 5, 1, -35)
+ExecuteBtn.BackgroundColor3 = Color3.fromRGB(150, 255, 150)
+ExecuteBtn.Text = "Execute"
+ExecuteBtn.Font = Enum.Font.SourceSansBold
+ExecuteBtn.TextSize = 14
+ExecuteBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+Instance.new("UICorner", ExecuteBtn).CornerRadius = UDim.new(0, 4)
+ExecuteBtn.Parent = Page2
+
+ExecuteBtn.MouseButton1Click:Connect(function()
+    local code = CodeBox.Text
+    if code and code ~= "" then
+        local func, err = loadstring(code)
+        if func then
+            pcall(func)
+        else
+            warn("Lỗi script:", err)
+        end
     end
-    UpdateButtonText()
 end)
 
-triggerbotButton = CreateButton("Triggerbot: ON", function()
-    Config.TriggerbotEnabled = not Config.TriggerbotEnabled
-    UpdateButtonText()
+-- Nút Clear
+local ClearBtn = Instance.new("TextButton")
+ClearBtn.Size = UDim2.new(0.5, -7, 0, 30)
+ClearBtn.Position = UDim2.new(0.5, 2, 1, -35)
+ClearBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 150)
+ClearBtn.Text = "Clear"
+ClearBtn.Font = Enum.Font.SourceSansBold
+ClearBtn.TextSize = 14
+ClearBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+Instance.new("UICorner", ClearBtn).CornerRadius = UDim.new(0, 4)
+ClearBtn.Parent = Page2
+
+ClearBtn.MouseButton1Click:Connect(function()
+    CodeBox.Text = ""
 end)
 
-autoStompButton = CreateButton("AutoStomp: ON", function()
-    Config.AutoStompEnabled = not Config.AutoStompEnabled
-    UpdateButtonText()
+-- Thanh chuyển trang
+local PageButtons = Instance.new("Frame")
+PageButtons.Size = UDim2.new(1, 0, 0, 30)
+PageButtons.Position = UDim2.new(0, 0, 1, -30)
+PageButtons.BackgroundTransparency = 1
+PageButtons.Parent = MenuFrame
+
+local Btn1 = Instance.new("TextButton")
+Btn1.Size = UDim2.new(0.5, -2, 1, 0)
+Btn1.Position = UDim2.new(0, 0, 0, 0)
+Btn1.Text = "Trang 1"
+Btn1.BackgroundColor3 = Color3.fromRGB(200, 200, 255)
+Instance.new("UICorner", Btn1).CornerRadius = UDim.new(0, 4)
+Btn1.Parent = PageButtons
+
+local Btn2 = Instance.new("TextButton")
+Btn2.Size = UDim2.new(0.5, -2, 1, 0)
+Btn2.Position = UDim2.new(0.5, 2, 0, 0)
+Btn2.Text = "Trang 2"
+Btn2.BackgroundColor3 = Color3.fromRGB(200, 255, 200)
+Instance.new("UICorner", Btn2).CornerRadius = UDim.new(0, 4)
+Btn2.Parent = PageButtons
+
+-- Sự kiện chuyển trang
+Btn1.MouseButton1Click:Connect(function()
+    Page1.Visible = true
+    Page2.Visible = false
+end)
+
+Btn2.MouseButton1Click:Connect(function()
+    Page1.Visible = false
+    Page2.Visible = true
 end)
 
 -- Khởi tạo ScreenGui cho ESP
@@ -1036,7 +1085,7 @@ task.spawn(function()
             local closestKO, minDistKO = nil, math.huge
             local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
 
-            -- Tìm người gần nhất bị K.O
+            -- Find the closest K.O.'d player
             for name, selected in pairs(Config.SelectedPlayers) do
                 if selected then
                     local plr = Players:FindFirstChild(name)
@@ -1053,7 +1102,7 @@ task.spawn(function()
                 end
             end
 
-            -- Stomp người gần nhất bị K.O
+            -- Stomp the closest K.O.'d player
             if closestKO then
                 local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                 if root then
@@ -1071,7 +1120,7 @@ task.spawn(function()
                 end
             end
         end
-        task.wait(4) -- Delay để tránh CPU cao
+        task.wait(4) -- Small delay to prevent excessive CPU usage
     end
 end)
 
