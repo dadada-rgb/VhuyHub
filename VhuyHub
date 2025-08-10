@@ -674,7 +674,7 @@ end
 
 -- Fly logic supporting PC and Mobile
 local flyBv, flyBg
-local flyKeys = {w = false, s = false, a = false, d = false, space = false, ctrl = false}
+local flyKeys = {f = 0, b = 0, l = 0, r = 0, up = 0, down = 0}
 
 local function startFly()
     local character = LocalPlayer.Character
@@ -683,31 +683,50 @@ local function startFly()
     local root = character:FindFirstChild("HumanoidRootPart")
     if not humanoid or not root then return end
 
+    local bodyPart = humanoid.RigType == Enum.HumanoidRigType.R6 and character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+    if not bodyPart then return end
+
     humanoid.PlatformStand = true
     flyBv = Instance.new("BodyVelocity")
     flyBv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    flyBv.Velocity = Vector3.new(0, 0, 0)
-    flyBv.Parent = root
+    flyBv.Velocity = Vector3.new(0, 0.1, 0)
+    flyBv.Parent = bodyPart
 
     flyBg = Instance.new("BodyGyro")
     flyBg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
     flyBg.P = 9e4
-    flyBg.Parent = root
+    flyBg.Parent = bodyPart
 
     spawn(function()
-        while Config.FlyEnabled do
+        while Config.FlyEnabled and character and humanoid and humanoid.Parent and bodyPart.Parent do
             local cam = Workspace.CurrentCamera
             local dir = Vector3.new(0, 0, 0)
-            if flyKeys.w then dir = dir + cam.CFrame.LookVector end
-            if flyKeys.s then dir = dir - cam.CFrame.LookVector end
-            if flyKeys.a then dir = dir - cam.CFrame.RightVector end
-            if flyKeys.d then dir = dir + cam.CFrame.RightVector end
-            if flyKeys.space then dir = dir + Vector3.new(0, 1, 0) end
-            if flyKeys.ctrl then dir = dir - Vector3.new(0, 1, 0) end
-            if dir.Magnitude > 0 then dir = dir.Unit end
-            flyBv.Velocity = dir * Config.FlySpeed
-            flyBg.CFrame = cam.CFrame
-            RunService.RenderStepped:Wait()
+
+            -- Lấy hướng từ joystick trên di động
+            if UserInputService.TouchEnabled then
+                local moveDirection = humanoid.MoveDirection
+                if moveDirection.Magnitude > 0 then
+                    dir = cam.CFrame:VectorToWorldSpace(moveDirection).Unit
+                end
+            end
+
+            -- Kết hợp với phím trên PC
+            if flyKeys.f ~= 0 then dir = cam.CFrame.LookVector * flyKeys.f end
+            if flyKeys.b ~= 0 then dir = -cam.CFrame.LookVector * flyKeys.b end
+            if flyKeys.l ~= 0 then dir = -cam.CFrame.RightVector * flyKeys.l end
+            if flyKeys.r ~= 0 then dir = cam.CFrame.RightVector * flyKeys.r end
+            if flyKeys.up ~= 0 then dir = Vector3.new(0, 1, 0) * flyKeys.up end
+            if flyKeys.down ~= 0 then dir = Vector3.new(0, -1, 0) * flyKeys.down end
+
+            -- Nếu có hướng di chuyển, bay với tốc độ FlySpeed, nếu không thì đứng yên
+            if dir.Magnitude > 0 then
+                flyBv.Velocity = dir * Config.FlySpeed
+                flyBg.CFrame = cam.CFrame * CFrame.Angles(-math.rad((flyKeys.f + flyKeys.b) * Config.FlySpeed / 50), 0, 0)
+            else
+                flyBv.Velocity = Vector3.new(0, 0.1, 0) -- Giữ nhẹ để không rơi
+            end
+
+            game:GetService("RunService").RenderStepped:Wait()
         end
         humanoid.PlatformStand = false
         if flyBv then flyBv:Destroy() end
@@ -717,67 +736,40 @@ end
 
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
-    if input.KeyCode == Enum.KeyCode.W then flyKeys.w = true
-    elseif input.KeyCode == Enum.KeyCode.S then flyKeys.s = true
-    elseif input.KeyCode == Enum.KeyCode.A then flyKeys.a = true
-    elseif input.KeyCode == Enum.KeyCode.D then flyKeys.d = true
-    elseif input.KeyCode == Enum.KeyCode.Space then flyKeys.space = true
-    elseif input.KeyCode == Enum.KeyCode.LeftControl then flyKeys.ctrl = true
+    if input.KeyCode == Enum.KeyCode.W then flyKeys.f = 1
+    elseif input.KeyCode == Enum.KeyCode.S then flyKeys.b = 1
+    elseif input.KeyCode == Enum.KeyCode.A then flyKeys.l = 1
+    elseif input.KeyCode == Enum.KeyCode.D then flyKeys.r = 1
+    elseif input.KeyCode == Enum.KeyCode.Space then flyKeys.up = 1
+    elseif input.KeyCode == Enum.KeyCode.LeftControl then flyKeys.down = 1
     end
 end)
 
 UserInputService.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.W then flyKeys.w = false
-    elseif input.KeyCode == Enum.KeyCode.S then flyKeys.s = false
-    elseif input.KeyCode == Enum.KeyCode.A then flyKeys.a = false
-    elseif input.KeyCode == Enum.KeyCode.D then flyKeys.d = false
-    elseif input.KeyCode == Enum.KeyCode.Space then flyKeys.space = false
-    elseif input.KeyCode == Enum.KeyCode.LeftControl then flyKeys.ctrl = false
+    if input.KeyCode == Enum.KeyCode.W then flyKeys.f = 0
+    elseif input.KeyCode == Enum.KeyCode.S then flyKeys.b = 0
+    elseif input.KeyCode == Enum.KeyCode.A then flyKeys.l = 0
+    elseif input.KeyCode == Enum.KeyCode.D then flyKeys.r = 0
+    elseif input.KeyCode == Enum.KeyCode.Space then flyKeys.up = 0
+    elseif input.KeyCode == Enum.KeyCode.LeftControl then flyKeys.down = 0
     end
 end)
 
--- For mobile support, add on-screen buttons when fly enabled
-local flyControlsGui
-if UserInputService.TouchEnabled then
-    flyControlsGui = Instance.new("ScreenGui")
-    flyControlsGui.Parent = PlayerGui
-
-    local function createFlyButton(name, pos, key)
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 50, 0, 50)
-        btn.Position = pos
-        btn.Text = name
-        btn.Parent = flyControlsGui
-        btn.Visible = false
-        btn.MouseButton1Down:Connect(function()
-            flyKeys[key] = true
-        end)
-        btn.MouseButton1Up:Connect(function()
-            flyKeys[key] = false
-        end)
-        return btn
+-- Khởi động Fly khi bật
+flyButton.MouseButton1Click:Connect(function()
+    if Config.FlyEnabled then
+        startFly()
     end
+end)
 
-    local wBtn = createFlyButton("W", UDim2.new(0.4, 0, 0.8, 0), "w")
-    local sBtn = createFlyButton("S", UDim2.new(0.4, 0, 0.9, 0), "s")
-    local aBtn = createFlyButton("A", UDim2.new(0.3, 0, 0.85, 0), "a")
-    local dBtn = createFlyButton("D", UDim2.new(0.5, 0, 0.85, 0), "d")
-    local upBtn = createFlyButton("Up", UDim2.new(0.6, 0, 0.8, 0), "space")
-    local downBtn = createFlyButton("Down", UDim2.new(0.6, 0, 0.9, 0), "ctrl")
-
-    local function toggleFlyButtons(visible)
-        wBtn.Visible = visible
-        sBtn.Visible = visible
-        aBtn.Visible = visible
-        dBtn.Visible = visible
-        upBtn.Visible = visible
-        downBtn.Visible = visible
+-- Hỗ trợ respawn
+LocalPlayer.CharacterAdded:Connect(function(char)
+    if Config.FlyEnabled then
+        wait(0.5)
+        startFly()
     end
-
+end)
     flyButton.MouseButton1Click:Connect(function()
-        toggleFlyButtons(Config.FlyEnabled)
-    end)
-end
 
 LocalPlayer.CharacterAdded:Connect(function(char)
     char:WaitForChild("Humanoid").WalkSpeed = Config.WalkSpeed
