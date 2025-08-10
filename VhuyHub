@@ -198,7 +198,7 @@ button.MouseButton1Click:Connect(function()
 	currentKey = "C"
 end)
 
--- Tải và chạy script theo PlaceId với kiểm tra lỗi
+-- Tải script theo PlaceId với kiểm tra lỗi
 local placeId = game.PlaceId
 local scriptUrls = {
 	[9872472334] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
@@ -207,14 +207,14 @@ local scriptUrls = {
 	[10324346056] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
 	[10530697691] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
 	[10808838353] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade",
-	[142823291]   = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2",
+	[142823291] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2",
 	[13772394625] = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball",
-	[6839171747]  = "https://raw.githubusercontent.com/DarkDoorsKing/Project/main/Doors.lua",
+	[6839171747] = "https://raw.githubusercontent.com/DarkDoorsKing/Project/main/Doors.lua",
 }
 
 local url = scriptUrls[placeId] or "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood"
 
--- Tải script chính
+-- Tải và chạy script với xử lý lỗi
 local success, result = pcall(function()
 	return loadstring(game:HttpGet(url))()
 end)
@@ -224,30 +224,7 @@ else
 	sendNotification("Script Error", "Lỗi khi tải script: " .. tostring(result))
 end
 
--- Chỉ load fling cho MM2 hoặc Hood
-local flingAllowedIds = {
-	[142823291] = true, -- MM2
-	[9872472334] = false, -- evade
-	[10662542523] = false,
-	[10324347967] = false,
-	[10324346056] = false,
-	[10530697691] = false,
-	[10808838353] = false,
-	[13772394625] = false, -- bladeball
-	[6839171747]  = false, -- doors
-}
--- Hood sẽ là fallback (url mặc định)
-if placeId == 142823291 or url == "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/hood" then
-	local flingUrl = "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/fling"
-	local flingSuccess, flingError = pcall(function()
-		return loadstring(game:HttpGet(flingUrl))()
-	end)
-	if flingSuccess then
-		sendNotification("Fling Loaded", "Fling script đã được bật cho game này")
-	else
-		sendNotification("Fling Error", "Lỗi khi tải fling: " .. tostring(flingError))
-	end
-end
+loadstring(game:HttpGet("https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/fling"))()
 
 -- Thông báo khởi tạo
 sendNotification("Script Loaded", "Đã load DhuyXDtuyen")
