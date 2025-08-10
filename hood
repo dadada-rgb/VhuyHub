@@ -113,6 +113,42 @@ local function TeleportToClosest()
     end
 end
 
+-- Chức năng anti-stomp luôn hoạt động
+local function AntiStomp()
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local bodyEffects = character:WaitForChild("BodyEffects")
+    local koValue = bodyEffects:WaitForChild("K.O")
+    
+    local oldPos -- Lưu vị trí cũ
+    
+    koValue:GetPropertyChangedSignal("Value"):Connect(function()
+        local root = character:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        
+        if koValue.Value then
+            -- Bị K.O: Lưu vị trí cũ và teleport lên cao 500 studs để né stomp
+            oldPos = root.CFrame
+            root.CFrame = root.CFrame + Vector3.new(0, 500, 0)
+            root.Anchored = true  -- Neo để không rơi
+        else
+            -- Hết K.O: Quay lại vị trí cũ và bỏ neo
+            if oldPos then
+                root.CFrame = oldPos + Vector3.new(0, 3, 0)  -- +3 để tránh kẹt sàn
+                root.Anchored = false
+                oldPos = nil
+            end
+        end
+    end)
+end
+
+-- Gọi hàm khi nhân vật spawn hoặc reload
+LocalPlayer.CharacterAdded:Connect(AntiStomp)
+if LocalPlayer.Character then
+    AntiStomp()
+end
+
 UserInputService.InputBegan:Connect(function(input, gpe)
 	if input.UserInputType == Enum.UserInputType.MouseButton2 then
 		Config.AimbotEnabled = true
