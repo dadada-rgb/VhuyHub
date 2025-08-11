@@ -953,6 +953,7 @@ CreateScriptItem("Evade", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/
 CreateScriptItem("Murder Mystery 2", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2")
 CreateScriptItem("Blade Ball", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball")
 CreateScriptItem("Doors", "https://raw.githubusercontent.com/DarkDoorsKing/Project/main/Doors.lua")
+CreateScriptItem("Emote", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote")
 
 local PageButtons = Instance.new("Frame")
 PageButtons.Size = UDim2.new(1, 0, 0, 35)
