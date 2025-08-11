@@ -129,7 +129,7 @@ introGui.Name = "VhuyIntroGui"
 introGui.IgnoreGuiInset = true
 introGui.ResetOnSpawn = false
 introGui.DisplayOrder = 99999
-introGui.Parent = game:GetService("CoreGui")
+introGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local bg = Instance.new("Frame")
 bg.Size = UDim2.new(1, 0, 1, 0)
@@ -180,7 +180,7 @@ local cButtonGui = Instance.new("ScreenGui")
 cButtonGui.Name = "CButtonGui"
 cButtonGui.ResetOnSpawn = false
 cButtonGui.IgnoreGuiInset = true
-cButtonGui.Parent = game.CoreGui
+cButtonGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 
 local cButton = Instance.new("TextButton")
 cButton.Name = "PlayCButton"
@@ -1341,15 +1341,17 @@ local function Connect(event, callback)
     return connection
 end
 
-Connect(Players.PlayerAdded, function(player)
-    task.wait(math.random(2, 3))
+Connect(Players.PlayerRemoving, function(player)
     RemoveESP(player)
     UpdatePlayerList()
 end)
 
-Connect(Players.PlayerRemoving, function(player)
+Connect(Players.PlayerAdded, function(player)
+    task.wait(math.random(2, 3))
     RemoveESP(player)
-    Config.SelectedPlayers[player.Name] = nil
+    if Config.SelectedPlayers[player.Name] then
+        Config.SelectedPlayers[player.Name] = true 
+    end
     UpdatePlayerList()
 end)
 
