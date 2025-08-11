@@ -1422,27 +1422,3 @@ task.spawn(function()
         task.wait(4)
     end
 end)
-
-game:BindToClose(function()
-    for _, connection in pairs(Connections) do
-        pcall(function() connection:Disconnect() end)
-    end
-    for _, esp in pairs(ESPs) do
-        pcall(function()
-            esp.label:Destroy()
-            esp.highlight:Destroy()
-        end)
-    end
-    pcall(function() if ScreenGui and ScreenGui.Parent then ScreenGui:Destroy() end end)
-    pcall(function() if espGui and espGui.Parent then espGui:Destroy() end end)
-    pcall(function() if cButtonGui and cButtonGui.Parent then cButtonGui:Destroy() end end)
-    if noclipConnection then
-        noclipConnection:Disconnect()
-    end
-    Lighting.Brightness = oldLighting.Brightness
-    Lighting.GlobalShadows = oldLighting.GlobalShadows
-    Lighting.FogEnd = oldLighting.FogEnd
-    Lighting.Ambient = oldLighting.Ambient
-    Lighting.OutdoorAmbient = oldLighting.OutdoorAmbient
-    Lighting.ClockTime = oldLighting.ClockTime
-end)
