@@ -28,7 +28,7 @@ local Config = {
 }
 
 local autoSelect = false
-local tbEnabled = true
+local tbEnabled = false
 local fovRadius = 20
 local Player = nil
 local camera = Workspace.CurrentCamera
