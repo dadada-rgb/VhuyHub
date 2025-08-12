@@ -576,16 +576,13 @@ ButtonLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
 end)
 
 local function CreateButton(name, callback)
-    -- Frame chứa cả nút và ô keybind
     local buttonFrame = Instance.new("Frame")
     buttonFrame.Size = UDim2.new(1, -10, 0, 30)
     buttonFrame.BackgroundTransparency = 1
     buttonFrame.Parent = ButtonFrame
 
-    -- Nút chức năng (70% chiều ngang)
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(0.7, -5, 1, 0)
-    button.Position = UDim2.new(0, 0, 0, 0)
     button.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
     button.BackgroundTransparency = 0.2
     button.TextColor3 = Color3.fromRGB(0, 0, 0)
@@ -597,7 +594,6 @@ local function CreateButton(name, callback)
     animateButton(button)
     button.MouseButton1Click:Connect(callback)
 
-    -- Ô nhập keybind (30% chiều ngang)
     local keyBox = Instance.new("TextBox")
     keyBox.Size = UDim2.new(0.3, 0, 1, 0)
     keyBox.Position = UDim2.new(0.7, 5, 0, 0)
@@ -612,14 +608,73 @@ local function CreateButton(name, callback)
     Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 6)
 
     keyBox:GetPropertyChangedSignal("Text"):Connect(function()
-        local keyName = keyBox.Text:upper()
-        if Enum.KeyCode[keyName] then
-            game:GetService("UserInputService").InputBegan:Connect(function(input, gp)
-                if not gp and input.KeyCode.Name == keyName then
-                    callback()
+        local text = keyBox.Text:lower()
+
+        if text == "button" then
+            -- Tạo ScreenGui riêng ngoài menu
+            local screenGui = Instance.new("ScreenGui")
+            screenGui.IgnoreGuiInset = true
+            screenGui.Parent = game:GetService("CoreGui")
+
+            -- Tạo nút giống Show/Hide
+            local screenBtn = Instance.new("TextButton")
+            screenBtn.Size = UDim2.new(0, 70, 0, 30)
+            screenBtn.Position = UDim2.new(0, 100, 0, 300)
+            screenBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 255)
+            screenBtn.Text = name
+            screenBtn.TextColor3 = Color3.new(0, 0, 0)
+            screenBtn.TextSize = 10
+            screenBtn.Font = Enum.Font.GothamBold
+            screenBtn.Parent = screenGui
+            Instance.new("UICorner", screenBtn).CornerRadius = UDim.new(0, 6)
+
+            -- Kéo di chuyển
+            local dragging = false
+            local dragStart, startPos
+            screenBtn.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = true
+                    dragStart = input.Position
+                    startPos = screenBtn.Position
+                    input.Changed:Connect(function()
+                        if input.UserInputState == Enum.UserInputState.End then
+                            dragging = false
+                        end
+                    end)
                 end
             end)
-            SaveSettings()
+            UserInputService.InputChanged:Connect(function(input)
+                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    local delta = input.Position - dragStart
+                    screenBtn.Position = UDim2.new(
+                        startPos.X.Scale, startPos.X.Offset + delta.X,
+                        startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                    )
+                end
+            end)
+
+            -- Bấm => chạy đúng callback
+            screenBtn.MouseButton1Click:Connect(function()
+                callback()
+            end)
+
+            -- Chết thì mất
+            LocalPlayer.CharacterAdded:Connect(function()
+                if screenGui then
+                    screenGui:Destroy()
+                end
+            end)
+
+        else
+            -- Bind phím (không phân biệt hoa/thường)
+            local keyName = text:upper()
+            if Enum.KeyCode[keyName] then
+                UserInputService.InputBegan:Connect(function(input, gp)
+                    if not gp and input.KeyCode.Name:upper() == keyName then
+                        callback()
+                    end
+                end)
+            end
         end
     end)
 
