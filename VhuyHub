@@ -1366,13 +1366,6 @@ UserInputService.InputBegan:Connect(function(input, processed)
     end
 end)
 
-UserInputService.InputBegan:Connect(function(input, gpe)
-    if input.KeyCode == Enum.KeyCode.E and not gpe then
-        Config.AimbotEnabled = not Config.AimbotEnabled
-        UpdateButtonText()
-    end
-end)
-
 local hitParts = {
     "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "LeftUpperArm", "LeftLowerArm", "LeftHand",
     "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
