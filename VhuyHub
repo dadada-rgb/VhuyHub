@@ -1,3 +1,51 @@
+-- XÓA GUI & NGẮT KẾT NỐI CŨ TRƯỚC KHI CHẠY LẠI
+pcall(function()
+    -- Xóa ScreenGui chính và GUI phụ
+    local pg = game.Players.LocalPlayer:FindFirstChild("PlayerGui")
+    if pg then
+        for _, gui in ipairs(pg:GetChildren()) do
+            if gui.Name == "DhuyxMenu" or gui.Name == "VhuyIntroGui" or gui.Name == "CButtonGui" or gui.Name == "SafeESP" then
+                gui:Destroy()
+            end
+        end
+    end
+
+    -- Xóa tool click TP nếu có
+    local bp = game.Players.LocalPlayer:FindFirstChild("Backpack")
+    if bp then
+        local tool = bp:FindFirstChild("ClickTP")
+        if tool then tool:Destroy() end
+    end
+
+    -- Tắt noclip nếu đang bật
+    if getgenv().noclipConnection and typeof(getgenv().noclipConnection) == "RBXScriptConnection" then
+        getgenv().noclipConnection:Disconnect()
+        getgenv().noclipConnection = nil
+    end
+
+    -- Tắt fling
+    getgenv().hiddenFling = false
+
+    -- Xóa ESP nếu còn tồn tại
+    if getgenv().ESPs then
+        for _, esp in pairs(getgenv().ESPs) do
+            pcall(function()
+                if esp.label then esp.label:Destroy() end
+                if esp.highlight then esp.highlight:Destroy() end
+            end)
+        end
+        getgenv().ESPs = {}
+    end
+
+    -- Ngắt tất cả kết nối đã lưu
+    if getgenv().Connections then
+        for _, conn in pairs(getgenv().Connections) do
+            pcall(function() conn:Disconnect() end)
+        end
+        getgenv().Connections = {}
+    end
+end)
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -540,7 +588,7 @@ local function CreateButton(name, callback)
         end
     end)
 
-    return button
+    return buttonFrame, button
 end
 
 -- Custom Field of View
@@ -585,6 +633,35 @@ fovBox.FocusLost:Connect(function(enterPressed)
             sendNotification("Custom FOV", "Đã đặt FOV thành "..num)
         else
             sendNotification("Custom FOV", "Giá trị FOV phải từ 40 đến 120")
+        end
+    end
+end)
+
+local antiAfkEnabled = false
+local antiAfkLoop
+
+antiAfkButton = CreateButton("Anti AFK: OFF", function()
+    antiAfkEnabled = not antiAfkEnabled
+    antiAfkButton.Text = "Anti AFK: " .. (antiAfkEnabled and "ON" or "OFF")
+    sendNotification("ANTI AFK", antiAfkEnabled and "ON" or "OFF")
+
+    if antiAfkEnabled then
+        -- Vòng lặp tự nhảy mỗi 60 giây
+        antiAfkLoop = task.spawn(function()
+            while antiAfkEnabled do
+                task.wait(60) -- Đợi 60 giây
+                pcall(function()
+                    local hum = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                end)
+            end
+        end)
+    else
+        if antiAfkLoop then
+            task.cancel(antiAfkLoop)
+            antiAfkLoop = nil
         end
     end
 end)
@@ -651,137 +728,6 @@ fullbrightButton = CreateButton("Fullbright: OFF", function()
     end
     sendNotification("FULLBRIGHT", Config.FullbrightEnabled and "ON" or "OFF")
     fullbrightButton.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
-end)
-
--- === Variables ===
-local spectatorEnabled = false
-local spectatorList = {}
-local currentSpectatorIndex = 1
-
-local savedMinZoom, savedMaxZoom = LocalPlayer.CameraMinZoomDistance, LocalPlayer.CameraMaxZoomDistance
-local savedCameraMode = LocalPlayer.CameraMode
-
--- === Functions ===
-local function UpdateSpectatorList()
-    spectatorList = {}
-    for name, selected in pairs(Config.SelectedPlayers) do
-        if selected then
-            local plr = Players:FindFirstChild(name)
-            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                table.insert(spectatorList, plr)
-            end
-        end
-    end
-end
-
-local function NextSpectator()
-    if #spectatorList == 0 then return end
-    currentSpectatorIndex = currentSpectatorIndex % #spectatorList + 1
-    Camera.CameraSubject = spectatorList[currentSpectatorIndex].Character.Humanoid
-    sendNotification("Spectator", "Watching " .. spectatorList[currentSpectatorIndex].Name)
-end
-
-local function PrevSpectator()
-    if #spectatorList == 0 then return end
-    currentSpectatorIndex = (currentSpectatorIndex - 2) % #spectatorList + 1
-    Camera.CameraSubject = spectatorList[currentSpectatorIndex].Character.Humanoid
-    sendNotification("Spectator", "Watching " .. spectatorList[currentSpectatorIndex].Name)
-end
-
--- === Buttons ===
-local buttonWidth = 100
-local buttonHeight = 30
-local spacing = 5
-
-spectatorButton = CreateButton("Spectator: OFF", function()
-    spectatorEnabled = not spectatorEnabled
-    if spectatorEnabled then
-        UpdateSpectatorList()
-        currentSpectatorIndex = 1
-        if #spectatorList > 0 then
-            savedMinZoom, savedMaxZoom = LocalPlayer.CameraMinZoomDistance, LocalPlayer.CameraMaxZoomDistance
-            savedCameraMode = LocalPlayer.CameraMode
-            LocalPlayer.CameraMinZoomDistance = 2
-            LocalPlayer.CameraMaxZoomDistance = 128
-            LocalPlayer.CameraMode = Enum.CameraMode.Classic
-            Camera.CameraSubject = spectatorList[currentSpectatorIndex].Character.Humanoid
-            sendNotification("Spectator", "ON - Watching " .. spectatorList[currentSpectatorIndex].Name)
-        else
-            sendNotification("Spectator", "No selected players to watch!")
-            spectatorEnabled = false
-        end
-    else
-        Camera.CameraSubject = LocalPlayer.Character.Humanoid
-        LocalPlayer.CameraMinZoomDistance = savedMinZoom
-        LocalPlayer.CameraMaxZoomDistance = savedMaxZoom
-        LocalPlayer.CameraMode = savedCameraMode
-        sendNotification("Spectator", "OFF")
-    end
-    spectatorButton.Text = "Spectator: " .. (spectatorEnabled and "ON" or "OFF")
-end)
-
-spectatorButton.Size = UDim2.new(0, buttonWidth, 0, buttonHeight)
-spectatorButton.Position = UDim2.new(0.5, -buttonWidth/2, 0, 100)
-
-prevSpectatorButton = CreateButton("<", function()
-    if spectatorEnabled then
-        PrevSpectator()
-    end
-end)
-prevSpectatorButton.Size = UDim2.new(0, buttonHeight, 0, buttonHeight)
-prevSpectatorButton.Position = spectatorButton.Position - UDim2.new(0, buttonHeight + spacing, 0, 0)
-
-nextSpectatorButton = CreateButton(">", function()
-    if spectatorEnabled then
-        NextSpectator()
-    end
-end)
-nextSpectatorButton.Size = UDim2.new(0, buttonHeight, 0, buttonHeight)
-nextSpectatorButton.Position = spectatorButton.Position + UDim2.new(0, buttonWidth + spacing, 0, 0)
-
--- === RunService integration ===
-RunService.RenderStepped:Connect(function(deltaTime)
-    UpdateESP()
-    UpdateSpeed()
-    UpdateFly(deltaTime)
-
-    if Config.AimbotEnabled and getgenv().Aimbot.Status then
-        Player = GetClosestValidPlayer()
-        if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
-            local part = Player.Character[getgenv().Aimbot.Hitpart]
-            local predictedPos = GetPredictedPosition(part)
-            if not IsObstructed(Camera.CFrame.Position, predictedPos) then
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
-            end
-        end
-    end
-
-    if tbEnabled then
-        local part = GetBestTargetPart()
-        if part then
-            task.spawn(function()
-                local cap = part
-                task.wait(0)
-                if tbEnabled and distToCursor(cap) <= fovRadius then
-                    click()
-                end
-            end)
-        end
-    end
-
-    if spectatorEnabled then
-        if #spectatorList == 0 
-        or not spectatorList[currentSpectatorIndex]
-        or not spectatorList[currentSpectatorIndex].Character
-        or not spectatorList[currentSpectatorIndex].Character:FindFirstChild("HumanoidRootPart") then
-            UpdateSpectatorList()
-            if #spectatorList > 0 then
-                currentSpectatorIndex = 1
-                Camera.CameraSubject = spectatorList[currentSpectatorIndex].Character.Humanoid
-                sendNotification("Spectator", "Watching " .. spectatorList[currentSpectatorIndex].Name)
-            end
-        end
-    end
 end)
 
 noclipButton = CreateButton("Noclip: OFF", function()
@@ -1405,9 +1351,7 @@ end
 
 UserInputService.InputBegan:Connect(function(input, processed)
     if processed then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
-        ScreenGui.Enabled = not ScreenGui.Enabled
-    elseif input.KeyCode == Enum.KeyCode.Y then
+    if input.KeyCode == Enum.KeyCode.Y then
         autoSelect = not autoSelect
         if autoSelect then
             for _, player in pairs(Players:GetPlayers()) do
