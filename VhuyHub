@@ -492,20 +492,54 @@ ButtonLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     ButtonFrame.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout.AbsoluteContentSize.Y)
 end)
 
--- Hàm tạo nút
 local function CreateButton(name, callback)
+    -- Frame chứa cả nút và ô keybind
+    local buttonFrame = Instance.new("Frame")
+    buttonFrame.Size = UDim2.new(1, -10, 0, 30)
+    buttonFrame.BackgroundTransparency = 1
+    buttonFrame.Parent = ButtonFrame
+
+    -- Nút chức năng (70% chiều ngang)
     local button = Instance.new("TextButton")
-    button.Size = UDim2.new(1, -10, 0, 30)
+    button.Size = UDim2.new(0.7, -5, 1, 0)
+    button.Position = UDim2.new(0, 0, 0, 0)
     button.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
     button.BackgroundTransparency = 0.2
     button.TextColor3 = Color3.fromRGB(0, 0, 0)
     button.TextSize = 14
     button.Font = Enum.Font.Gotham
     button.Text = name
-    button.Parent = ButtonFrame
-    button.MouseButton1Click:Connect(callback)
+    button.Parent = buttonFrame
     Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
     animateButton(button)
+    button.MouseButton1Click:Connect(callback)
+
+    -- Ô nhập keybind (30% chiều ngang)
+    local keyBox = Instance.new("TextBox")
+    keyBox.Size = UDim2.new(0.3, 0, 1, 0)
+    keyBox.Position = UDim2.new(0.7, 5, 0, 0)
+    keyBox.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+    keyBox.PlaceholderText = "Key"
+    keyBox.Text = ""
+    keyBox.TextColor3 = Color3.fromRGB(0, 0, 0)
+    keyBox.TextSize = 14
+    keyBox.Font = Enum.Font.Gotham
+    keyBox.ClearTextOnFocus = false
+    keyBox.Parent = buttonFrame
+    Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 6)
+
+    -- Gán phím tắt
+    keyBox.FocusLost:Connect(function(enterPressed)
+        if enterPressed and keyBox.Text ~= "" then
+            local keyName = keyBox.Text:upper()
+            game:GetService("UserInputService").InputBegan:Connect(function(input, gp)
+                if not gp and input.KeyCode.Name == keyName then
+                    callback()
+                end
+            end)
+        end
+    end)
+
     return button
 end
 
@@ -1072,6 +1106,33 @@ ScriptHubScroll.ScrollingDirection = Enum.ScrollingDirection.XY
 ScriptHubScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 ScriptHubScroll.Parent = Page3
 
+local headerFrame = Instance.new("Frame")
+headerFrame.Size = UDim2.new(1, 0, 0, 30)
+headerFrame.BackgroundTransparency = 1
+headerFrame.Parent = ScriptHubScroll
+
+local nameHeader = Instance.new("TextLabel")
+nameHeader.Size = UDim2.new(0.7, 0, 1, 0)
+nameHeader.Position = UDim2.new(0, 5, 0, 0)
+nameHeader.BackgroundTransparency = 1
+nameHeader.Text = "Tên Chức Năng"
+nameHeader.TextColor3 = Color3.fromRGB(0, 0, 0)
+nameHeader.Font = Enum.Font.GothamBold
+nameHeader.TextSize = 16
+nameHeader.TextXAlignment = Enum.TextXAlignment.Left
+nameHeader.Parent = headerFrame
+
+local keyHeader = Instance.new("TextLabel")
+keyHeader.Size = UDim2.new(0.3, -10, 1, 0)
+keyHeader.Position = UDim2.new(0.7, 5, 0, 0)
+keyHeader.BackgroundTransparency = 1
+keyHeader.Text = "Phím Tắt"
+keyHeader.TextColor3 = Color3.fromRGB(0, 0, 0)
+keyHeader.Font = Enum.Font.GothamBold
+keyHeader.TextSize = 16
+keyHeader.TextXAlignment = Enum.TextXAlignment.Center
+keyHeader.Parent = headerFrame
+
 local ScriptListLayout = Instance.new("UIListLayout")
 ScriptListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 ScriptListLayout.Padding = UDim.new(0, 6)
@@ -1358,14 +1419,6 @@ UserInputService.InputBegan:Connect(function(input, processed)
             Config.SelectedPlayers = {}
         end
         UpdatePlayerList()
-    elseif input.KeyCode == Enum.KeyCode.Z then
-        Config.SpeedEnabled = not Config.SpeedEnabled
-        UpdateButtonText()
-    elseif input.KeyCode == Enum.KeyCode.Q then
-        Config.FlyEnabled = not Config.FlyEnabled
-        UpdateButtonText()
-    elseif input.KeyCode == Enum.KeyCode.T then
-        TeleportToClosest()
     end
 end)
 
