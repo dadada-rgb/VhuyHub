@@ -58,42 +58,50 @@ local Camera = Workspace.CurrentCamera
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local HttpService = game:GetService("HttpService")
-local SETTINGS_FILE = "DhuyxDtuyen_Settings.json"
+local LocalPlayer = game:GetService("Players").LocalPlayer
 
+-- Tạo file config riêng cho mỗi người chơi
+local ConfigFile = "mygui_config_" .. LocalPlayer.UserId .. ".json"
+
+-- Cấu trúc config mặc định
+local Config = {
+    Buttons = {}, -- Lưu keybind + trạng thái của từng chức năng
+    GuiPosition = {X = 0, Y = 0}, -- Vị trí GUI
+    GuiVisible = true -- Trạng thái hiện/ẩn menu
+}
+
+-- Hàm lưu config
 local function SaveSettings()
-    local saveData = {
-        Config = Config,
-        MenuPos = {
-            ScaleX = MenuFrame.Position.X.Scale,
-            OffsetX = MenuFrame.Position.X.Offset,
-            ScaleY = MenuFrame.Position.Y.Scale,
-            OffsetY = MenuFrame.Position.Y.Offset
-        },
-        MenuVisible = MenuFrame.Visible
-    }
-    writefile(SETTINGS_FILE, HttpService:JSONEncode(saveData))
-end
-
-local function LoadSettings()
-    if isfile(SETTINGS_FILE) then
-        local data = HttpService:JSONDecode(readfile(SETTINGS_FILE))
-        if data.Config then
-            for k,v in pairs(data.Config) do
-                Config[k] = v
-            end
-        end
-        if data.MenuPos then
-            MenuFrame.Position = UDim2.new(data.MenuPos.ScaleX, data.MenuPos.OffsetX, data.MenuPos.ScaleY, data.MenuPos.OffsetY)
-        end
-        if data.MenuVisible ~= nil then
-            MenuFrame.Visible = data.MenuVisible
-            ToggleButton.Text = data.MenuVisible and "HIDE" or "SHOW"
-        end
+    local success, err = pcall(function()
+        writefile(ConfigFile, HttpService:JSONEncode(Config))
+    end)
+    if not success then
+        warn("[SaveSettings] Lỗi lưu config:", err)
     end
 end
 
--- Gọi ngay khi GUI tạo xong
-task.defer(LoadSettings)
+-- Hàm load config
+local function LoadSettings()
+    if isfile(ConfigFile) then
+        local success, data = pcall(function()
+            return HttpService:JSONDecode(readfile(ConfigFile))
+        end)
+        if success and type(data) == "table" then
+            -- Gộp dữ liệu load vào Config hiện tại
+            for k, v in pairs(data) do
+                Config[k] = v
+            end
+        else
+            warn("[LoadSettings] Lỗi đọc config:", data)
+        end
+    else
+        -- Nếu chưa có file thì tạo mới
+        SaveSettings()
+    end
+end
+
+-- Load config ngay khi script chạy
+LoadSettings()
 
 -- Cấu hình
 local Config = {
