@@ -46,6 +46,14 @@ pcall(function()
     end
 end)
 
+getgenv().SavedConfig = getgenv().SavedConfig or Config
+
+if getgenv().SavedConfig then
+    for k, v in pairs(getgenv().SavedConfig) do
+        Config[k] = v
+    end
+end
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -84,6 +92,7 @@ local camConnection
 local clickTpTool = nil
 local savedWaypoint = nil
 local noclipConnection = nil
+local keyConnection = nil
 
 
 -- Biến lưu trạng thái Lighting cũ cho Fullbright
@@ -467,7 +476,7 @@ PingClock.Parent = MenuTitle
 
 task.spawn(function()
     while task.wait(1) do
-        local ping = Config.CustomPing or math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+        local ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
         local fps = math.floor(1 / RunService.RenderStepped:Wait())
         local timeStr = os.date("%H:%M")
         PingClock.Text = string.format("Ping: %d ms | FPS: %d | %s", ping, fps, timeStr)
@@ -488,16 +497,14 @@ PingBox.ClearTextOnFocus = false
 PingBox.Parent = MenuTitle
 Instance.new("UICorner", PingBox).CornerRadius = UDim.new(0, 6)
 
-PingBox.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        local input = tonumber(PingBox.Text)
-        if input and input >= 0 then
-            Config.CustomPing = math.clamp(input, 10, 1000)
-            PingBox.Text = tostring(Config.CustomPing)
-        else
-            Config.CustomPing = nil
-            PingBox.Text = ""
-        end
+PingBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local input = tonumber(PingBox.Text)
+    if input and input >= 0 then
+        Config.CustomPing = math.clamp(input, 10, 1000)
+        PingBox.Text = tostring(Config.CustomPing)
+    else
+        Config.CustomPing = nil
+        PingBox.Text = ""
     end
 end)
 
@@ -576,15 +583,79 @@ local function CreateButton(name, callback)
     keyBox.Parent = buttonFrame
     Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 6)
 
-    -- Gán phím tắt
-    keyBox.FocusLost:Connect(function(enterPressed)
-        if enterPressed and keyBox.Text ~= "" then
-            local keyName = keyBox.Text:upper()
-            game:GetService("UserInputService").InputBegan:Connect(function(input, gp)
-                if not gp and input.KeyCode.Name == keyName then
-                    callback()
+    -- Gán phím tắt hoặc tạo nút ngay khi nhập
+    keyBox:GetPropertyChangedSignal("Text"):Connect(function()
+        local keyText = keyBox.Text
+        if keyText == "" then
+            -- Xóa phím tắt nếu ô trống
+            if keyConnection then
+                keyConnection:Disconnect()
+                keyConnection = nil
+            end
+            return
+        end
+
+        if keyText:lower() == "button" then
+            -- Tạo nút trên màn hình
+            local funcButton = Instance.new("TextButton")
+            funcButton.Size = UDim2.new(0, 70, 0, 30)
+            funcButton.Position = UDim2.new(0.5, 0, 0.5, 0)  -- Vị trí mặc định
+            funcButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+            funcButton.Text = name  -- Tên chức năng
+            funcButton.TextColor3 = Color3.new(0, 0, 0)
+            funcButton.Font = Enum.Font.GothamBold
+            funcButton.TextSize = 14
+            funcButton.Parent = cButtonGui  -- Hoặc ScreenGui mới nếu cần
+            Instance.new("UICorner", funcButton).CornerRadius = UDim.new(0, 10)
+            animateButton(funcButton)  -- Tái sử dụng hàm animate
+
+            funcButton.MouseButton1Click:Connect(callback)
+
+            -- Làm draggable giống nút C
+            local dragging = false
+            local dragStart, startPos
+            funcButton.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = true
+                    dragStart = input.Position
+                    startPos = funcButton.Position
+                    input.Changed:Connect(function()
+                        if input.UserInputState == Enum.UserInputState.End then
+                            dragging = false
+                        end
+                    end)
                 end
             end)
+            UserInputService.InputChanged:Connect(function(input)
+                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    local delta = input.Position - dragStart
+                    funcButton.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+                end
+            end)
+
+            keyBox.Text = ""  -- Xóa textbox sau khi tạo nút
+            if keyConnection then
+                keyConnection:Disconnect()
+                keyConnection = nil
+            end
+        else
+            -- Gán phím tắt
+            if keyConnection then
+                keyConnection:Disconnect()
+                keyConnection = nil
+            end
+            local keyName = keyText:upper()
+            if Enum.KeyCode[keyName] then  -- Kiểm tra xem keyName có hợp lệ không
+                keyConnection = UserInputService.InputBegan:Connect(function(input, gp)
+                    if not gp and input.KeyCode == Enum.KeyCode[keyName] then
+                        callback()
+                    end
+                end)
+            else
+                -- Thông báo nếu phím không hợp lệ
+                sendNotification("Keybind Error", "Phím '" .. keyText .. "' không hợp lệ!")
+                keyBox.Text = ""
+            end
         end
     end)
 
@@ -625,8 +696,8 @@ fovBox.ClearTextOnFocus = false
 fovBox.Parent = ButtonFrame
 Instance.new("UICorner", fovBox).CornerRadius = UDim.new(0, 6)
 
-fovBox.FocusLost:Connect(function(enterPressed)
-    if enterPressed and customFovEnabled then
+fovBox:GetPropertyChangedSignal("Text"):Connect(function()
+    if customFovEnabled then
         local num = tonumber(fovBox.Text)
         if num and num >= 40 and num <= 120 then
             Workspace.CurrentCamera.FieldOfView = num
@@ -1052,6 +1123,19 @@ ScriptHubScroll.ScrollingDirection = Enum.ScrollingDirection.XY
 ScriptHubScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
 ScriptHubScroll.Parent = Page3
 
+local InstructionLabel = Instance.new("TextLabel")
+InstructionLabel.Size = UDim2.new(1, -10, 0, 60)
+InstructionLabel.Position = UDim2.new(0, 5, 1, -100)  -- Điều chỉnh vị trí dưới scroll
+InstructionLabel.BackgroundTransparency = 1
+InstructionLabel.TextWrapped = true
+InstructionLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
+InstructionLabel.Font = Enum.Font.Gotham
+InstructionLabel.TextSize = 14
+InstructionLabel.Text = [[Hướng dẫn sử dụng / Instructions:
+Tiếng Việt: Nhập "button" vào ô trống (textbox keybind) của bất kỳ chức năng nào để tạo nút trên màn hình (không phải trong GUI), nút này có thể di chuyển và bấm để kích hoạt chức năng.
+English: Enter "button" in the empty box (keybind textbox) of any function to create a button on the screen (outside the GUI), this button is draggable and clicks to activate the function.]]
+InstructionLabel.Parent = Page3
+
 local ScriptListLayout = Instance.new("UIListLayout")
 ScriptListLayout.SortOrder = Enum.SortOrder.LayoutOrder
 ScriptListLayout.Padding = UDim.new(0, 6)
@@ -1422,13 +1506,16 @@ local function GetPredictedPosition(part)
     return part.Position + velocity * delay * distanceFactor
 end
 
-local function IsObstructed(origin, targetPos)
+local function IsObstructedToPart(origin, targetPos, targetCharacter)
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
     raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-    local result = Workspace:Raycast(origin, (targetPos - origin), raycastParams)
-    if result and result.Instance and not result.Instance:IsDescendantOf(Player and Player.Character) then
-        return true
+    raycastParams.IgnoreWater = true
+    local result = Workspace:Raycast(origin, targetPos - origin, raycastParams)
+    if result and result.Instance then
+        if not result.Instance:IsDescendantOf(targetCharacter) then
+            return true
+        end
     end
     return false
 end
@@ -1470,11 +1557,15 @@ RunService.RenderStepped:Connect(function(deltaTime)
     if tbEnabled then
         local part = GetBestTargetPart()
         if part then
-            task.spawn(function()
-                local cap = part
-                task.wait(0)
-                if tbEnabled and distToCursor(cap) <= fovRadius then
-                    click()
+            local targetChar = part.Parent
+            local predictedPos = GetPredictedPosition(part)  -- Nếu không có prediction thì dùng part.Position
+            if not IsObstructedToPart(Camera.CFrame.Position, predictedPos, targetChar) then
+                task.spawn(function()
+                    local cap = part
+                    task.wait(0)
+                    if tbEnabled and distToCursor(cap) <= fovRadius then
+                        click()
+                    end
                 end
             end)
         end
