@@ -560,7 +560,11 @@ local function CreateButton(name, callback)
     button.Parent = buttonFrame
     Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
     animateButton(button)
-    button.MouseButton1Click:Connect(callback)
+
+    -- Khi click chuột vào nút, truyền chính nút đó vào callback
+    button.MouseButton1Click:Connect(function()
+        callback(button)
+    end)
 
     -- Ô nhập keybind (30% chiều ngang)
     local keyBox = Instance.new("TextBox")
@@ -576,13 +580,21 @@ local function CreateButton(name, callback)
     keyBox.Parent = buttonFrame
     Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 6)
 
-    -- Gán phím tắt
+    -- Gán phím tắt (bàn phím + chuột)
     keyBox.FocusLost:Connect(function(enterPressed)
         if enterPressed and keyBox.Text ~= "" then
             local keyName = keyBox.Text:upper()
             game:GetService("UserInputService").InputBegan:Connect(function(input, gp)
-                if not gp and input.KeyCode.Name == keyName then
-                    callback()
+                if not gp then
+                    if input.KeyCode ~= Enum.KeyCode.Unknown and input.KeyCode.Name:upper() == keyName then
+                        callback(button)
+                    elseif input.UserInputType == Enum.UserInputType.MouseButton1 and keyName == "MB1" then
+                        callback(button)
+                    elseif input.UserInputType == Enum.UserInputType.MouseButton2 and keyName == "MB2" then
+                        callback(button)
+                    elseif input.UserInputType == Enum.UserInputType.MouseButton3 and keyName == "MB3" then
+                        callback(button)
+                    end
                 end
             end)
         end
@@ -597,7 +609,7 @@ local defaultFov = Workspace.CurrentCamera.FieldOfView
 
 customFovButton = CreateButton("Custom FOV: OFF", function()
     customFovEnabled = not customFovEnabled
-    customFovButton.Text = "Custom FOV: " .. (customFovEnabled and "ON" or "OFF")
+    btn.Text = "Custom FOV: " .. (customFovEnabled and "ON" or "OFF")
 
     if customFovEnabled then
         local num = tonumber(fovBox.Text)
@@ -669,25 +681,25 @@ end)
 aimbotButton = CreateButton("Aimbot: OFF", function()
     Config.AimbotEnabled = not Config.AimbotEnabled
     sendNotification("AIMBOT", Config.AimbotEnabled and "ON" or "OFF")
-    aimbotButton.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
+    btn.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
 end)
 
 checkKOAimbotButton = CreateButton("Check K.O Aimbot: OFF", function()
     Config.checkKOAimbot = not Config.checkKOAimbot
     sendNotification("CHECK K.O AIMBOT", Config.checkKOAimbot and "ON" or "OFF")
-    checkKOAimbotButton.Text = "Check K.O Aimbot: " .. (Config.checkKOAimbot and "ON" or "OFF")
+    btn.Text = "Check K.O Aimbot: " .. (Config.checkKOAimbot and "ON" or "OFF")
 end)
 
 espButton = CreateButton("ESP: OFF", function()
     Config.ESPEnabled = not Config.ESPEnabled
     sendNotification("ESP", Config.ESPEnabled and "ON" or "OFF")
-    espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
+    btn.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
 end)
 
 infiniteJumpButton = CreateButton("Infinite Jump: OFF", function()
     Config.infiniteJumpEnabled = not Config.infiniteJumpEnabled
     sendNotification("INFINITIEJUMP", Config.infiniteJumpEnabled and "ON" or "OFF")
-    infiniteJumpButton.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
+    btn.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
 end)
 
 -- JumpRequest chạy khi bấm Space (PC) hoặc nút nhảy mặc định (Mobile)
@@ -700,13 +712,13 @@ end)
 speedButton = CreateButton("Speed: OFF", function()
     Config.SpeedEnabled = not Config.SpeedEnabled
     sendNotification("SPEED", Config.SpeedEnabled and "ON" or "OFF")
-    speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
+    btn.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
 end)
 
 flyButton = CreateButton("Fly: OFF", function()
     Config.FlyEnabled = not Config.FlyEnabled
     sendNotification("FLY", Config.FlyEnabled and "ON" or "OFF")
-    flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
+    btn.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
 end)
 
 fullbrightButton = CreateButton("Fullbright: OFF", function()
@@ -727,7 +739,7 @@ fullbrightButton = CreateButton("Fullbright: OFF", function()
         Lighting.ClockTime = oldLighting.ClockTime
     end
     sendNotification("FULLBRIGHT", Config.FullbrightEnabled and "ON" or "OFF")
-    fullbrightButton.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
+    btn.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
 end)
 
 noclipButton = CreateButton("Noclip: OFF", function()
@@ -753,7 +765,7 @@ noclipButton = CreateButton("Noclip: OFF", function()
     end
 
     sendNotification("NOCLIP", Config.NoclipEnabled and "ON" or "OFF")
-    noclipButton.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
+    btn.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
 end)
 
 -- Đảm bảo noclip vẫn bật khi respawn
@@ -795,7 +807,7 @@ end
 clickTpButton = CreateButton("Click TP: OFF", function()
     Config.clickTpEnabled = not Config.clickTpEnabled
     sendNotification("GIVECLICKTOOL", Config.clickTpEnabled and "ON" or "OFF")
-    clickTpButton.Text = "Click TP: " .. (Config.clickTpEnabled and "ON" or "OFF")
+    btn.Text = "Click TP: " .. (Config.clickTpEnabled and "ON" or "OFF")
 
     if Config.clickTpEnabled then
         giveClickTpTool()
@@ -837,7 +849,7 @@ end)
 triggerBotButton = CreateButton("TriggerBot: " .. (tbEnabled and "ON" or "OFF"), function()
     tbEnabled = not tbEnabled
     sendNotification("TRIGGERBOT", tbEnabled and "ON" or "OFF")
-    triggerBotButton.Text = "TriggerBot: " .. (tbEnabled and "ON" or "OFF")
+    btn.Text = "TriggerBot: " .. (tbEnabled and "ON" or "OFF")
 end)
 
 local hiddenFling = false
@@ -881,7 +893,7 @@ flingLoop()
 flintTouchButton = CreateButton("FlintTouch: OFF", function()
     hiddenFling = not hiddenFling
     sendNotification("FLINGTOUCH", hiddenFling and "ON" or "OFF")
-    flintTouchButton.Text = "FlintTouch: " .. (hiddenFling and "ON" or "OFF")
+    btn.Text = "FlintTouch: " .. (hiddenFling and "ON" or "OFF")
 end)
 
 tpAndStompButton = CreateButton("TP Player", function()
