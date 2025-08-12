@@ -588,7 +588,7 @@ local function CreateButton(name, callback)
         end
     end)
 
-    return buttonFrame, button
+    return button
 end
 
 -- Custom Field of View
