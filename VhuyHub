@@ -65,9 +65,27 @@ local ConfigFile = "mygui_config_" .. LocalPlayer.UserId .. ".json"
 
 -- Cấu trúc config mặc định
 local Config = {
-    Buttons = {}, -- Lưu keybind + trạng thái của từng chức năng
+    Buttons = {}, -- Lưu keybind của từng chức năng
     GuiPosition = {X = 0, Y = 0}, -- Vị trí GUI
-    GuiVisible = true -- Trạng thái hiện/ẩn menu
+    GuiVisible = true, -- Trạng thái hiện/ẩn menu
+    ESPEnabled = false,
+    SpeedEnabled = false,
+    FlyEnabled = false,
+    AimbotEnabled = false,
+    FullbrightEnabled = false,
+    NoclipEnabled = false,
+    ShiftAmount = 0.5,
+    SelectedPlayers = {},
+    FlySpeed = 35,
+    SpeedAmount = 20,
+    infiniteJumpEnabled = false,
+    clickTpEnabled = false,
+    checkKOAimbot = false,
+    CustomPing = nil,
+    CustomFOV = 70,
+    CustomFOVEnabled = false,
+    NoReloadEnabled = false,
+    InstantStompEnabled = false
 }
 
 -- Hàm lưu config
@@ -103,24 +121,6 @@ end
 -- Load config ngay khi script chạy
 LoadSettings()
 
--- Cấu hình
-local Config = {
-    ESPEnabled = false,
-    SpeedEnabled = false,
-    FlyEnabled = false,
-    AimbotEnabled = false,
-    FullbrightEnabled = false,
-    NoclipEnabled = false,
-    ShiftAmount = 0.5,
-    SelectedPlayers = {},
-    FlySpeed = 35,
-    SpeedAmount = 20,
-    infiniteJumpEnabled = false,
-    clickTpEnabled = false,
-    checkKOAimbot = false,
-    CustomPing = nil
-}
-
 local autoSelect = false
 local tbEnabled = false
 local fovRadius = 20
@@ -130,6 +130,13 @@ local camConnection
 local clickTpTool = nil
 local savedWaypoint = nil
 local noclipConnection = nil
+local autoKillEnabled = false
+local autoKillLoop = nil
+local customFOVEnabled = Config.CustomFOVEnabled
+local noReloadEnabled = Config.NoReloadEnabled
+local instantStompEnabled = Config.InstantStompEnabled
+
+getgenv().Keybinds = {} -- Lưu kết nối keybind
 
 
 -- Biến lưu trạng thái Lighting cũ cho Fullbright
@@ -366,50 +373,6 @@ cButton.MouseButton1Click:Connect(function()
     sendNotification("Animation", "Playing C animation!")
 end)
 
--- Hàm dịch chuyển đến người gần nhất
-local function TeleportToClosest()
-    local closestKO, closestAlive = nil, nil
-    local minDistKO, minDistAlive = math.huge, math.huge
-    local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
-
-    if not myPos then return end
-
-    for name, selected in pairs(Config.SelectedPlayers) do
-        if selected then
-            local plr = Players:FindFirstChild(name)
-            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local pos = plr.Character.HumanoidRootPart.Position
-                local dist = (myPos - pos).Magnitude
-                if dist < minDistAlive then
-                    closestAlive = plr
-                    minDistAlive = dist
-                end
-            end
-        end
-    end
-
-    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    local oldPos = root.CFrame
-
-    if closestKO then
-        local torso = closestKO.Character:FindFirstChild("Torso") or closestKO.Character:FindFirstChild("HumanoidRootPart")
-        if torso then
-            root.CFrame = torso.CFrame
-            task.wait(0.2)
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-            task.wait(0.1)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-            task.wait(1.5)
-        end
-    elseif closestAlive then
-        local torso = closestAlive.Character:FindFirstChild("HumanoidRootPart") or closestAlive.Character:FindFirstChild("HumanoidRootPart")
-        if torso then
-            root.CFrame = torso.CFrame + Vector3.new(0, 30, 0)
-        end
-    end
-end
-
 -- GUI chính
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "DhuyxMenu"
@@ -420,7 +383,7 @@ ScreenGui.Parent = PlayerGui
 local MenuFrame = Instance.new("Frame")
 MenuFrame.Size = UDim2.new(0, 300, 0, 250)
 MenuFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
-MenuFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+MenuFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 0)
 MenuFrame.BackgroundTransparency = 0.1
 MenuFrame.Active = true
 MenuFrame.Draggable = true
@@ -544,12 +507,21 @@ PingBox:GetPropertyChangedSignal("Text"):Connect(function()
     SaveSettings()
 end)
 
--- Frame danh sách người chơi
+-- Tạo 3 trang
+local currentPage = 1
+
+local Page1 = Instance.new("Frame")
+Page1.Size = UDim2.new(1, 0, 1, -70)
+Page1.Position = UDim2.new(0, 0, 0, 30)
+Page1.BackgroundTransparency = 1
+Page1.Parent = MenuFrame
+
+-- Frame danh sách người chơi cho trang 1
 local PlayerListFrame = Instance.new("Frame")
 PlayerListFrame.Size = UDim2.new(0.5, -5, 1, -20)
 PlayerListFrame.Position = UDim2.new(0, 5, 0, 10)
 PlayerListFrame.BackgroundTransparency = 1
-PlayerListFrame.Parent = MenuFrame
+PlayerListFrame.Parent = Page1
 
 local PlayerList = Instance.new("ScrollingFrame")
 PlayerList.Size = UDim2.new(1, 0, 1, 0)
@@ -566,28 +538,197 @@ UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     PlayerList.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
 end)
 
--- Frame nút chức năng
-local ButtonFrame = Instance.new("ScrollingFrame")
-ButtonFrame.Size = UDim2.new(0.5, -5, 1, -20)
-ButtonFrame.Position = UDim2.new(0.5, 0, 0, 10)
-ButtonFrame.BackgroundTransparency = 1
-ButtonFrame.ScrollBarThickness = 4
-ButtonFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-ButtonFrame.Parent = MenuFrame
+-- Frame nút chức năng cho trang 1
+local ButtonFrame1 = Instance.new("ScrollingFrame")
+ButtonFrame1.Size = UDim2.new(0.5, -5, 1, -20)
+ButtonFrame1.Position = UDim2.new(0.5, 0, 0, 10)
+ButtonFrame1.BackgroundTransparency = 1
+ButtonFrame1.ScrollBarThickness = 4
+ButtonFrame1.CanvasSize = UDim2.new(0, 0, 0, 0)
+ButtonFrame1.Parent = Page1
 
-local ButtonLayout = Instance.new("UIListLayout")
-ButtonLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ButtonLayout.Padding = UDim.new(0, 6)
-ButtonLayout.Parent = ButtonFrame
-ButtonLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    ButtonFrame.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout.AbsoluteContentSize.Y)
+local ButtonLayout1 = Instance.new("UIListLayout")
+ButtonLayout1.SortOrder = Enum.SortOrder.LayoutOrder
+ButtonLayout1.Padding = UDim.new(0, 6)
+ButtonLayout1.Parent = ButtonFrame1
+ButtonLayout1:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ButtonFrame1.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout1.AbsoluteContentSize.Y)
 end)
 
-local function CreateButton(name, callback)
+local Page2 = Instance.new("Frame")
+Page2.Size = UDim2.new(1, 0, 1, -70)
+Page2.Position = UDim2.new(0, 0, 0, 30)
+Page2.BackgroundTransparency = 1
+Page2.Visible = false
+Page2.Parent = MenuFrame
+
+-- Frame nút chức năng trái cho trang 2
+local ButtonFrame2Left = Instance.new("ScrollingFrame")
+ButtonFrame2Left.Size = UDim2.new(0.5, -5, 1, -20)
+ButtonFrame2Left.Position = UDim2.new(0, 5, 0, 10)
+ButtonFrame2Left.BackgroundTransparency = 1
+ButtonFrame2Left.ScrollBarThickness = 4
+ButtonFrame2Left.CanvasSize = UDim2.new(0, 0, 0, 0)
+ButtonFrame2Left.Parent = Page2
+
+local ButtonLayout2Left = Instance.new("UIListLayout")
+ButtonLayout2Left.SortOrder = Enum.SortOrder.LayoutOrder
+ButtonLayout2Left.Padding = UDim.new(0, 6)
+ButtonLayout2Left.Parent = ButtonFrame2Left
+ButtonLayout2Left:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ButtonFrame2Left.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout2Left.AbsoluteContentSize.Y)
+end)
+
+-- Frame nút chức năng phải cho trang 2
+local ButtonFrame2Right = Instance.new("ScrollingFrame")
+ButtonFrame2Right.Size = UDim2.new(0.5, -5, 1, -20)
+ButtonFrame2Right.Position = UDim2.new(0.5, 0, 0, 10)
+ButtonFrame2Right.BackgroundTransparency = 1
+ButtonFrame2Right.ScrollBarThickness = 4
+ButtonFrame2Right.CanvasSize = UDim2.new(0, 0, 0, 0)
+ButtonFrame2Right.Parent = Page2
+
+local ButtonLayout2Right = Instance.new("UIListLayout")
+ButtonLayout2Right.SortOrder = Enum.SortOrder.LayoutOrder
+ButtonLayout2Right.Padding = UDim.new(0, 6)
+ButtonLayout2Right.Parent = ButtonFrame2Right
+ButtonLayout2Right:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ButtonFrame2Right.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout2Right.AbsoluteContentSize.Y)
+end)
+
+local Page3 = Instance.new("Frame")
+Page3.Size = UDim2.new(1, 0, 1, -70)
+Page3.Position = UDim2.new(0, 0, 0, 30)
+Page3.BackgroundTransparency = 1
+Page3.Visible = false
+Page3.Parent = MenuFrame
+
+local ScriptHubScroll = Instance.new("ScrollingFrame")
+ScriptHubScroll.Size = UDim2.new(1, -10, 1, -50)
+ScriptHubScroll.Position = UDim2.new(0, 5, 0, 5)
+ScriptHubScroll.BackgroundTransparency = 1
+ScriptHubScroll.ScrollBarThickness = 6
+ScriptHubScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+ScriptHubScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+ScriptHubScroll.Parent = Page3
+
+local ScriptListLayout = Instance.new("UIListLayout")
+ScriptListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ScriptListLayout.Padding = UDim.new(0, 6)
+ScriptListLayout.FillDirection = Enum.FillDirection.Vertical
+ScriptListLayout.Parent = ScriptHubScroll
+
+ScriptListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ScriptHubScroll.CanvasSize = UDim2.new(0, 0, 0, ScriptListLayout.AbsoluteContentSize.Y)
+end)
+
+local function CreateScriptItem(name, url)
+    local itemFrame = Instance.new("Frame")
+    itemFrame.Size = UDim2.new(1, 0, 0, 35)
+    itemFrame.BackgroundTransparency = 0.2
+    itemFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    itemFrame.Parent = ScriptHubScroll
+    Instance.new("UICorner", itemFrame).CornerRadius = UDim.new(0, 6)
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.new(0.7, 0, 1, 0)
+    nameLabel.Position = UDim2.new(0, 5, 0, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = name
+    nameLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
+    nameLabel.TextSize = 16
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.Parent = itemFrame
+
+    local runBtn = Instance.new("TextButton")
+    runBtn.Size = UDim2.new(0.3, -10, 1, -4)
+    runBtn.Position = UDim2.new(0.7, 5, 0, 2)
+    runBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
+    runBtn.Text = "Run"
+    runBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    runBtn.TextSize = 16
+    runBtn.Font = Enum.Font.GothamBold
+    runBtn.Parent = itemFrame
+    Instance.new("UICorner", runBtn).CornerRadius = UDim.new(0, 6)
+    animateButton(runBtn)
+
+    runBtn.MouseButton1Click:Connect(function()
+        loadstring(game:HttpGet(url))()
+    end)
+
+    return itemFrame
+end
+
+CreateScriptItem("Evade", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade")
+CreateScriptItem("Murder Mystery 2", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2")
+CreateScriptItem("Blade Ball", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball")
+CreateScriptItem("Doors", "https://raw.githubusercontent.com/DarkDoorsKing/Project/main/Doors.lua")
+CreateScriptItem("Emote", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote")
+
+local PageButtons = Instance.new("Frame")
+PageButtons.Size = UDim2.new(1, 0, 0, 35)
+PageButtons.Position = UDim2.new(0, 0, 1, -35)
+PageButtons.BackgroundTransparency = 1
+PageButtons.Parent = MenuFrame
+
+local Btn1 = Instance.new("TextButton")
+Btn1.Size = UDim2.new(1/3, -2, 1, 0)
+Btn1.Position = UDim2.new(0, 0, 0, 0)
+Btn1.Text = "Da Hood"
+Btn1.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+Btn1.TextColor3 = Color3.fromRGB(0, 0, 0)
+Btn1.Font = Enum.Font.GothamBold
+Btn1.TextSize = 16
+Instance.new("UICorner", Btn1).CornerRadius = UDim.new(0, 6)
+Btn1.Parent = PageButtons
+animateButton(Btn1)
+
+local Btn2 = Instance.new("TextButton")
+Btn2.Size = UDim2.new(1/3, -2, 1, 0)
+Btn2.Position = UDim2.new(1/3, 2, 0, 0)
+Btn2.Text = "Universal"
+Btn2.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+Btn2.TextColor3 = Color3.fromRGB(0, 0, 0)
+Btn2.Font = Enum.Font.GothamBold
+Btn2.TextSize = 16
+Instance.new("UICorner", Btn2).CornerRadius = UDim.new(0, 6)
+Btn2.Parent = PageButtons
+animateButton(Btn2)
+
+local Btn3 = Instance.new("TextButton")
+Btn3.Size = UDim2.new(1/3, -2, 1, 0)
+Btn3.Position = UDim2.new(2/3, 2, 0, 0)
+Btn3.Text = "Script Other"
+Btn3.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+Btn3.TextColor3 = Color3.fromRGB(0, 0, 0)
+Btn3.Font = Enum.Font.GothamBold
+Btn3.TextSize = 16
+Instance.new("UICorner", Btn3).CornerRadius = UDim.new(0, 6)
+Btn3.Parent = PageButtons
+animateButton(Btn3)
+
+local function ShowPage(page)
+    Page1.Visible = (page == 1)
+    Page2.Visible = (page == 2)
+    Page3.Visible = (page == 3)
+end
+
+Btn1.MouseButton1Click:Connect(function()
+    ShowPage(1)
+end)
+Btn2.MouseButton1Click:Connect(function()
+    ShowPage(2)
+end)
+Btn3.MouseButton1Click:Connect(function()
+    ShowPage(3)
+end)
+
+local function CreateButton(parent, name, callback)
     local buttonFrame = Instance.new("Frame")
     buttonFrame.Size = UDim2.new(1, -10, 0, 30)
     buttonFrame.BackgroundTransparency = 1
-    buttonFrame.Parent = ButtonFrame
+    buttonFrame.Parent = parent
 
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(0.7, -5, 1, 0)
@@ -607,7 +748,7 @@ local function CreateButton(name, callback)
     keyBox.Position = UDim2.new(0.7, 5, 0, 0)
     keyBox.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
     keyBox.PlaceholderText = "Key"
-    keyBox.Text = ""
+    keyBox.Text = Config.Buttons[name] or ""
     keyBox.TextColor3 = Color3.fromRGB(0, 0, 0)
     keyBox.TextSize = 14
     keyBox.Font = Enum.Font.Gotham
@@ -615,9 +756,12 @@ local function CreateButton(name, callback)
     keyBox.Parent = buttonFrame
     Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 6)
 
-    keyBox:GetPropertyChangedSignal("Text"):Connect(function()
-        local text = keyBox.Text:lower()
-
+    local function applyBind(text)
+        text = text:lower()
+        if getgenv().Keybinds[name] then
+            getgenv().Keybinds[name]:Disconnect()
+            getgenv().Keybinds[name] = nil
+        end
         if text == "button" then
             -- Tạo ScreenGui riêng ngoài menu
             local screenGui = Instance.new("ScreenGui")
@@ -666,84 +810,81 @@ local function CreateButton(name, callback)
                 callback()
             end)
 
-            -- Chết thì mất
-            LocalPlayer.CharacterAdded:Connect(function()
-                if screenGui then
-                    screenGui:Destroy()
-                end
-            end)
-
         else
-            -- Bind phím (không phân biệt hoa/thường)
+            -- Bind phím
             local keyName = text:upper()
             if Enum.KeyCode[keyName] then
-                UserInputService.InputBegan:Connect(function(input, gp)
+                getgenv().Keybinds[name] = UserInputService.InputBegan:Connect(function(input, gp)
                     if not gp and input.KeyCode.Name:upper() == keyName then
                         callback()
                     end
                 end)
             end
         end
+        Config.Buttons[name] = text
+        SaveSettings()
+    end
+
+    applyBind(keyBox.Text) -- Áp dụng bind hiện tại nếu có
+
+    keyBox:GetPropertyChangedSignal("Text"):Connect(function()
+        applyBind(keyBox.Text)
     end)
 
     return button
 end
 
--- Custom Field of View
-local customFovEnabled = false
-local defaultFov = Workspace.CurrentCamera.FieldOfView
-
-customFovButton = CreateButton("Custom FOV: OFF", function()
-    customFovEnabled = not customFovEnabled
-    customFovButton.Text = "Custom FOV: " .. (customFovEnabled and "ON" or "OFF")
-
-    if customFovEnabled then
-        local num = tonumber(fovBox.Text)
-        if num and num >= 40 and num <= 120 then
-            Workspace.CurrentCamera.FieldOfView = num
-            sendNotification("Custom FOV", "Đã đặt FOV thành " .. num)
-        else
-            sendNotification("Custom FOV", "Hãy nhập giá trị 40-120 vào ô FOV")
-        end
-    else
-        Workspace.CurrentCamera.FieldOfView = defaultFov
-    end
+-- Nút cho trang 1
+espButton = CreateButton(ButtonFrame1, "ESP: " .. (Config.ESPEnabled and "ON" or "OFF"), function()
+    Config.ESPEnabled = not Config.ESPEnabled
+    sendNotification("ESP", Config.ESPEnabled and "ON" or "OFF")
+    espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
+    SaveSettings()
 end)
 
--- Ô nhập giá trị FOV
-local fovBox = Instance.new("TextBox")
-fovBox.Size = UDim2.new(1, -10, 0, 25)
-fovBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-fovBox.BackgroundTransparency = 0.2
-fovBox.TextColor3 = Color3.fromRGB(0, 0, 0)
-fovBox.TextSize = 14
-fovBox.Font = Enum.Font.Gotham
-fovBox.PlaceholderText = "Nhập FOV (mặc định: "..defaultFov..")"
-fovBox.ClearTextOnFocus = false
-fovBox.Parent = ButtonFrame
-Instance.new("UICorner", fovBox).CornerRadius = UDim.new(0, 6)
-
-fovBox:GetPropertyChangedSignal("Text"):Connect(function()
-    if customFovEnabled then
-        local num = tonumber(fovBox.Text)
-        if num and num >= 40 and num <= 120 then
-            Workspace.CurrentCamera.FieldOfView = num
-            sendNotification("Custom FOV", "Đã đặt FOV thành " .. num)
-            SaveSettings()
-        end
-    end
+speedButton = CreateButton(ButtonFrame1, "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF"), function()
+    Config.SpeedEnabled = not Config.SpeedEnabled
+    sendNotification("SPEED", Config.SpeedEnabled and "ON" or "OFF")
+    speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
+    SaveSettings()
 end)
 
-local antiAfkEnabled = false
-local antiAfkLoop
+flyButton = CreateButton(ButtonFrame1, "Fly: " .. (Config.FlyEnabled and "ON" or "OFF"), function()
+    Config.FlyEnabled = not Config.FlyEnabled
+    sendNotification("FLY", Config.FlyEnabled and "ON" or "OFF")
+    flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
+    SaveSettings()
+end)
 
-antiAfkButton = CreateButton("Anti AFK: OFF", function()
+aimbotButton = CreateButton(ButtonFrame1, "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF"), function()
+    Config.AimbotEnabled = not Config.AimbotEnabled
+    sendNotification("AIMBOT", Config.AimbotEnabled and "ON" or "OFF")
+    aimbotButton.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
+    SaveSettings()
+end)
+
+checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O Aimbot: " .. (Config.checkKOAimbot and "ON" or "OFF"), function()
+    Config.checkKOAimbot = not Config.checkKOAimbot
+    sendNotification("CHECK K.O AIMBOT", Config.checkKOAimbot and "ON" or "OFF")
+    checkKOAimbotButton.Text = "Check K.O Aimbot: " .. (Config.checkKOAimbot and "ON" or "OFF")
+    SaveSettings()
+end)
+
+infiniteJumpButton = CreateButton(ButtonFrame1, "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF"), function()
+    Config.infiniteJumpEnabled = not Config.infiniteJumpEnabled
+    sendNotification("INFINITIEJUMP", Config.infiniteJumpEnabled and "ON" or "OFF")
+    infiniteJumpButton.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
+    SaveSettings()
+end)
+
+antiAfkEnabled = false
+antiAfkLoop = nil
+antiAfkButton = CreateButton(ButtonFrame1, "Anti AFK: OFF", function()
     antiAfkEnabled = not antiAfkEnabled
     antiAfkButton.Text = "Anti AFK: " .. (antiAfkEnabled and "ON" or "OFF")
     sendNotification("ANTI AFK", antiAfkEnabled and "ON" or "OFF")
 
     if antiAfkEnabled then
-        -- Vòng lặp tự nhảy mỗi 60 giây
         antiAfkLoop = task.spawn(function()
             while antiAfkEnabled do
                 task.wait(60) -- Đợi 60 giây
@@ -761,57 +902,299 @@ antiAfkButton = CreateButton("Anti AFK: OFF", function()
             antiAfkLoop = nil
         end
     end
-end)
-
-aimbotButton = CreateButton("Aimbot: OFF", function()
-    Config.AimbotEnabled = not Config.AimbotEnabled
-    sendNotification("AIMBOT", Config.AimbotEnabled and "ON" or "OFF")
-    aimbotButton.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
     SaveSettings()
 end)
 
-checkKOAimbotButton = CreateButton("Check K.O Aimbot: OFF", function()
-    Config.checkKOAimbot = not Config.checkKOAimbot
-    sendNotification("CHECK K.O AIMBOT", Config.checkKOAimbot and "ON" or "OFF")
-    checkKOAimbotButton.Text = "Check K.O Aimbot: " .. (Config.checkKOAimbot and "ON" or "OFF")
+triggerBotButton = CreateButton(ButtonFrame1, "TriggerBot: " .. (tbEnabled and "ON" or "OFF"), function()
+    tbEnabled = not tbEnabled
+    sendNotification("TRIGGERBOT", tbEnabled and "ON" or "OFF")
+    triggerBotButton.Text = "TriggerBot: " .. (tbEnabled and "ON" or "OFF")
     SaveSettings()
 end)
 
-espButton = CreateButton("ESP: OFF", function()
-    Config.ESPEnabled = not Config.ESPEnabled
-    sendNotification("ESP", Config.ESPEnabled and "ON" or "OFF")
-    espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
-end)
+tpAndStompButton = CreateButton(ButtonFrame1, "TP Player", function()
+    local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+    if not myPos then return end
 
-infiniteJumpButton = CreateButton("Infinite Jump: OFF", function()
-    Config.infiniteJumpEnabled = not Config.infiniteJumpEnabled
-    sendNotification("INFINITIEJUMP", Config.infiniteJumpEnabled and "ON" or "OFF")
-    infiniteJumpButton.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
-    SaveSettings()
-end)
+    local closestPlayer, minDist = nil, math.huge
 
--- JumpRequest chạy khi bấm Space (PC) hoặc nút nhảy mặc định (Mobile)
-UserInputService.JumpRequest:Connect(function()
-    if Config.infiniteJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+    for name, selected in pairs(Config.SelectedPlayers) do
+        if selected then
+            local plr = Players:FindFirstChild(name)
+            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local pos = plr.Character.HumanoidRootPart.Position
+                local dist = (myPos - pos).Magnitude
+                if dist < minDist then
+                    closestPlayer = plr
+                    minDist = dist
+                end
+            end
+        end
+    end
+
+    if closestPlayer then
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            local pos = closestPlayer.Character.HumanoidRootPart.Position
+            root.CFrame = CFrame.new(pos + Vector3.new(8, 3, 8))
+        end
     end
 end)
 
-speedButton = CreateButton("Speed: OFF", function()
-    Config.SpeedEnabled = not Config.SpeedEnabled
-    sendNotification("SPEED", Config.SpeedEnabled and "ON" or "OFF")
-    speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
+-- AutoKill Button
+autoKillButton = CreateButton(ButtonFrame1, "AutoKill: " .. (autoKillEnabled and "ON" or "OFF"), function()
+    autoKillEnabled = not autoKillEnabled
+    autoKillButton.Text = "AutoKill: " .. (autoKillEnabled and "ON" or "OFF")
+    sendNotification("AUTOKILL", autoKillEnabled and "ON" or "OFF")
+    SaveSettings()
+
+    if autoKillEnabled then
+        autoKillLoop = task.spawn(function()
+            while autoKillEnabled do
+                local closestTarget = nil
+                local minDist = math.huge
+                local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if not myRoot then task.wait(1) continue end
+                local myPos = myRoot.Position
+
+                for name, selected in pairs(Config.SelectedPlayers) do
+                    if selected then
+                        local plr = Players:FindFirstChild(name)
+                        if plr and IsValidTarget(plr) then
+                            local targetRoot = plr.Character:FindFirstChild("HumanoidRootPart")
+                            if targetRoot then
+                                local dist = (myPos - targetRoot.Position).Magnitude
+                                if dist < minDist then
+                                    minDist = dist
+                                    closestTarget = plr
+                                end
+                            end
+                        end
+                    end
+                end
+
+                if closestTarget then
+                    local targetRoot = closestTarget.Character.HumanoidRootPart
+                    local targetHead = closestTarget.Character:FindFirstChild("Head")
+                    local targetHum = closestTarget.Character.Humanoid
+                    local bodyEffects = closestTarget.Character:FindFirstChild("BodyEffects")
+                    local koValue = bodyEffects and bodyEffects:FindFirstChild("K.O")
+
+                    -- Equip gun if not
+                    local gun = LocalPlayer.Character:FindFirstChildOfClass("Tool")
+                    if not gun or not gun:FindFirstChild("Ammo") then
+                        gun = LocalPlayer.Backpack:FindFirstChild("[Double-Barrel SG]") or LocalPlayer.Backpack:FindFirstChild("[Revolver]") -- Assume a gun
+                        if gun then
+                            gun.Parent = LocalPlayer.Character
+                        end
+                    end
+
+                    -- TP gần target
+                    myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 5, 3)
+
+                    local spinConnection
+                    spinConnection = RunService.Heartbeat:Connect(function()
+                        if not autoKillEnabled then spinConnection:Disconnect() return end
+                        local angle = os.clock() * 10 -- Tốc độ xoay
+                        myRoot.CFrame = targetRoot.CFrame * CFrame.new(math.sin(angle) * 3, 2, math.cos(angle) * 3) * CFrame.lookAt(myRoot.Position, targetRoot.Position)
+                    end)
+
+                    while autoKillEnabled and IsValidTarget(closestTarget) and not (koValue and koValue.Value) do
+                        -- Aim vào head
+                        if targetHead then
+                            Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
+                        end
+
+                        -- Bắn (click)
+                        click()
+                        task.wait(0.1) -- Fire rate giả định
+                    end
+
+                    spinConnection:Disconnect()
+
+                    -- Nếu KO, stomp nếu cần
+                    if koValue and koValue.Value then
+                        myRoot.CFrame = targetRoot.CFrame
+                        task.wait(0.2)
+                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                        task.wait(0.1)
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                    end
+                end
+
+                task.wait(0.5)
+            end
+        end)
+    else
+        if autoKillLoop then
+            task.cancel(autoKillLoop)
+            autoKillLoop = nil
+        end
+    end
+end)
+
+noReloadButton = CreateButton(ButtonFrame1, "No Reload Anim: " .. (noReloadEnabled and "ON" or "OFF"), function()
+    noReloadEnabled = not noReloadEnabled
+    noReloadButton.Text = "No Reload Anim: " .. (noReloadEnabled and "ON" or "OFF")
+    sendNotification("NO RELOAD ANIM", noReloadEnabled and "ON" or "OFF")
+    SaveSettings()
+
+    if noReloadEnabled then
+        -- Infinite ammo for Revolver code
+        local player = game.Players.LocalPlayer
+        local Gun = "[Revolver]"
+        local GunTexture = "rbxassetid://3420082920"
+        local GunPath = game:GetService("Workspace").Ignored.Shop["[Revolver] - $1300"].Head
+        local Holding = false
+
+        local InfiniteTool = Instance.new("Tool", player.Backpack)
+        InfiniteTool.Name = "Rev"
+        InfiniteTool.ToolTip = "buy guns while holding, shoot while using this tool"
+        InfiniteTool.TextureId = GunTexture
+        InfiniteTool.RequiresHandle = true
+        InfiniteTool.CanBeDropped = false
+
+        local Handle = Instance.new("Part", InfiniteTool)
+        Handle.Name = "Handle"
+        Handle.Anchored = false
+        Handle.Size = Vector3.new(0,0,0)
+        Handle.Massless = true
+        Handle.Transparency = 1
+        Handle.CanCollide = false
+
+        InfiniteTool.Equipped:Connect(function()
+            Holding = true
+            if player.PlayerGui.MainScreenGui:FindFirstChild("AmmoFrame") then
+                player.PlayerGui.MainScreenGui:FindFirstChild("AmmoFrame").Name = "AmmoFrame2"
+            end
+            for i,v in pairs(player.Backpack:GetChildren()) do
+                if v.Name == Gun and not player.Character:FindFirstChild(Gun) then
+                    if v.Ammo.Value > 0 then
+                        v.Parent = player.Character
+                    end
+                end
+            end
+            while Holding == true do
+                wait(0)
+                local TotalAmmo = 0
+                for i,v in pairs(player.Backpack:GetChildren()) do
+                    if v.Name == Gun then
+                        TotalAmmo = TotalAmmo + v.Ammo.Value
+                    end
+                end
+                for i,v in pairs(player.Character:GetChildren()) do
+                    if v.Name = Gun then
+                        TotalAmmo = TotalAmmo + v.Ammo.Value
+                    end
+                end
+                if player.PlayerGui.MainScreenGui.AmmoFrame2 then
+                    player.PlayerGui.MainScreenGui.AmmoFrame2.AmmoText.Text = tostring(TotalAmmo)
+                    player.PlayerGui.MainScreenGui.AmmoFrame2.AmmoText.Visible = true
+                    player.PlayerGui.MainScreenGui.AmmoFrame2.Visible = true
+                end
+                local mag = (GunPath.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                if mag <= 8 and player.Character:FindFirstChild(InfiniteTool.Name) then
+                    for i,v in pairs(player.Backpack:GetChildren()) do
+                        if v.Name == Gun then
+                            v.Parent = player.Character
+                        end
+                    end
+                end
+                fireclickdetector(GunPath.Parent.ClickDetector)
+                if player.Character:FindFirstChild(Gun) and player.Character:FindFirstChild(Gun).Ammo.Value < 1 then
+                    player.Character:FindFirstChild(Gun).Parent = player.Backpack
+                    for i,v in pairs(player.Backpack:GetChildren()) do
+                        if v.Name == Gun and not player.Character:FindFirstChild(Gun) then
+                            if v.Ammo.Value > 0 then
+                                v.Parent = player.Character
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+        InfiniteTool.Unequipped:Connect(function()
+            Holding = false
+            if player.PlayerGui.MainScreenGui:FindFirstChild("AmmoFrame2") then
+                player.PlayerGui.MainScreenGui:FindFirstChild("AmmoFrame2").Name = "AmmoFrame"
+            end
+        end)
+    else
+        -- Tắt infinite ammo
+        local infiniteTool = LocalPlayer.Backpack:FindFirstChild("Rev") or LocalPlayer.Character:FindFirstChild("Rev")
+        if infiniteTool then
+            infiniteTool:Destroy()
+        end
+    end
+end)
+
+instantStompButton = CreateButton(ButtonFrame1, "Instant Stomp: " .. (instantStompEnabled and "ON" or "OFF"), function()
+    instantStompEnabled = not instantStompEnabled
+    instantStompButton.Text = "Instant Stomp: " .. (instantStompEnabled and "ON" or "OFF")
+    sendNotification("INSTANT STOMP", instantStompEnabled and "ON" or "OFF")
     SaveSettings()
 end)
 
-flyButton = CreateButton("Fly: OFF", function()
-    Config.FlyEnabled = not Config.FlyEnabled
-    sendNotification("FLY", Config.FlyEnabled and "ON" or "OFF")
-    flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
-    SaveSettings()
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        if instantStompEnabled then
+            game:GetService("ReplicatedStorage").MainEvent:FireServer("Stomp")
+        end
+    end
 end)
 
-fullbrightButton = CreateButton("Fullbright: OFF", function()
+-- Nút cho trang 2
+customFovButton = CreateButton(ButtonFrame2Left, "Custom FOV: " .. (customFOVEnabled and "ON" or "OFF"), function()
+    customFOVEnabled = not customFOVEnabled
+    customFovButton.Text = "Custom FOV: " .. (customFOVEnabled and "ON" or "OFF")
+    Config.CustomFOVEnabled = customFOVEnabled
+    SaveSettings()
+
+    if customFOVEnabled then
+        local num = tonumber(fovBox.Text)
+        if num and num >= 40 and num <= 120 then
+            Workspace.CurrentCamera.FieldOfView = num
+            sendNotification("Custom FOV", "Đã đặt FOV thành " .. num)
+        else
+            sendNotification("Custom FOV", "Hãy nhập giá trị 40-120 vào ô FOV")
+        end
+    else
+        Workspace.CurrentCamera.FieldOfView = 70 -- default
+    end
+end)
+
+-- Ô nhập giá trị FOV
+local fovBox = Instance.new("TextBox")
+fovBox.Size = UDim2.new(1, -10, 0, 25)
+fovBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+fovBox.BackgroundTransparency = 0.2
+fovBox.TextColor3 = Color3.fromRGB(0, 0, 0)
+fovBox.TextSize = 14
+fovBox.Font = Enum.Font.Gotham
+fovBox.PlaceholderText = "Nhập FOV (mặc định: 70)"
+fovBox.Text = tostring(Config.CustomFOV)
+fovBox.ClearTextOnFocus = false
+fovBox.Parent = ButtonFrame2Left
+Instance.new("UICorner", fovBox).CornerRadius = UDim.new(0, 6)
+
+fovBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local num = tonumber(fovBox.Text)
+    if num and num >= 40 and num <= 120 then
+        Config.CustomFOV = num
+        SaveSettings()
+        if customFOVEnabled then
+            Workspace.CurrentCamera.FieldOfView = num
+            sendNotification("Custom FOV", "Đã đặt FOV thành " .. num)
+        end
+    end
+end)
+
+if customFOVEnabled then
+    Workspace.CurrentCamera.FieldOfView = Config.CustomFOV
+end
+
+fullbrightButton = CreateButton(ButtonFrame2Left, "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF"), function()
     Config.FullbrightEnabled = not Config.FullbrightEnabled
     if Config.FullbrightEnabled then
         Lighting.Brightness = 2
@@ -833,7 +1216,7 @@ fullbrightButton = CreateButton("Fullbright: OFF", function()
     SaveSettings()
 end)
 
-noclipButton = CreateButton("Noclip: OFF", function()
+noclipButton = CreateButton(ButtonFrame2Left, "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF"), function()
     Config.NoclipEnabled = not Config.NoclipEnabled
     
     if Config.NoclipEnabled then
@@ -896,7 +1279,7 @@ local function giveClickTpTool()
 end
 
 -- Nút bật/tắt
-clickTpButton = CreateButton("Click TP: OFF", function()
+clickTpButton = CreateButton(ButtonFrame2Right, "Click TP: " .. (Config.clickTpEnabled and "ON" or "OFF"), function()
     Config.clickTpEnabled = not Config.clickTpEnabled
     sendNotification("GIVECLICKTOOL", Config.clickTpEnabled and "ON" or "OFF")
     clickTpButton.Text = "Click TP: " .. (Config.clickTpEnabled and "ON" or "OFF")
@@ -921,7 +1304,7 @@ LocalPlayer.CharacterAdded:Connect(function()
     end
 end)
 
-saveWaypointButton = CreateButton("Save Waypoint", function()
+saveWaypointButton = CreateButton(ButtonFrame2Right, "Save Waypoint", function()
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         savedWaypoint = LocalPlayer.Character.HumanoidRootPart.CFrame
         sendNotification("Waypoint", "Đã lưu vị trí hiện tại!")
@@ -930,20 +1313,13 @@ saveWaypointButton = CreateButton("Save Waypoint", function()
     end
 end)
 
-tpWaypointButton = CreateButton("TP to Waypoint", function()
+tpWaypointButton = CreateButton(ButtonFrame2Right, "TP to Waypoint", function()
     if savedWaypoint and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         LocalPlayer.Character.HumanoidRootPart.CFrame = savedWaypoint
         sendNotification("Waypoint", "Đã teleport tới vị trí đã lưu!")
     else
         sendNotification("Waypoint", "Chưa có vị trí được lưu!")
     end
-end)
-
-triggerBotButton = CreateButton("TriggerBot: " .. (tbEnabled and "ON" or "OFF"), function()
-    tbEnabled = not tbEnabled
-    sendNotification("TRIGGERBOT", tbEnabled and "ON" or "OFF")
-    triggerBotButton.Text = "TriggerBot: " .. (tbEnabled and "ON" or "OFF")
-    SaveSettings()
 end)
 
 local hiddenFling = false
@@ -984,40 +1360,11 @@ end
 
 flingLoop()
 
-flintTouchButton = CreateButton("FlintTouch: OFF", function()
+flintTouchButton = CreateButton(ButtonFrame2Right, "FlintTouch: OFF", function()
     hiddenFling = not hiddenFling
     sendNotification("FLINGTOUCH", hiddenFling and "ON" or "OFF")
-    btn.Text = "FlintTouch: " .. (hiddenFling and "ON" or "OFF")
+    flintTouchButton.Text = "FlintTouch: " .. (hiddenFling and "ON" or "OFF")
     SaveSettings()
-end)
-
-tpAndStompButton = CreateButton("TP Player", function()
-    local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
-    if not myPos then return end
-
-    local closestPlayer, minDist = nil, math.huge
-
-    for name, selected in pairs(Config.SelectedPlayers) do
-        if selected then
-            local plr = Players:FindFirstChild(name)
-            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local pos = plr.Character.HumanoidRootPart.Position
-                local dist = (myPos - pos).Magnitude
-                if dist < minDist then
-                    closestPlayer = plr
-                    minDist = dist
-                end
-            end
-        end
-    end
-
-    if closestPlayer then
-        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if root then
-            local pos = closestPlayer.Character.HumanoidRootPart.Position
-            root.CFrame = CFrame.new(pos + Vector3.new(8, 3, 8))
-        end
-    end
 end)
 
 local function FlingAll()
@@ -1039,237 +1386,7 @@ local function FlingAll()
     end
 end
 
-flingAllButton = CreateButton("Fling All", FlingAll)
-
--- Tạo 3 trang
-local currentPage = 1
-
-local Page1 = Instance.new("Frame")
-Page1.Size = UDim2.new(1, 0, 1, -70)
-Page1.Position = UDim2.new(0, 0, 0, 30)
-Page1.BackgroundTransparency = 1
-Page1.Parent = MenuFrame
-
-PlayerListFrame.Parent = Page1
-ButtonFrame.Parent = Page1
-
-local Page2 = Instance.new("Frame")
-Page2.Size = UDim2.new(1, 0, 1, -70)
-Page2.Position = UDim2.new(0, 0, 0, 30)
-Page2.BackgroundTransparency = 1
-Page2.Visible = false
-Page2.Parent = MenuFrame
-
-local CodeScroll = Instance.new("ScrollingFrame")
-CodeScroll.Size = UDim2.new(1, -10, 1, -50)
-CodeScroll.Position = UDim2.new(0, 5, 0, 5)
-CodeScroll.BackgroundTransparency = 0.2
-CodeScroll.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-CodeScroll.ScrollBarThickness = 6
-CodeScroll.ScrollingDirection = Enum.ScrollingDirection.XY
-CodeScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-CodeScroll.Parent = Page2
-Instance.new("UICorner", CodeScroll).CornerRadius = UDim.new(0, 6)
-
-local CodeBox = Instance.new("TextBox")
-CodeBox.Size = UDim2.new(0, 1000, 0, 1000)
-CodeBox.Position = UDim2.new(0, 5, 0, 5)
-CodeBox.MultiLine = true
-CodeBox.ClearTextOnFocus = false
-CodeBox.TextWrapped = false
-CodeBox.TextYAlignment = Enum.TextYAlignment.Top
-CodeBox.TextXAlignment = Enum.TextXAlignment.Left
-CodeBox.BackgroundTransparency = 1
-CodeBox.Font = Enum.Font.Code
-CodeBox.TextSize = 14
-CodeBox.TextColor3 = Color3.fromRGB(0, 0, 0)
-CodeBox.Text = "-- Nhập script của bạn vào đây --"
-CodeBox.Parent = CodeScroll
-
-local TextService = game:GetService("TextService")
-CodeBox:GetPropertyChangedSignal("Text"):Connect(function()
-    local textBounds = TextService:GetTextSize(
-        CodeBox.Text,
-        CodeBox.TextSize,
-        CodeBox.Font,
-        Vector2.new(1000, 1000)
-    )
-    CodeScroll.CanvasSize = UDim2.new(0, math.max(textBounds.X + 30, CodeScroll.AbsoluteSize.X), 0, math.max(textBounds.Y + 30, CodeScroll.AbsoluteSize.Y))
-end)
-
-local initialTextBounds = TextService:GetTextSize(
-    CodeBox.Text,
-    CodeBox.TextSize,
-    CodeBox.Font,
-    Vector2.new(1000, 1000)
-)
-CodeScroll.CanvasSize = UDim2.new(0, math.max(initialTextBounds.X + 30, CodeScroll.AbsoluteSize.X), 0, math.max(initialTextBounds.Y + 30, CodeScroll.AbsoluteSize.Y))
-
-local ExecuteBtn = Instance.new("TextButton")
-ExecuteBtn.Size = UDim2.new(0.5, -7, 0, 35)
-ExecuteBtn.Position = UDim2.new(0, 5, 1, -40)
-ExecuteBtn.BackgroundColor3 = Color3.fromRGB(100, 255, 100)
-ExecuteBtn.Text = "Execute"
-ExecuteBtn.Font = Enum.Font.GothamBold
-ExecuteBtn.TextSize = 16
-ExecuteBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
-Instance.new("UICorner", ExecuteBtn).CornerRadius = UDim.new(0, 6)
-ExecuteBtn.Parent = Page2
-
-ExecuteBtn.MouseButton1Click:Connect(function()
-    local code = CodeBox.Text
-    if code and code ~= "" then
-        local func, err = loadstring(code)
-        if func then
-            pcall(func)
-        else
-            warn("Lỗi script:", err)
-        end
-    end
-end)
-
-local ClearBtn = Instance.new("TextButton")
-ClearBtn.Size = UDim2.new(0.5, -7, 0, 35)
-ClearBtn.Position = UDim2.new(0.5, 2, 1, -40)
-ClearBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 100)
-ClearBtn.Text = "Clear"
-ClearBtn.Font = Enum.Font.GothamBold
-ClearBtn.TextSize = 16
-ClearBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
-Instance.new("UICorner", ClearBtn).CornerRadius = UDim.new(0, 6)
-ClearBtn.Parent = Page2
-
-ClearBtn.MouseButton1Click:Connect(function()
-    CodeBox.Text = ""
-end)
-
-local Page3 = Instance.new("Frame")
-Page3.Size = UDim2.new(1, 0, 1, -70)
-Page3.Position = UDim2.new(0, 0, 0, 30)
-Page3.BackgroundTransparency = 1
-Page3.Visible = false
-Page3.Parent = MenuFrame
-
-local ScriptHubScroll = Instance.new("ScrollingFrame")
-ScriptHubScroll.Size = UDim2.new(1, -10, 1, -50)
-ScriptHubScroll.Position = UDim2.new(0, 5, 0, 5)
-ScriptHubScroll.BackgroundTransparency = 1
-ScriptHubScroll.ScrollBarThickness = 6
-ScriptHubScroll.ScrollingDirection = Enum.ScrollingDirection.XY
-ScriptHubScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-ScriptHubScroll.Parent = Page3
-
-local ScriptListLayout = Instance.new("UIListLayout")
-ScriptListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ScriptListLayout.Padding = UDim.new(0, 6)
-ScriptListLayout.FillDirection = Enum.FillDirection.Vertical
-ScriptListLayout.Parent = ScriptHubScroll
-
-ScriptListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    ScriptHubScroll.CanvasSize = UDim2.new(0, ScriptListLayout.AbsoluteContentSize.X, 0, ScriptListLayout.AbsoluteContentSize.Y)
-end)
-
-local function CreateScriptItem(name, url)
-    local itemFrame = Instance.new("Frame")
-    itemFrame.Size = UDim2.new(1, 0, 0, 35)
-    itemFrame.BackgroundTransparency = 0.2
-    itemFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    itemFrame.Parent = ScriptHubScroll
-    Instance.new("UICorner", itemFrame).CornerRadius = UDim.new(0, 6)
-
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(0.7, 0, 1, 0)
-    nameLabel.Position = UDim2.new(0, 5, 0, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = name
-    nameLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
-    nameLabel.TextSize = 16
-    nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-    nameLabel.Parent = itemFrame
-
-    local runBtn = Instance.new("TextButton")
-    runBtn.Size = UDim2.new(0.3, -10, 1, -4)
-    runBtn.Position = UDim2.new(0.7, 5, 0, 2)
-    runBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-    runBtn.Text = "Run"
-    runBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
-    runBtn.TextSize = 16
-    runBtn.Font = Enum.Font.GothamBold
-    runBtn.Parent = itemFrame
-    Instance.new("UICorner", runBtn).CornerRadius = UDim.new(0, 6)
-    animateButton(runBtn)
-
-    runBtn.MouseButton1Click:Connect(function()
-        loadstring(game:HttpGet(url))()
-    end)
-
-    return itemFrame
-end
-
-CreateScriptItem("Evade", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade")
-CreateScriptItem("Murder Mystery 2", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2")
-CreateScriptItem("Blade Ball", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball")
-CreateScriptItem("Doors", "https://raw.githubusercontent.com/DarkDoorsKing/Project/main/Doors.lua")
-CreateScriptItem("Emote", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote")
-
-local PageButtons = Instance.new("Frame")
-PageButtons.Size = UDim2.new(1, 0, 0, 35)
-PageButtons.Position = UDim2.new(0, 0, 1, -35)
-PageButtons.BackgroundTransparency = 1
-PageButtons.Parent = MenuFrame
-
-local Btn1 = Instance.new("TextButton")
-Btn1.Size = UDim2.new(1/3, -2, 1, 0)
-Btn1.Position = UDim2.new(0, 0, 0, 0)
-Btn1.Text = "Trang 1"
-Btn1.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-Btn1.TextColor3 = Color3.fromRGB(0, 0, 0)
-Btn1.Font = Enum.Font.GothamBold
-Btn1.TextSize = 16
-Instance.new("UICorner", Btn1).CornerRadius = UDim.new(0, 6)
-Btn1.Parent = PageButtons
-animateButton(Btn1)
-
-local Btn2 = Instance.new("TextButton")
-Btn2.Size = UDim2.new(1/3, -2, 1, 0)
-Btn2.Position = UDim2.new(1/3, 2, 0, 0)
-Btn2.Text = "Trang 2"
-Btn2.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-Btn2.TextColor3 = Color3.fromRGB(0, 0, 0)
-Btn2.Font = Enum.Font.GothamBold
-Btn2.TextSize = 16
-Instance.new("UICorner", Btn2).CornerRadius = UDim.new(0, 6)
-Btn2.Parent = PageButtons
-animateButton(Btn2)
-
-local Btn3 = Instance.new("TextButton")
-Btn3.Size = UDim2.new(1/3, -2, 1, 0)
-Btn3.Position = UDim2.new(2/3, 2, 0, 0)
-Btn3.Text = "Trang 3"
-Btn3.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-Btn3.TextColor3 = Color3.fromRGB(0, 0, 0)
-Btn3.Font = Enum.Font.GothamBold
-Btn3.TextSize = 16
-Instance.new("UICorner", Btn3).CornerRadius = UDim.new(0, 6)
-Btn3.Parent = PageButtons
-animateButton(Btn3)
-
-local function ShowPage(page)
-    Page1.Visible = (page == 1)
-    Page2.Visible = (page == 2)
-    Page3.Visible = (page == 3)
-end
-
-Btn1.MouseButton1Click:Connect(function()
-    ShowPage(1)
-end)
-Btn2.MouseButton1Click:Connect(function()
-    ShowPage(2)
-end)
-Btn3.MouseButton1Click:Connect(function()
-    ShowPage(3)
-end)
+flingAllButton = CreateButton(ButtonFrame2Right, "Fling All", FlingAll)
 
 -- ESP
 local espGui = Instance.new("ScreenGui")
@@ -1422,6 +1539,7 @@ local function UpdatePlayerList()
             button.MouseButton1Click:Connect(function()
                 Config.SelectedPlayers[player.Name] = not Config.SelectedPlayers[player.Name]
                 UpdateButtonText()
+                SaveSettings()
             end)
             animateButton(button)
             UpdateButtonText()
@@ -1443,6 +1561,7 @@ UserInputService.InputBegan:Connect(function(input, processed)
             Config.SelectedPlayers = {}
         end
         UpdatePlayerList()
+        SaveSettings()
     end
 end)
 
