@@ -4,7 +4,7 @@ pcall(function()
     local pg = game.Players.LocalPlayer:FindFirstChild("PlayerGui")
     if pg then
         for _, gui in ipairs(pg:GetChildren()) do
-            if gui.Name == "DhuyxMenu" or gui.Name == "VhuyIntroGui" or gui.Name == "CButtonGui" or gui.Name == "SafeESP" then
+            if gui.Name == "DhuyxMenu" or gui.Name == "VhuyIntroGui" or gui.Name == "CButtonGui" or gui.Name == "SafeESP" or gui.Name == "CustomButtonGui" then
                 gui:Destroy()
             end
         end
@@ -56,16 +56,14 @@ local Lighting = game:GetService("Lighting")
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-
 local HttpService = game:GetService("HttpService")
-local LocalPlayer = game:GetService("Players").LocalPlayer
 
 -- Tạo file config riêng cho mỗi người chơi
 local ConfigFile = "mygui_config_" .. LocalPlayer.UserId .. ".json"
 
 -- Cấu trúc config mặc định
 local Config = {
-    Buttons = {}, -- Lưu keybind của từng chức năng
+    Buttons = {}, -- Lưu keybind + trạng thái của từng chức năng
     GuiPosition = {X = 0, Y = 0}, -- Vị trí GUI
     GuiVisible = true, -- Trạng thái hiện/ẩn menu
     ESPEnabled = false,
@@ -82,10 +80,13 @@ local Config = {
     clickTpEnabled = false,
     checkKOAimbot = false,
     CustomPing = nil,
-    CustomFOV = 70,
-    CustomFOVEnabled = false,
-    NoReloadEnabled = false,
-    InstantStompEnabled = false
+    FOV = 70,
+    AntiLockEnabled = false,
+    AutoReloadEnabled = false,
+    NoStompAnimEnabled = false,
+    AntiAFKEnabled = false,
+    SelectedGun = nil,
+    SelectedAmmo = nil
 }
 
 -- Hàm lưu config
@@ -105,7 +106,6 @@ local function LoadSettings()
             return HttpService:JSONDecode(readfile(ConfigFile))
         end)
         if success and type(data) == "table" then
-            -- Gộp dữ liệu load vào Config hiện tại
             for k, v in pairs(data) do
                 Config[k] = v
             end
@@ -113,12 +113,10 @@ local function LoadSettings()
             warn("[LoadSettings] Lỗi đọc config:", data)
         end
     else
-        -- Nếu chưa có file thì tạo mới
         SaveSettings()
     end
 end
 
--- Load config ngay khi script chạy
 LoadSettings()
 
 local autoSelect = false
@@ -132,12 +130,7 @@ local savedWaypoint = nil
 local noclipConnection = nil
 local autoKillEnabled = false
 local autoKillLoop = nil
-local customFOVEnabled = Config.CustomFOVEnabled
-local noReloadEnabled = Config.NoReloadEnabled
-local instantStompEnabled = Config.InstantStompEnabled
-
-getgenv().Keybinds = {} -- Lưu kết nối keybind
-
+local keybindConnections = {}
 
 -- Biến lưu trạng thái Lighting cũ cho Fullbright
 local oldLighting = {
@@ -176,11 +169,9 @@ local function setupCharacter(char)
 
     local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
 
-    -- Ngắt kết nối cũ
     if renderConnection then renderConnection:Disconnect() end
     if inputConnection then inputConnection:Disconnect() end
 
-    -- Dừng animation khi di chuyển
     renderConnection = RunService.RenderStepped:Connect(function()
         if currentTrack and hum.MoveDirection.Magnitude > 0 then
             currentTrack:Stop()
@@ -189,7 +180,6 @@ local function setupCharacter(char)
         end
     end)
 
-    -- Phát animation khi nhấn phím
     inputConnection = UserInputService.InputBegan:Connect(function(input)
         local key = input.KeyCode.Name
         local animId = animations[key]
@@ -209,12 +199,10 @@ local function setupCharacter(char)
     end)
 end
 
--- Kiểm tra character hiện tại
 if LocalPlayer.Character then
     setupCharacter(LocalPlayer.Character)
 end
 
--- Khi nhân vật respawn
 LocalPlayer.CharacterAdded:Connect(function(char)
     currentTrack = nil
     currentKey = nil
@@ -265,11 +253,9 @@ gradient.Color = ColorSequence.new{
 gradient.Rotation = 45
 gradient.Parent = title
 
--- Hiệu ứng fade in
 TweenService:Create(title, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {TextTransparency = 0}):Play()
 TweenService:Create(bg, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {BackgroundTransparency = 0.4}):Play()
 
--- Hiệu ứng fade out
 task.delay(4, function()
     TweenService:Create(title, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
     TweenService:Create(bg, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
@@ -309,7 +295,6 @@ cGradient.Color = ColorSequence.new{
 cGradient.Rotation = 90
 cGradient.Parent = cButton
 
--- Hiệu ứng hover cho nút C
 local function animateCButton()
     cButton.MouseEnter:Connect(function()
         TweenService:Create(cButton, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 200, 200)}):Play()
@@ -320,7 +305,6 @@ local function animateCButton()
 end
 animateCButton()
 
--- Kéo thả nút C
 local dragging = false
 local dragStart, startPos
 
@@ -351,7 +335,6 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Phát animation C khi nhấn nút
 cButton.MouseButton1Click:Connect(function()
     local char = LocalPlayer.Character
     if not char then return end
@@ -373,6 +356,50 @@ cButton.MouseButton1Click:Connect(function()
     sendNotification("Animation", "Playing C animation!")
 end)
 
+-- Hàm dịch chuyển đến người gần nhất
+local function TeleportToClosest()
+    local closestKO, closestAlive = nil, nil
+    local minDistKO, minDistAlive = math.huge, math.huge
+    local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
+
+    if not myPos then return end
+
+    for name, selected in pairs(Config.SelectedPlayers) do
+        if selected then
+            local plr = Players:FindFirstChild(name)
+            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local pos = plr.Character.HumanoidRootPart.Position
+                local dist = (myPos - pos).Magnitude
+                if dist < minDistAlive then
+                    closestAlive = plr
+                    minDistAlive = dist
+                end
+            end
+        end
+    end
+
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local oldPos = root.CFrame
+
+    if closestKO then
+        local torso = closestKO.Character:FindFirstChild("Torso") or closestKO.Character:FindFirstChild("HumanoidRootPart")
+        if torso then
+            root.CFrame = torso.CFrame
+            task.wait(0.2)
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            task.wait(1.5)
+        end
+    elseif closestAlive then
+        local torso = closestAlive.Character:FindFirstChild("HumanoidRootPart") or closestAlive.Character:FindFirstChild("HumanoidRootPart")
+        if torso then
+            root.CFrame = torso.CFrame + Vector3.new(0, 30, 0)
+        end
+    end
+end
+
 -- GUI chính
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "DhuyxMenu"
@@ -383,7 +410,7 @@ ScreenGui.Parent = PlayerGui
 local MenuFrame = Instance.new("Frame")
 MenuFrame.Size = UDim2.new(0, 300, 0, 250)
 MenuFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
-MenuFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 0)
+MenuFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MenuFrame.BackgroundTransparency = 0.1
 MenuFrame.Active = true
 MenuFrame.Draggable = true
@@ -409,7 +436,7 @@ local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 70, 0, 30)
 ToggleButton.Position = UDim2.new(0, 20, 0, 240)
 ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-ToggleButton.Text = "SHOW"
+ToggleButton.Text = Config.GuiVisible and "HIDE" or "SHOW"
 ToggleButton.TextColor3 = Color3.new(0, 0, 0)
 ToggleButton.Font = Enum.Font.GothamBold
 ToggleButton.TextSize = 16
@@ -425,7 +452,6 @@ toggleGradient.Color = ColorSequence.new{
 }
 toggleGradient.Parent = ToggleButton
 
--- Hiệu ứng hover/click
 local function animateButton(btn)
     btn.MouseEnter:Connect(function()
         TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 200, 200)}):Play()
@@ -442,9 +468,10 @@ end
 animateButton(ToggleButton)
 
 ToggleButton.MouseButton1Click:Connect(function()
-    local targetSize = MenuFrame.Visible and UDim2.new(0, 0, 0, 0) or UDim2.new(0, 300, 0, 250)
+    Config.GuiVisible = not Config.GuiVisible
+    local targetSize = Config.GuiVisible and UDim2.new(0, 300, 0, 250) or UDim2.new(0, 0, 0, 0)
     local tween = TweenService:Create(MenuFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize})
-    if not MenuFrame.Visible then
+    if Config.GuiVisible then
         MenuFrame.Visible = true
         tween:Play()
     else
@@ -452,7 +479,8 @@ ToggleButton.MouseButton1Click:Connect(function()
         tween.Completed:Wait()
         MenuFrame.Visible = false
     end
-    ToggleButton.Text = MenuFrame.Visible and "HIDE" or "SHOW"
+    ToggleButton.Text = Config.GuiVisible and "HIDE" or "SHOW"
+    SaveSettings()
 end)
 
 -- Tiêu đề & Ping/FPS/Clock
@@ -492,7 +520,7 @@ PingBox.TextColor3 = Color3.fromRGB(0, 0, 0)
 PingBox.TextSize = 14
 PingBox.Font = Enum.Font.Gotham
 PingBox.PlaceholderText = "Ping (ms)"
-PingBox.Text = ""
+PingBox.Text = Config.CustomPing and tostring(Config.CustomPing) or ""
 PingBox.ClearTextOnFocus = false
 PingBox.Parent = MenuTitle
 Instance.new("UICorner", PingBox).CornerRadius = UDim.new(0, 6)
@@ -516,7 +544,6 @@ Page1.Position = UDim2.new(0, 0, 0, 30)
 Page1.BackgroundTransparency = 1
 Page1.Parent = MenuFrame
 
--- Frame danh sách người chơi cho trang 1
 local PlayerListFrame = Instance.new("Frame")
 PlayerListFrame.Size = UDim2.new(0.5, -5, 1, -20)
 PlayerListFrame.Position = UDim2.new(0, 5, 0, 10)
@@ -538,7 +565,6 @@ UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     PlayerList.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
 end)
 
--- Frame nút chức năng cho trang 1
 local ButtonFrame1 = Instance.new("ScrollingFrame")
 ButtonFrame1.Size = UDim2.new(0.5, -5, 1, -20)
 ButtonFrame1.Position = UDim2.new(0.5, 0, 0, 10)
@@ -562,7 +588,6 @@ Page2.BackgroundTransparency = 1
 Page2.Visible = false
 Page2.Parent = MenuFrame
 
--- Frame nút chức năng trái cho trang 2
 local ButtonFrame2Left = Instance.new("ScrollingFrame")
 ButtonFrame2Left.Size = UDim2.new(0.5, -5, 1, -20)
 ButtonFrame2Left.Position = UDim2.new(0, 5, 0, 10)
@@ -579,7 +604,6 @@ ButtonLayout2Left:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(functi
     ButtonFrame2Left.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout2Left.AbsoluteContentSize.Y)
 end)
 
--- Frame nút chức năng phải cho trang 2
 local ButtonFrame2Right = Instance.new("ScrollingFrame")
 ButtonFrame2Right.Size = UDim2.new(0.5, -5, 1, -20)
 ButtonFrame2Right.Position = UDim2.new(0.5, 0, 0, 10)
@@ -724,7 +748,14 @@ Btn3.MouseButton1Click:Connect(function()
     ShowPage(3)
 end)
 
-local function CreateButton(parent, name, callback)
+-- Tạo GUI cho nút tùy chỉnh ngoài menu
+local CustomButtonGui = Instance.new("ScreenGui")
+CustomButtonGui.Name = "CustomButtonGui"
+CustomButtonGui.ResetOnSpawn = false
+CustomButtonGui.IgnoreGuiInset = true
+CustomButtonGui.Parent = game:GetService("CoreGui")
+
+local function CreateButton(parent, name, callback, configKey)
     local buttonFrame = Instance.new("Frame")
     buttonFrame.Size = UDim2.new(1, -10, 0, 30)
     buttonFrame.BackgroundTransparency = 1
@@ -737,11 +768,10 @@ local function CreateButton(parent, name, callback)
     button.TextColor3 = Color3.fromRGB(0, 0, 0)
     button.TextSize = 14
     button.Font = Enum.Font.Gotham
-    button.Text = name
+    button.Text = name .. (Config[configKey] and ": ON" or ": OFF")
     button.Parent = buttonFrame
     Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
     animateButton(button)
-    button.MouseButton1Click:Connect(callback)
 
     local keyBox = Instance.new("TextBox")
     keyBox.Size = UDim2.new(0.3, 0, 1, 0)
@@ -756,19 +786,25 @@ local function CreateButton(parent, name, callback)
     keyBox.Parent = buttonFrame
     Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 6)
 
-    local function applyBind(text)
-        text = text:lower()
-        if getgenv().Keybinds[name] then
-            getgenv().Keybinds[name]:Disconnect()
-            getgenv().Keybinds[name] = nil
-        end
-        if text == "button" then
-            -- Tạo ScreenGui riêng ngoài menu
-            local screenGui = Instance.new("ScreenGui")
-            screenGui.IgnoreGuiInset = true
-            screenGui.Parent = game:GetService("CoreGui")
+    button.MouseButton1Click:Connect(function()
+        Config[configKey] = not Config[configKey]
+        button.Text = name .. (Config[configKey] and ": ON" or ": OFF")
+        callback()
+        SaveSettings()
+    end)
 
-            -- Tạo nút giống Show/Hide
+    keyBox:GetPropertyChangedSignal("Text"):Connect(function()
+        local text = keyBox.Text:lower()
+        Config.Buttons[name] = text
+        SaveSettings()
+
+        -- Xóa keybind cũ
+        if keybindConnections[name] then
+            keybindConnections[name]:Disconnect()
+            keybindConnections[name] = nil
+        end
+
+        if text == "button" then
             local screenBtn = Instance.new("TextButton")
             screenBtn.Size = UDim2.new(0, 70, 0, 30)
             screenBtn.Position = UDim2.new(0, 100, 0, 300)
@@ -777,10 +813,9 @@ local function CreateButton(parent, name, callback)
             screenBtn.TextColor3 = Color3.new(0, 0, 0)
             screenBtn.TextSize = 10
             screenBtn.Font = Enum.Font.GothamBold
-            screenBtn.Parent = screenGui
+            screenBtn.Parent = CustomButtonGui
             Instance.new("UICorner", screenBtn).CornerRadius = UDim.new(0, 6)
 
-            -- Kéo di chuyển
             local dragging = false
             local dragStart, startPos
             screenBtn.InputBegan:Connect(function(input)
@@ -805,112 +840,211 @@ local function CreateButton(parent, name, callback)
                 end
             end)
 
-            -- Bấm => chạy đúng callback
             screenBtn.MouseButton1Click:Connect(function()
                 callback()
             end)
-
         else
-            -- Bind phím
             local keyName = text:upper()
             if Enum.KeyCode[keyName] then
-                getgenv().Keybinds[name] = UserInputService.InputBegan:Connect(function(input, gp)
+                keybindConnections[name] = UserInputService.InputBegan:Connect(function(input, gp)
                     if not gp and input.KeyCode.Name:upper() == keyName then
                         callback()
                     end
                 end)
             end
         end
-        Config.Buttons[name] = text
-        SaveSettings()
-    end
-
-    applyBind(keyBox.Text) -- Áp dụng bind hiện tại nếu có
-
-    keyBox:GetPropertyChangedSignal("Text"):Connect(function()
-        applyBind(keyBox.Text)
     end)
+
+    if Config.Buttons[name] then
+        keyBox.Text = Config.Buttons[name]
+        keyBox:CaptureFocus()
+        keyBox:ReleaseFocus()
+    end
 
     return button
 end
 
--- Nút cho trang 1
-espButton = CreateButton(ButtonFrame1, "ESP: " .. (Config.ESPEnabled and "ON" or "OFF"), function()
-    Config.ESPEnabled = not Config.ESPEnabled
-    sendNotification("ESP", Config.ESPEnabled and "ON" or "OFF")
-    espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
-    SaveSettings()
-end)
+-- Danh sách súng và ammo trong Da Hood
+local Guns = {
+    ["Revolver"] = CFrame.new(-794, -2, -452),
+    ["Pistol"] = CFrame.new(-583, -2, -596),
+    ["Shotgun"] = CFrame.new(-583, -2, -596),
+    ["SMG"] = CFrame.new(-583, -2, -596),
+    ["RPG"] = CFrame.new(-1039, -2, -596)
+}
 
-speedButton = CreateButton(ButtonFrame1, "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF"), function()
-    Config.SpeedEnabled = not Config.SpeedEnabled
-    sendNotification("SPEED", Config.SpeedEnabled and "ON" or "OFF")
-    speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
-    SaveSettings()
-end)
+local Ammo = {
+    ["Revolver Ammo"] = CFrame.new(-583, -2, -596),
+    ["Pistol Ammo"] = CFrame.new(-583, -2, -596),
+    ["Shotgun Ammo"] = CFrame.new(-583, -2, -596),
+    ["SMG Ammo"] = CFrame.new(-583, -2, -596),
+    ["RPG Ammo"] = CFrame.new(-1039, -2, -596)
+}
 
-flyButton = CreateButton(ButtonFrame1, "Fly: " .. (Config.FlyEnabled and "ON" or "OFF"), function()
-    Config.FlyEnabled = not Config.FlyEnabled
-    sendNotification("FLY", Config.FlyEnabled and "ON" or "OFF")
-    flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
-    SaveSettings()
-end)
+-- Tạo dropdown cho súng
+local function CreateGunDropdown(parent)
+    local dropdownFrame = Instance.new("Frame")
+    dropdownFrame.Size = UDim2.new(1, -10, 0, 30)
+    dropdownFrame.BackgroundTransparency = 1
+    dropdownFrame.Parent = parent
 
-aimbotButton = CreateButton(ButtonFrame1, "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF"), function()
-    Config.AimbotEnabled = not Config.AimbotEnabled
-    sendNotification("AIMBOT", Config.AimbotEnabled and "ON" or "OFF")
-    aimbotButton.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
-    SaveSettings()
-end)
+    local selectButton = Instance.new("TextButton")
+    selectButton.Size = UDim2.new(1, 0, 1, 0)
+    selectButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+    selectButton.Text = Config.SelectedGun or "Select Gun"
+    selectButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+    selectButton.TextSize = 14
+    selectButton.Font = Enum.Font.Gotham
+    selectButton.Parent = dropdownFrame
+    Instance.new("UICorner", selectButton).CornerRadius = UDim.new(0, 6)
+    animateButton(selectButton)
 
-checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O Aimbot: " .. (Config.checkKOAimbot and "ON" or "OFF"), function()
-    Config.checkKOAimbot = not Config.checkKOAimbot
-    sendNotification("CHECK K.O AIMBOT", Config.checkKOAimbot and "ON" or "OFF")
-    checkKOAimbotButton.Text = "Check K.O Aimbot: " .. (Config.checkKOAimbot and "ON" or "OFF")
-    SaveSettings()
-end)
+    local dropdownList = Instance.new("ScrollingFrame")
+    dropdownList.Size = UDim2.new(1, 0, 0, 100)
+    dropdownList.Position = UDim2.new(0, 0, 1, 5)
+    dropdownList.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    dropdownList.BackgroundTransparency = 0.2
+    dropdownList.ScrollBarThickness = 4
+    dropdownList.Visible = false
+    dropdownList.Parent = dropdownFrame
+    Instance.new("UICorner", dropdownList).CornerRadius = UDim.new(0, 6)
 
-infiniteJumpButton = CreateButton(ButtonFrame1, "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF"), function()
-    Config.infiniteJumpEnabled = not Config.infiniteJumpEnabled
-    sendNotification("INFINITIEJUMP", Config.infiniteJumpEnabled and "ON" or "OFF")
-    infiniteJumpButton.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
-    SaveSettings()
-end)
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 4)
+    listLayout.Parent = dropdownList
+    listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        dropdownList.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
+    end)
 
-antiAfkEnabled = false
-antiAfkLoop = nil
-antiAfkButton = CreateButton(ButtonFrame1, "Anti AFK: OFF", function()
-    antiAfkEnabled = not antiAfkEnabled
-    antiAfkButton.Text = "Anti AFK: " .. (antiAfkEnabled and "ON" or "OFF")
-    sendNotification("ANTI AFK", antiAfkEnabled and "ON" or "OFF")
+    selectButton.MouseButton1Click:Connect(function()
+        dropdownList.Visible = not dropdownList.Visible
+    end)
 
-    if antiAfkEnabled then
-        antiAfkLoop = task.spawn(function()
-            while antiAfkEnabled do
-                task.wait(60) -- Đợi 60 giây
-                pcall(function()
-                    local hum = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                    if hum then
-                        hum:ChangeState(Enum.HumanoidStateType.Jumping)
-                    end
-                end)
-            end
+    for gun, _ in pairs(Guns) do
+        local gunButton = Instance.new("TextButton")
+        gunButton.Size = UDim2.new(1, -4, 0, 20)
+        gunButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        gunButton.BackgroundTransparency = 0.2
+        gunButton.Text = gun
+        gunButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+        gunButton.TextSize = 14
+        gunButton.Font = Enum.Font.Gotham
+        gunButton.Parent = dropdownList
+        animateButton(gunButton)
+
+        gunButton.MouseButton1Click:Connect(function()
+            Config.SelectedGun = gun
+            selectButton.Text = gun
+            dropdownList.Visible = false
+            SaveSettings()
         end)
-    else
-        if antiAfkLoop then
-            task.cancel(antiAfkLoop)
-            antiAfkLoop = nil
-        end
     end
-    SaveSettings()
-end)
+end
 
-triggerBotButton = CreateButton(ButtonFrame1, "TriggerBot: " .. (tbEnabled and "ON" or "OFF"), function()
-    tbEnabled = not tbEnabled
-    sendNotification("TRIGGERBOT", tbEnabled and "ON" or "OFF")
-    triggerBotButton.Text = "TriggerBot: " .. (tbEnabled and "ON" or "OFF")
+-- Tạo dropdown cho ammo
+local function CreateAmmoDropdown(parent)
+    local dropdownFrame = Instance.new("Frame")
+    dropdownFrame.Size = UDim2.new(1, -10, 0, 30)
+    dropdownFrame.BackgroundTransparency = 1
+    dropdownFrame.Parent = parent
+
+    local selectButton = Instance.new("TextButton")
+    selectButton.Size = UDim2.new(1, 0, 1, 0)
+    selectButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+    selectButton.Text = Config.SelectedAmmo or "Select Ammo"
+    selectButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+    selectButton.TextSize = 14
+    selectButton.Font = Enum.Font.Gotham
+    selectButton.Parent = dropdownFrame
+    Instance.new("UICorner", selectButton).CornerRadius = UDim.new(0, 6)
+    animateButton(selectButton)
+
+    local dropdownList = Instance.new("ScrollingFrame")
+    dropdownList.Size = UDim2.new(1, 0, 0, 100)
+    dropdownList.Position = UDim2.new(0, 0, 1, 5)
+    dropdownList.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    dropdownList.BackgroundTransparency = 0.2
+    dropdownList.ScrollBarThickness = 4
+    dropdownList.Visible = false
+    dropdownList.Parent = dropdownFrame
+    Instance.new("UICorner", dropdownList).CornerRadius = UDim.new(0, 6)
+
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 4)
+    listLayout.Parent = dropdownList
+    listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        dropdownList.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y)
+    end)
+
+    selectButton.MouseButton1Click:Connect(function()
+        dropdownList.Visible = not dropdownList.Visible
+    end)
+
+    for ammo, _ in pairs(Ammo) do
+        local ammoButton = Instance.new("TextButton")
+        ammoButton.Size = UDim2.new(1, -4, 0, 20)
+        ammoButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        ammoButton.BackgroundTransparency = 0.2
+        ammoButton.Text = ammo
+        ammoButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+        ammoButton.TextSize = 14
+        ammoButton.Font = Enum.Font.Gotham
+        ammoButton.Parent = dropdownList
+        animateButton(ammoButton)
+
+        ammoButton.MouseButton1Click:Connect(function()
+            Config.SelectedAmmo = ammo
+            selectButton.Text = ammo
+            dropdownList.Visible = false
+            SaveSettings()
+        end)
+    end
+end
+
+-- Nút cho trang 1
+espButton = CreateButton(ButtonFrame1, "ESP", function()
+    Config.ESPEnabled = not Config.ESPEnabled
+    espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
+    sendNotification("ESP", Config.ESPEnabled and "ON" or "OFF")
     SaveSettings()
-end)
+end, "ESPEnabled")
+
+speedButton = CreateButton(ButtonFrame1, "Speed", function()
+    Config.SpeedEnabled = not Config.SpeedEnabled
+    speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
+    sendNotification("SPEED", Config.SpeedEnabled and "ON" or "OFF")
+    SaveSettings()
+end, "SpeedEnabled")
+
+flyButton = CreateButton(ButtonFrame1, "Fly", function()
+    Config.FlyEnabled = not Config.FlyEnabled
+    flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
+    sendNotification("FLY", Config.FlyEnabled and "ON" or "OFF")
+    SaveSettings()
+end, "FlyEnabled")
+
+aimbotButton = CreateButton(ButtonFrame1, "Aimbot", function()
+    Config.AimbotEnabled = not Config.AimbotEnabled
+    aimbotButton.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
+    sendNotification("AIMBOT", Config.AimbotEnabled and "ON" or "OFF")
+    SaveSettings()
+end, "AimbotEnabled")
+
+checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O Aimbot", function()
+    Config.checkKOAimbot = not Config.checkKOAimbot
+    checkKOAimbotButton.Text = "Check K.O Aimbot: " .. (Config.checkKOAimbot and "ON" or "OFF")
+    sendNotification("CHECK K.O AIMBOT", Config.checkKOAimbot and "ON" or "OFF")
+    SaveSettings()
+end, "checkKOAimbot")
+
+triggerBotButton = CreateButton(ButtonFrame1, "TriggerBot", function()
+    tbEnabled = not tbEnabled
+    triggerBotButton.Text = "TriggerBot: " .. (tbEnabled and "ON" or "OFF")
+    sendNotification("TRIGGERBOT", tbEnabled and "ON" or "OFF")
+    SaveSettings()
+end, "TriggerBotEnabled")
 
 tpAndStompButton = CreateButton(ButtonFrame1, "TP Player", function()
     local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
@@ -939,10 +1073,9 @@ tpAndStompButton = CreateButton(ButtonFrame1, "TP Player", function()
             root.CFrame = CFrame.new(pos + Vector3.new(8, 3, 8))
         end
     end
-end)
+end, "TPPlayerEnabled")
 
--- AutoKill Button
-autoKillButton = CreateButton(ButtonFrame1, "AutoKill: " .. (autoKillEnabled and "ON" or "OFF"), function()
+autoKillButton = CreateButton(ButtonFrame1, "AutoKill", function()
     autoKillEnabled = not autoKillEnabled
     autoKillButton.Text = "AutoKill: " .. (autoKillEnabled and "ON" or "OFF")
     sendNotification("AUTOKILL", autoKillEnabled and "ON" or "OFF")
@@ -980,39 +1113,25 @@ autoKillButton = CreateButton(ButtonFrame1, "AutoKill: " .. (autoKillEnabled and
                     local bodyEffects = closestTarget.Character:FindFirstChild("BodyEffects")
                     local koValue = bodyEffects and bodyEffects:FindFirstChild("K.O")
 
-                    -- Equip gun if not
-                    local gun = LocalPlayer.Character:FindFirstChildOfClass("Tool")
-                    if not gun or not gun:FindFirstChild("Ammo") then
-                        gun = LocalPlayer.Backpack:FindFirstChild("[Double-Barrel SG]") or LocalPlayer.Backpack:FindFirstChild("[Revolver]") -- Assume a gun
-                        if gun then
-                            gun.Parent = LocalPlayer.Character
-                        end
-                    end
-
-                    -- TP gần target
                     myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 5, 3)
 
                     local spinConnection
                     spinConnection = RunService.Heartbeat:Connect(function()
                         if not autoKillEnabled then spinConnection:Disconnect() return end
-                        local angle = os.clock() * 10 -- Tốc độ xoay
+                        local angle = os.clock() * 10
                         myRoot.CFrame = targetRoot.CFrame * CFrame.new(math.sin(angle) * 3, 2, math.cos(angle) * 3) * CFrame.lookAt(myRoot.Position, targetRoot.Position)
                     end)
 
                     while autoKillEnabled and IsValidTarget(closestTarget) and not (koValue and koValue.Value) do
-                        -- Aim vào head
                         if targetHead then
                             Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
                         end
-
-                        -- Bắn (click)
                         click()
-                        task.wait(0.1) -- Fire rate giả định
+                        task.wait(0.1)
                     end
 
                     spinConnection:Disconnect()
 
-                    -- Nếu KO, stomp nếu cần
                     if koValue and koValue.Value then
                         myRoot.CFrame = targetRoot.CFrame
                         task.wait(0.2)
@@ -1031,170 +1150,98 @@ autoKillButton = CreateButton(ButtonFrame1, "AutoKill: " .. (autoKillEnabled and
             autoKillLoop = nil
         end
     end
-end)
+end, "AutoKillEnabled")
 
-noReloadButton = CreateButton(ButtonFrame1, "No Reload Anim: " .. (noReloadEnabled and "ON" or "OFF"), function()
-    noReloadEnabled = not noReloadEnabled
-    noReloadButton.Text = "No Reload Anim: " .. (noReloadEnabled and "ON" or "OFF")
-    sendNotification("NO RELOAD ANIM", noReloadEnabled and "ON" or "OFF")
+antiLockButton = CreateButton(ButtonFrame1, "AntiLock", function()
+    Config.AntiLockEnabled = not Config.AntiLockEnabled
+    antiLockButton.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
+    sendNotification("ANTILOCK", Config.AntiLockEnabled and "ON" or "OFF")
     SaveSettings()
+end, "AntiLockEnabled")
 
-    if noReloadEnabled then
-        -- Infinite ammo for Revolver code
-        local player = game.Players.LocalPlayer
-        local Gun = "[Revolver]"
-        local GunTexture = "rbxassetid://3420082920"
-        local GunPath = game:GetService("Workspace").Ignored.Shop["[Revolver] - $1300"].Head
-        local Holding = false
-
-        local InfiniteTool = Instance.new("Tool", player.Backpack)
-        InfiniteTool.Name = "Rev"
-        InfiniteTool.ToolTip = "buy guns while holding, shoot while using this tool"
-        InfiniteTool.TextureId = GunTexture
-        InfiniteTool.RequiresHandle = true
-        InfiniteTool.CanBeDropped = false
-
-        local Handle = Instance.new("Part", InfiniteTool)
-        Handle.Name = "Handle"
-        Handle.Anchored = false
-        Handle.Size = Vector3.new(0,0,0)
-        Handle.Massless = true
-        Handle.Transparency = 1
-        Handle.CanCollide = false
-
-        InfiniteTool.Equipped:Connect(function()
-            Holding = true
-            if player.PlayerGui.MainScreenGui:FindFirstChild("AmmoFrame") then
-                player.PlayerGui.MainScreenGui:FindFirstChild("AmmoFrame").Name = "AmmoFrame2"
-            end
-            for i,v in pairs(player.Backpack:GetChildren()) do
-                if v.Name == Gun and not player.Character:FindFirstChild(Gun) then
-                    if v.Ammo.Value > 0 then
-                        v.Parent = player.Character
-                    end
-                end
-            end
-            while Holding == true do
-                wait(0)
-                local TotalAmmo = 0
-                for i,v in pairs(player.Backpack:GetChildren()) do
-                    if v.Name == Gun then
-                        TotalAmmo = TotalAmmo + v.Ammo.Value
-                    end
-                end
-                for i,v in pairs(player.Character:GetChildren()) do
-                    if v.Name = Gun then
-                        TotalAmmo = TotalAmmo + v.Ammo.Value
-                    end
-                end
-                if player.PlayerGui.MainScreenGui.AmmoFrame2 then
-                    player.PlayerGui.MainScreenGui.AmmoFrame2.AmmoText.Text = tostring(TotalAmmo)
-                    player.PlayerGui.MainScreenGui.AmmoFrame2.AmmoText.Visible = true
-                    player.PlayerGui.MainScreenGui.AmmoFrame2.Visible = true
-                end
-                local mag = (GunPath.Position - player.Character.HumanoidRootPart.Position).Magnitude
-                if mag <= 8 and player.Character:FindFirstChild(InfiniteTool.Name) then
-                    for i,v in pairs(player.Backpack:GetChildren()) do
-                        if v.Name == Gun then
-                            v.Parent = player.Character
-                        end
-                    end
-                end
-                fireclickdetector(GunPath.Parent.ClickDetector)
-                if player.Character:FindFirstChild(Gun) and player.Character:FindFirstChild(Gun).Ammo.Value < 1 then
-                    player.Character:FindFirstChild(Gun).Parent = player.Backpack
-                    for i,v in pairs(player.Backpack:GetChildren()) do
-                        if v.Name == Gun and not player.Character:FindFirstChild(Gun) then
-                            if v.Ammo.Value > 0 then
-                                v.Parent = player.Character
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-        InfiniteTool.Unequipped:Connect(function()
-            Holding = false
-            if player.PlayerGui.MainScreenGui:FindFirstChild("AmmoFrame2") then
-                player.PlayerGui.MainScreenGui:FindFirstChild("AmmoFrame2").Name = "AmmoFrame"
-            end
-        end)
+CreateGunDropdown(ButtonFrame1)
+tpGunButton = CreateButton(ButtonFrame1, "TP Gun", function()
+    if Config.SelectedGun and Guns[Config.SelectedGun] then
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = Guns[Config.SelectedGun]
+            task.wait(0.2)
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            sendNotification("TP Gun", "Teleported to " .. Config.SelectedGun .. " and purchased!")
+        end
     else
-        -- Tắt infinite ammo
-        local infiniteTool = LocalPlayer.Backpack:FindFirstChild("Rev") or LocalPlayer.Character:FindFirstChild("Rev")
-        if infiniteTool then
-            infiniteTool:Destroy()
-        end
+        sendNotification("TP Gun", "Please select a gun first!")
     end
-end)
+end, "TPGunEnabled")
 
-instantStompButton = CreateButton(ButtonFrame1, "Instant Stomp: " .. (instantStompEnabled and "ON" or "OFF"), function()
-    instantStompEnabled = not instantStompEnabled
-    instantStompButton.Text = "Instant Stomp: " .. (instantStompEnabled and "ON" or "OFF")
-    sendNotification("INSTANT STOMP", instantStompEnabled and "ON" or "OFF")
-    SaveSettings()
-end)
-
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        if instantStompEnabled then
-            game:GetService("ReplicatedStorage").MainEvent:FireServer("Stomp")
+CreateAmmoDropdown(ButtonFrame1)
+tpAmmoButton = CreateButton(ButtonFrame1, "TP Ammo", function()
+    if Config.SelectedAmmo and Ammo[Config.SelectedAmmo] then
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = Ammo[Config.SelectedAmmo]
+            task.wait(0.2)
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.1)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            sendNotification("TP Ammo", "Teleported to " .. Config.SelectedAmmo .. " and purchased!")
         end
+    else
+        sendNotification("TP Ammo", "Please select ammo first!")
     end
-end)
+end, "TPAmmoEnabled")
 
 -- Nút cho trang 2
-customFovButton = CreateButton(ButtonFrame2Left, "Custom FOV: " .. (customFOVEnabled and "ON" or "OFF"), function()
-    customFOVEnabled = not customFOVEnabled
-    customFovButton.Text = "Custom FOV: " .. (customFOVEnabled and "ON" or "OFF")
-    Config.CustomFOVEnabled = customFOVEnabled
-    SaveSettings()
+local customFovEnabled = false
+local defaultFov = Config.FOV or 70
 
-    if customFOVEnabled then
-        local num = tonumber(fovBox.Text)
+customFovButton = CreateButton(ButtonFrame2Left, "Custom FOV", function()
+    customFovEnabled = not customFovEnabled
+    customFovButton.Text = "Custom FOV: " .. (customFovEnabled and "ON" or "OFF")
+
+    if customFovEnabled then
+        local num = tonumber(fovBox.Text) or Config.FOV
         if num and num >= 40 and num <= 120 then
             Workspace.CurrentCamera.FieldOfView = num
+            Config.FOV = num
             sendNotification("Custom FOV", "Đã đặt FOV thành " .. num)
         else
             sendNotification("Custom FOV", "Hãy nhập giá trị 40-120 vào ô FOV")
         end
     else
-        Workspace.CurrentCamera.FieldOfView = 70 -- default
+        Workspace.CurrentCamera.FieldOfView = defaultFov
     end
-end)
+    SaveSettings()
+end, "CustomFovEnabled")
 
--- Ô nhập giá trị FOV
-local fovBox = Instance.new("TextBox")
+fovBox = Instance.new("TextBox")
 fovBox.Size = UDim2.new(1, -10, 0, 25)
 fovBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
 fovBox.BackgroundTransparency = 0.2
 fovBox.TextColor3 = Color3.fromRGB(0, 0, 0)
 fovBox.TextSize = 14
 fovBox.Font = Enum.Font.Gotham
-fovBox.PlaceholderText = "Nhập FOV (mặc định: 70)"
-fovBox.Text = tostring(Config.CustomFOV)
+fovBox.PlaceholderText = "70"
+fovBox.Text = tostring(Config.FOV)
 fovBox.ClearTextOnFocus = false
 fovBox.Parent = ButtonFrame2Left
 Instance.new("UICorner", fovBox).CornerRadius = UDim.new(0, 6)
 
 fovBox:GetPropertyChangedSignal("Text"):Connect(function()
-    local num = tonumber(fovBox.Text)
-    if num and num >= 40 and num <= 120 then
-        Config.CustomFOV = num
-        SaveSettings()
-        if customFOVEnabled then
+    if customFovEnabled then
+        local num = tonumber(fovBox.Text)
+        if num and num >= 40 and num <= 120 then
             Workspace.CurrentCamera.FieldOfView = num
+            Config.FOV = num
             sendNotification("Custom FOV", "Đã đặt FOV thành " .. num)
+            SaveSettings()
         end
     end
 end)
 
-if customFOVEnabled then
-    Workspace.CurrentCamera.FieldOfView = Config.CustomFOV
-end
-
-fullbrightButton = CreateButton(ButtonFrame2Left, "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF"), function()
+fullbrightButton = CreateButton(ButtonFrame2Left, "Fullbright", function()
     Config.FullbrightEnabled = not Config.FullbrightEnabled
     if Config.FullbrightEnabled then
         Lighting.Brightness = 2
@@ -1211,12 +1258,12 @@ fullbrightButton = CreateButton(ButtonFrame2Left, "Fullbright: " .. (Config.Full
         Lighting.OutdoorAmbient = oldLighting.OutdoorAmbient
         Lighting.ClockTime = oldLighting.ClockTime
     end
-    sendNotification("FULLBRIGHT", Config.FullbrightEnabled and "ON" or "OFF")
     fullbrightButton.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
+    sendNotification("FULLBRIGHT", Config.FullbrightEnabled and "ON" or "OFF")
     SaveSettings()
-end)
+end, "FullbrightEnabled")
 
-noclipButton = CreateButton(ButtonFrame2Left, "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF"), function()
+noclipButton = CreateButton(ButtonFrame2Left, "Noclip", function()
     Config.NoclipEnabled = not Config.NoclipEnabled
     
     if Config.NoclipEnabled then
@@ -1238,15 +1285,14 @@ noclipButton = CreateButton(ButtonFrame2Left, "Noclip: " .. (Config.NoclipEnable
         end
     end
 
-    sendNotification("NOCLIP", Config.NoclipEnabled and "ON" or "OFF")
     noclipButton.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
+    sendNotification("NOCLIP", Config.NoclipEnabled and "ON" or "OFF")
     SaveSettings()
-end)
+end, "NoclipEnabled")
 
--- Đảm bảo noclip vẫn bật khi respawn
 LocalPlayer.CharacterAdded:Connect(function()
     if Config.NoclipEnabled then
-        task.wait(0.5) -- đợi nhân vật load
+        task.wait(0.5)
         noclipConnection = RunService.Stepped:Connect(function()
             local char = LocalPlayer.Character
             if char and char:FindFirstChildOfClass("Humanoid") then
@@ -1260,49 +1306,58 @@ LocalPlayer.CharacterAdded:Connect(function()
     end
 end)
 
-local function giveClickTpTool()
-    if clickTpTool then clickTpTool:Destroy() end
-    clickTpTool = Instance.new("Tool")
-    clickTpTool.RequiresHandle = false
-    clickTpTool.Name = "ClickTP"
-    clickTpTool.Parent = LocalPlayer.Backpack
-
-    clickTpTool.Activated:Connect(function()
-        local mouse = LocalPlayer:GetMouse()
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            if mouse and mouse.Hit then
-                local targetPos = mouse.Hit.p + Vector3.new(0, 3, 0) -- cách mặt đất 3 stud
-                LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(targetPos)
-            end
-        end
-    end)
-end
-
--- Nút bật/tắt
-clickTpButton = CreateButton(ButtonFrame2Right, "Click TP: " .. (Config.clickTpEnabled and "ON" or "OFF"), function()
-    Config.clickTpEnabled = not Config.clickTpEnabled
-    sendNotification("GIVECLICKTOOL", Config.clickTpEnabled and "ON" or "OFF")
-    clickTpButton.Text = "Click TP: " .. (Config.clickTpEnabled and "ON" or "OFF")
+infiniteJumpButton = CreateButton(ButtonFrame2Left, "Infinite Jump", function()
+    Config.infiniteJumpEnabled = not Config.infiniteJumpEnabled
+    infiniteJumpButton.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
+    sendNotification("INFINITEJUMP", Config.infiniteJumpEnabled and "ON" or "OFF")
     SaveSettings()
+end, "infiniteJumpEnabled")
 
-    if Config.clickTpEnabled then
-        giveClickTpTool()
-        sendNotification("Click TP", "Đã cấp tool Click TP vào Backpack!")
+UserInputService.JumpRequest:Connect(function()
+    if Config.infiniteJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+antiAfkButton = CreateButton(ButtonFrame2Left, "Anti AFK", function()
+    Config.AntiAFKEnabled = not Config.AntiAFKEnabled
+    antiAfkButton.Text = "Anti AFK: " .. (Config.AntiAFKEnabled and "ON" or "OFF")
+    sendNotification("ANTI AFK", Config.AntiAFKEnabled and "ON" or "OFF")
+
+    if Config.AntiAFKEnabled then
+        antiAfkLoop = task.spawn(function()
+            while Config.AntiAFKEnabled do
+                task.wait(60)
+                pcall(function()
+                    local hum = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                end)
+            end
+        end)
     else
-        if clickTpTool then
-            clickTpTool:Destroy()
-            clickTpTool = nil
+        if antiAfkLoop then
+            task.cancel(antiAfkLoop)
+            antiAfkLoop = nil
         end
     end
-end)
+    SaveSettings()
+end, "AntiAFKEnabled")
 
--- Khi respawn thì gắn lại tool nếu đang bật
-LocalPlayer.CharacterAdded:Connect(function()
-    if Config.clickTpEnabled then
-        task.wait(0.5) -- đợi nhân vật load
-        giveClickTpTool()
-    end
-end)
+autoReloadButton = CreateButton(ButtonFrame2Right, "Auto Reload", function()
+    Config.AutoReloadEnabled = not Config.AutoReloadEnabled
+    autoReloadButton.Text = "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF")
+    sendNotification("AUTO RELOAD", Config.AutoReloadEnabled and "ON" or "OFF")
+    SaveSettings()
+end, "AutoReloadEnabled")
+
+noStompAnimButton = CreateButton(ButtonFrame2Right, "No Stomp Anim", function()
+    Config.NoStompAnimEnabled = not Config.NoStompAnimEnabled
+    noStompAnimButton.Text = "No Stomp Anim: " .. (Config.NoStompAnimEnabled and "ON" or "OFF")
+    sendNotification("NO STOMP ANIM", Config.NoStompAnimEnabled and "ON" or "OFF")
+    SaveSettings()
+end, "NoStompAnimEnabled")
 
 saveWaypointButton = CreateButton(ButtonFrame2Right, "Save Waypoint", function()
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -1311,7 +1366,7 @@ saveWaypointButton = CreateButton(ButtonFrame2Right, "Save Waypoint", function()
     else
         sendNotification("Waypoint", "Không thể lưu vị trí!")
     end
-end)
+end, "SaveWaypointEnabled")
 
 tpWaypointButton = CreateButton(ButtonFrame2Right, "TP to Waypoint", function()
     if savedWaypoint and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -1320,7 +1375,7 @@ tpWaypointButton = CreateButton(ButtonFrame2Right, "TP to Waypoint", function()
     else
         sendNotification("Waypoint", "Chưa có vị trí được lưu!")
     end
-end)
+end, "TPWaypointEnabled")
 
 local hiddenFling = false
 local flingPower = 55000
@@ -1360,14 +1415,14 @@ end
 
 flingLoop()
 
-flintTouchButton = CreateButton(ButtonFrame2Right, "FlintTouch: OFF", function()
+flintTouchButton = CreateButton(ButtonFrame2Right, "FlintTouch", function()
     hiddenFling = not hiddenFling
-    sendNotification("FLINGTOUCH", hiddenFling and "ON" or "OFF")
     flintTouchButton.Text = "FlintTouch: " .. (hiddenFling and "ON" or "OFF")
+    sendNotification("FLINGTOUCH", hiddenFling and "ON" or "OFF")
     SaveSettings()
-end)
+end, "FlintTouchEnabled")
 
-local function FlingAll()
+flingAllButton = CreateButton(ButtonFrame2Right, "Fling All", function()
     hiddenFling = true
     flintTouchButton.Text = "FlintTouch: ON"
     local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -1376,7 +1431,7 @@ local function FlingAll()
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
             local targetRoot = plr.Character.HumanoidRootPart
-            for i = 1, 10 do  -- Di chuyển đi lại 5 lần để fling hiệu quả
+            for i = 1, 10 do
                 myRoot.CFrame = targetRoot.CFrame + Vector3.new(math.random(-2, 2), 0, math.random(-2, 2))
                 task.wait(0.05)
                 myRoot.CFrame = targetRoot.CFrame + Vector3.new(math.random(-2, 2), 0, math.random(-2, 2))
@@ -1384,9 +1439,7 @@ local function FlingAll()
             end
         end
     end
-end
-
-flingAllButton = CreateButton(ButtonFrame2Right, "Fling All", FlingAll)
+end, "FlingAllEnabled")
 
 -- ESP
 local espGui = Instance.new("ScreenGui")
@@ -1406,12 +1459,11 @@ local function IsValidTarget(player)
         return false
     end
     
-    -- Kiểm tra trạng thái K.O nếu checkKOAimbot được bật
     if Config.checkKOAimbot then
         local bodyEffects = player.Character:FindFirstChild("BodyEffects")
         local koValue = bodyEffects and bodyEffects:FindFirstChild("K.O")
         if koValue and koValue.Value then
-            return false -- Bỏ qua người chơi nếu họ bị K.O
+            return false
         end
     end
     
@@ -1584,165 +1636,253 @@ end
 local function distToCursor(part)
     local v, vis = Camera:WorldToViewportPoint(part.Position)
     if not vis then return math.huge end
-    local m = UserInputService.TouchEnabled and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
-    return (Vector2.new(v.X, v.Y) - Vector2.new(m.X, m.Y)).Magnitude
+    local mousePos = UserInputService:GetMouseLocation()
+    return (Vector2.new(v.X, v.Y) - mousePos).Magnitude
 end
 
-local function click()
-    if UserInputService.TouchEnabled then
-        local touchPos = UserInputService:GetMouseLocation()
-        VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.Begin, touchPos)
-        task.wait()
-        VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.End, touchPos)
-    else
-        if mouse1press then
-            mouse1press()
-            mouse1release()
-        elseif mouse1click then
-            mouse1click()
-        end
-    end
-end
-
-local function GetBestTargetPart()
-    local bestPart, bestDist = nil, fovRadius
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and IsValidTarget(plr) and plr.Character then
+local function GetClosestPlayerPart()
+    local closestPart, minDist = nil, math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if IsValidTarget(player) and Config.SelectedPlayers[player.Name] then
             for _, partName in ipairs(hitParts) do
-                local part = plr.Character:FindFirstChild(partName)
-                if part and part:IsA("BasePart") then
+                local part = player.Character:FindFirstChild(partName)
+                if part then
                     local dist = distToCursor(part)
-                    if dist < bestDist then
-                        bestPart = part
-                        bestDist = dist
+                    if dist < minDist then
+                        minDist = dist
+                        closestPart = part
                     end
                 end
             end
         end
     end
-    return bestPart
+    return closestPart, minDist
 end
 
-getgenv().Aimbot = {
-    Status = true,
-    Hitpart = "Head",
-}
+local function click()
+    local mouse = LocalPlayer:GetMouse()
+    mouse1press()
+    task.wait(0.01)
+    mouse1release()
+end
 
-local function GetPing()
-    if Config.CustomPing then
-        return Config.CustomPing
+local function UpdateAimbot()
+    if not Config.AimbotEnabled then
+        if camConnection then
+            camConnection:Disconnect()
+            camConnection = nil
+        end
+        return
     end
-    local stats = game:GetService("Stats"):FindFirstChild("Network")
-    local data = stats and stats:FindFirstChild("DataPing")
-    return data and math.clamp(data:GetValue(), 10, 300) or 40
+
+    if camConnection then camConnection:Disconnect() end
+    camConnection = RunService.RenderStepped:Connect(function()
+        local closestPart, dist = GetClosestPlayerPart()
+        if closestPart and dist <= Config.FOV then
+            local targetPos = closestPart.Position
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+            if tbEnabled then
+                click()
+            end
+        end
+    end)
 end
 
-local function GetPredictedPosition(part)
-    if not part or not part:IsA("BasePart") then return part.Position end
-    local velocity = part.Velocity
-    local origin = Camera.CFrame.Position
-    local distance = (part.Position - origin).Magnitude
-    local ping = GetPing()
-    local delay = ping / 1000
-    local distanceFactor = math.clamp(distance / 100, 1, 3)
-    return part.Position + velocity * delay * distanceFactor
-end
-
-local function IsObstructed(origin, targetPos)
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character}
-    local result = Workspace:Raycast(origin, (targetPos - origin), raycastParams)
-    if result and result.Instance and not result.Instance:IsDescendantOf(Player and Player.Character) then
-        return true
+-- AntiLock (ngăn aimlock lên trời)
+local function UpdateAntiLock()
+    if Config.AntiLockEnabled then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local root = char.HumanoidRootPart
+            local camLook = Camera.CFrame.LookVector
+            if camLook.Y > 0.5 then -- Ngăn camera hướng quá cao
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + Vector3.new(camLook.X, 0, camLook.Z))
+            end
+        end
     end
-    return false
 end
 
-local function GetClosestValidPlayer()
-    local closestPlayer = nil
-    local shortestDistance = math.huge
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and IsValidTarget(plr) and plr.Character and plr.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
-            local pos, visible = Camera:WorldToViewportPoint(plr.Character[getgenv().Aimbot.Hitpart].Position)
-            if visible then
-                local dist = (Vector2.new(UserInputService:GetMouseLocation().X, UserInputService:GetMouseLocation().Y) - Vector2.new(pos.X, pos.Y)).Magnitude
-                if dist < shortestDistance then
-                    closestPlayer = plr
-                    shortestDistance = dist
+-- Tự động nạp đạn và bỏ animation reload
+local function AutoReload()
+    if Config.AutoReloadEnabled then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            local bodyEffects = char:FindFirstChild("BodyEffects")
+            if bodyEffects then
+                local ammo = bodyEffects:FindFirstChild("Ammo")
+                if ammo and ammo.Value <= 0 then
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.R, false, game)
+                    task.wait(0.01)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.R, false, game)
                 end
             end
         end
     end
-    return closestPlayer
 end
 
+-- Bỏ animation reload và stomp
+local function DisableAnimations()
+    if Config.AutoReloadEnabled or Config.NoStompAnimEnabled then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            local animator = char.Humanoid:FindFirstChildOfClass("Animator")
+            if animator then
+                for _, track in ipairs(animator:GetPlayingAnimationTracks()) do
+                    if Config.AutoReloadEnabled and track.Animation.AnimationId:match("reload") then
+                        track:Stop()
+                    end
+                    if Config.NoStompAnimEnabled and track.Animation.AnimationId:match("stomp") then
+                        track:Stop()
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Vòng lặp chính
 RunService.RenderStepped:Connect(function(deltaTime)
     UpdateESP()
     UpdateSpeed()
     UpdateFly(deltaTime)
+    UpdateAimbot()
+    UpdateAntiLock()
+    AutoReload()
+    DisableAnimations()
+end)
 
-    if Config.AimbotEnabled and getgenv().Aimbot.Status then
-        Player = GetClosestValidPlayer()
-        if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
-            local part = Player.Character[getgenv().Aimbot.Hitpart]
-            local predictedPos = GetPredictedPosition(part)
-            if not IsObstructed(Camera.CFrame.Position, predictedPos) then
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
-            end
-        end
-    end
+-- Cập nhật danh sách người chơi
+Players.PlayerAdded:Connect(function(player)
+    Config.SelectedPlayers[player.Name] = Config.SelectedPlayers[player.Name] or false
+    UpdatePlayerList()
+    SaveSettings()
+end)
 
-    if tbEnabled then
-        local part = GetBestTargetPart()
-        if part then
-            task.spawn(function()
-                local cap = part
-                task.wait(0)
-                if tbEnabled and distToCursor(cap) <= fovRadius then
-                    -- Kiểm tra raycast
-                    local origin = Camera.CFrame.Position
-                    local direction = (cap.Position - origin)
-                    local rayParams = RaycastParams.new()
-                    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-                    rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+Players.PlayerRemoving:Connect(function(player)
+    RemoveESP(player)
+    Config.SelectedPlayers[player.Name] = nil
+    UpdatePlayerList()
+    SaveSettings()
+end)
 
-                    local result = Workspace:Raycast(origin, direction, rayParams)
+UpdatePlayerList()
 
-                    -- Nếu không có va chạm hoặc hit trúng đúng part của target => bắn
-                    if not result or result.Instance:IsDescendantOf(cap.Parent) then
-                        click()
+-- Tạo công cụ Click TP
+local function SetupClickTP()
+    if Config.clickTpEnabled then
+        if not clickTpTool then
+            clickTpTool = Instance.new("Tool")
+            clickTpTool.Name = "ClickTP"
+            clickTpTool.RequiresHandle = false
+            clickTpTool.Parent = LocalPlayer.Backpack
+            clickTpTool.Activated:Connect(function()
+                local mouse = LocalPlayer:GetMouse()
+                local hit = mouse.Hit
+                if hit then
+                    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if root then
+                        root.CFrame = hit
                     end
                 end
             end)
         end
+    else
+        if clickTpTool then
+            clickTpTool:Destroy()
+            clickTpTool = nil
+        end
     end
-end)
-
-local Connections = {}
-local function Connect(event, callback)
-    local connection = event:Connect(callback)
-    table.insert(Connections, connection)
-    return connection
 end
 
-Connect(Players.PlayerRemoving, function(player)
-    RemoveESP(player)
-    UpdatePlayerList()
+clickTpButton = CreateButton(ButtonFrame2Right, "Click TP", function()
+    Config.clickTpEnabled = not Config.clickTpEnabled
+    clickTpButton.Text = "Click TP: " .. (Config.clickTpEnabled and "ON" or "OFF")
+    sendNotification("CLICK TP", Config.clickTpEnabled and "ON" or "OFF")
+    SetupClickTP()
+    SaveSettings()
+end, "clickTpEnabled")
+
+-- Khởi tạo trạng thái ban đầu
+local function Initialize()
+    espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
+    speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
+    flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
+    aimbotButton.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
+    checkKOAimbotButton.Text = "Check K.O Aimbot: " .. (Config.checkKOAimbot and "ON" or "OFF")
+    triggerBotButton.Text = "TriggerBot: " .. (tbEnabled and "ON" or "OFF")
+    fullbrightButton.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
+    noclipButton.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
+    infiniteJumpButton.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
+    antiAfkButton.Text = "Anti AFK: " .. (Config.AntiAFKEnabled and "ON" or "OFF")
+    autoKillButton.Text = "AutoKill: " .. (autoKillEnabled and "ON" or "OFF")
+    customFovButton.Text = "Custom FOV: " .. (customFovEnabled and "ON" or "OFF")
+    antiLockButton.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
+    autoReloadButton.Text = "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF")
+    noStompAnimButton.Text = "No Stomp Anim: " .. (Config.NoStompAnimEnabled and "ON" or "OFF")
+    clickTpButton.Text = "Click TP: " .. (Config.clickTpEnabled and "ON" or "OFF")
+    
+    if Config.AimbotEnabled then UpdateAimbot() end
+    if Config.NoclipEnabled then
+        noclipConnection = RunService.Stepped:Connect(function()
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChildOfClass("Humanoid") then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+    end
+    if Config.clickTpEnabled then SetupClickTP() end
+    if Config.FullbrightEnabled then
+        Lighting.Brightness = 2
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 999999
+        Lighting.Ambient = Color3.fromRGB(255, 255, 255)
+        Lighting.OutdoorAmbient = Color3.fromRGB(255, 255, 255)
+        Lighting.ClockTime = 12
+    end
+    if customFovEnabled then
+        local num = tonumber(fovBox.Text) or Config.FOV
+        if num and num >= 40 and num <= 120 then
+            Workspace.CurrentCamera.FieldOfView = num
+        end
+    end
+end
+
+Initialize()
+
+-- Lưu vị trí GUI khi di chuyển
+MenuFrame:GetPropertyChangedSignal("Position"):Connect(function()
+    Config.GuiPosition = {X = MenuFrame.Position.X.Offset, Y = MenuFrame.Position.Y.Offset}
+    SaveSettings()
 end)
 
-Connect(Players.PlayerAdded, function(player)
-    task.wait(math.random(2, 3))
-    RemoveESP(player)
-    if Config.SelectedPlayers[player.Name] then
-        Config.SelectedPlayers[player.Name] = true 
+-- Áp dụng vị trí GUI đã lưu
+MenuFrame.Position = UDim2.new(0, Config.GuiPosition.X, 0, Config.GuiPosition.Y)
+MenuFrame.Visible = Config.GuiVisible
+ToggleButton.Text = Config.GuiVisible and "HIDE" or "SHOW"
+
+-- Xử lý khi nhân vật hồi sinh
+LocalPlayer.CharacterAdded:Connect(function()
+    if Config.NoclipEnabled then
+        task.wait(0.5)
+        noclipConnection = RunService.Stepped:Connect(function()
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChildOfClass("Humanoid") then
+                for _, part in ipairs(char:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
     end
-    UpdatePlayerList()
+    if Config.clickTpEnabled then
+        SetupClickTP()
+    end
 end)
 
-task.spawn(function()
-    while true do
-        UpdatePlayerList()
-        task.wait(math.random(12, 15))
-    end
-end)
+-- Thông báo khởi tạo
+sendNotification("DhuyxDtuyen", "Script loaded successfully!")
