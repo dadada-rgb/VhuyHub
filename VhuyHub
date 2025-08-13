@@ -15,7 +15,7 @@ pcall(function()
         if tool then tool:Destroy() end
     end
 
-    if getgenv().noclipConnection and typeof(getgenv().noclipConnection) == "RBXScriptConnection" then
+    if getgenv().noclipConnection then
         getgenv().noclipConnection:Disconnect()
         getgenv().noclipConnection = nil
     end
@@ -51,15 +51,16 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Tạo file config riêng cho mỗi người chơi
+-- File config riêng cho mỗi người chơi
 local ConfigFile = "mygui_config_" .. LocalPlayer.UserId .. ".json"
 
 -- Cấu trúc config mặc định
 local Config = {
-    Buttons = {}, -- Lưu keybind của từng chức năng
-    GuiPosition = {X = 0, Y = 0}, -- Vị trí GUI
-    GuiVisible = true, -- Trạng thái hiện/ẩn menu
+    Buttons = {},
+    GuiPosition = {X = 0, Y = 0},
+    GuiVisible = true,
     ESPEnabled = false,
     SpeedEnabled = false,
     FlyEnabled = false,
@@ -139,22 +140,78 @@ local oldLighting = {
     ClockTime = Lighting.ClockTime
 }
 
--- Danh sách súng và đạn trong Da Hood
-local Guns = {
-    ["Revolver"] = {Name = "[Revolver] - $1300", Position = CFrame.new(-593.6, -7.4, 529.2)},
-    ["Double-Barrel SG"] = {Name = "[Double-Barrel SG] - $1400", Position = CFrame.new(-583.2, -7.4, 529.2)},
-    ["Shotgun"] = {Name = "[Shotgun] - $1250", Position = CFrame.new(-573.8, -7.4, 529.2)},
-    ["SMG"] = {Name = "[SMG] - $750", Position = CFrame.new(-563.4, -7.4, 529.2)},
-    ["Tactical Shotgun"] = {Name = "[Tactical Shotgun] - $2000", Position = CFrame.new(-553.0, -7.4, 529.2)},
-    ["RPG"] = {Name = "[RPG] - $6000", Position = CFrame.new(-542.6, -7.4, 529.2)}
+-- Danh sách súng và ammo trong Da Hood với tọa độ
+local GunList = {
+    ["Revolver"] = {
+        Name = "[Revolver]",
+        ShopPath = Workspace.Ignored.Shop["[Revolver] - $1300"],
+        BuyPosition = Vector3.new(-279.5, 53.5, -262.7),
+        Texture = "rbxassetid://3420082920"
+    },
+    ["Double-Barrel SG"] = {
+        Name = "[Double-Barrel SG]",
+        ShopPath = Workspace.Ignored.Shop["[Double-Barrel SG] - $1400"],
+        BuyPosition = Vector3.new(-279.5, 53.5, -262.7),
+        Texture = "rbxassetid://3420082920"
+    },
+    ["Shotgun"] = {
+        Name = "[Shotgun]",
+        ShopPath = Workspace.Ignored.Shop["[Shotgun] - $1250"],
+        BuyPosition = Vector3.new(-279.5, 53.5, -262.7),
+        Texture = "rbxassetid://3420082920"
+    },
+    ["SMG"] = {
+        Name = "[SMG]",
+        ShopPath = Workspace.Ignored.Shop["[SMG] - $750"],
+        BuyPosition = Vector3.new(-279.5, 53.5, -262.7),
+        Texture = "rbxassetid://3420082920"
+    },
+    ["Tactical Shotgun"] = {
+        Name = "[Tactical Shotgun]",
+        ShopPath = Workspace.Ignored.Shop["[Tactical Shotgun] - $2000"],
+        BuyPosition = Vector3.new(-279.5, 53.5, -262.7),
+        Texture = "rbxassetid://3420082920"
+    }
 }
 
-local Ammo = {
-    ["Revolver Ammo"] = {Name = "[Revolver Ammo] - $75", Position = CFrame.new(-589.4, -7.4, 518.8)},
-    ["Shotgun Ammo"] = {Name = "[Shotgun Ammo] - $125", Position = CFrame.new(-579.0, -7.4, 518.8)},
-    ["SMG Ammo"] = {Name = "[SMG Ammo] - $200", Position = CFrame.new(-568.6, -7.4, 518.8)},
-    ["RPG Ammo"] = {Name = "[RPG Ammo] - $1000", Position = CFrame.new(-558.2, -7.4, 518.8)}
+local AmmoList = {
+    ["Revolver Ammo"] = {
+        Name = "12 [Revolver Ammo] - $75",
+        ShopPath = Workspace.Ignored.Shop["12 [Revolver Ammo] - $75"],
+        BuyPosition = Vector3.new(-279.5, 53.5, -262.7)
+    },
+    ["Double-Barrel Ammo"] = {
+        Name = "4 [Double-Barrel Ammo] - $125",
+        ShopPath = Workspace.Ignored.Shop["4 [Double-Barrel Ammo] - $125"],
+        BuyPosition = Vector3.new(-279.5, 53.5, -262.7)
+    },
+    ["Shotgun Ammo"] = {
+        Name = "12 [Shotgun Ammo] - $125",
+        ShopPath = Workspace.Ignored.Shop["12 [Shotgun Ammo] - $125"],
+        BuyPosition = Vector3.new(-279.5, 53.5, -262.7)
+    },
+    ["SMG Ammo"] = {
+        Name = "30 [SMG Ammo] - $60",
+        ShopPath = Workspace.Ignored.Shop["30 [SMG Ammo] - $60"],
+        BuyPosition = Vector3.new(-279.5, 53.5, -262.7)
+    },
+    ["Tactical Shotgun Ammo"] = {
+        Name = "12 [Tactical Shotgun Ammo] - $125",
+        ShopPath = Workspace.Ignored.Shop["12 [Tactical Shotgun Ammo] - $125"],
+        BuyPosition = Vector3.new(-279.5, 53.5, -262.7)
+    }
 }
+
+-- Danh sách animation
+local animations = {
+    C = "http://www.roblox.com/asset/?id=15609995579",
+    N = "http://www.roblox.com/asset/?id=14352343065",
+}
+
+local currentTrack = nil
+local currentKey = nil
+local renderConnection = nil
+local inputConnection = nil
 
 -- Hàm gửi thông báo
 local function sendNotification(title, text)
@@ -165,28 +222,41 @@ local function sendNotification(title, text)
     })
 end
 
--- Tự động nạp đạn tức thì cho mọi súng
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        if noReloadEnabled then
-            local char = LocalPlayer.Character
-            if char then
-                local tool = char:FindFirstChildWhichIsA("Tool")
-                if tool and tool:FindFirstChild("Ammo") and tool.Ammo.Value <= 0 then
-                    game:GetService("ReplicatedStorage").MainEvent:FireServer("Reload", tool)
-                    tool.Ammo.Value = tool:FindFirstChild("MaxAmmo").Value -- Nạp đầy đạn ngay lập tức
-                end
-            end
-        end
-    end
-end)
-
 -- Hàm thiết lập nhân vật
 local function setupCharacter(char)
     local hum = char:WaitForChild("Humanoid", 5)
     if not hum then return end
+
     local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
+
+    if renderConnection then renderConnection:Disconnect() end
+    if inputConnection then inputConnection:Disconnect() end
+
+    renderConnection = RunService.RenderStepped:Connect(function()
+        if currentTrack and hum.MoveDirection.Magnitude > 0 then
+            currentTrack:Stop()
+            currentTrack = nil
+            currentKey = nil
+        end
+    end)
+
+    inputConnection = UserInputService.InputBegan:Connect(function(input)
+        local key = input.KeyCode.Name
+        local animId = animations[key]
+        if animId and hum.MoveDirection.Magnitude == 0 then
+            if currentTrack then
+                currentTrack:Stop()
+                currentTrack = nil
+                currentKey = nil
+            end
+            local anim = Instance.new("Animation")
+            anim.AnimationId = animId
+            local track = animator:LoadAnimation(anim)
+            track:Play()
+            currentTrack = track
+            currentKey = key
+        end
+    end)
 end
 
 if LocalPlayer.Character then
@@ -194,9 +264,16 @@ if LocalPlayer.Character then
 end
 
 LocalPlayer.CharacterAdded:Connect(function(char)
+    currentTrack = nil
+    currentKey = nil
     task.wait(0.2)
     setupCharacter(char)
 end)
+
+-- Tạo hiệu ứng mờ nền
+local blur = Instance.new("BlurEffect")
+blur.Size = 20
+blur.Parent = Lighting
 
 -- Tạo GUI intro
 local introGui = Instance.new("ScreenGui")
@@ -204,7 +281,7 @@ introGui.Name = "VhuyIntroGui"
 introGui.IgnoreGuiInset = true
 introGui.ResetOnSpawn = false
 introGui.DisplayOrder = 99999
-introGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+introGui.Parent = PlayerGui
 
 local bg = Instance.new("Frame")
 bg.Size = UDim2.new(1, 0, 1, 0)
@@ -244,6 +321,7 @@ task.delay(4, function()
     TweenService:Create(bg, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
     task.delay(1.5, function()
         introGui:Destroy()
+        blur:Destroy()
     end)
 end)
 
@@ -252,7 +330,7 @@ local cButtonGui = Instance.new("ScreenGui")
 cButtonGui.Name = "CButtonGui"
 cButtonGui.ResetOnSpawn = false
 cButtonGui.IgnoreGuiInset = true
-cButtonGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+cButtonGui.Parent = PlayerGui
 
 local cButton = Instance.new("TextButton")
 cButton.Name = "PlayCButton"
@@ -317,6 +395,27 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
+cButton.MouseButton1Click:Connect(function()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.MoveDirection.Magnitude > 0 then return end
+
+    local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
+    local anim = Instance.new("Animation")
+    anim.AnimationId = animations["C"]
+    local track = animator:LoadAnimation(anim)
+
+    if currentTrack then
+        currentTrack:Stop()
+    end
+
+    track:Play()
+    currentTrack = track
+    currentKey = "C"
+    sendNotification("Animation", "Playing C animation!")
+end)
+
 -- GUI chính
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "DhuyxMenu"
@@ -348,6 +447,7 @@ stroke.Color = Color3.fromRGB(255, 255, 255)
 stroke.Transparency = 0.3
 stroke.Parent = MenuFrame
 
+-- Nút Toggle Show/Hide
 local ToggleButton = Instance.new("TextButton")
 ToggleButton.Size = UDim2.new(0, 70, 0, 30)
 ToggleButton.Position = UDim2.new(0, 20, 0, 240)
@@ -397,6 +497,7 @@ ToggleButton.MouseButton1Click:Connect(function()
     ToggleButton.Text = MenuFrame.Visible and "HIDE" or "SHOW"
 end)
 
+-- Tiêu đề & Ping/FPS/Clock
 local MenuTitle = Instance.new("TextLabel")
 MenuTitle.Size = UDim2.new(1, 0, 0, 30)
 MenuTitle.BackgroundTransparency = 1
@@ -433,7 +534,7 @@ PingBox.TextColor3 = Color3.fromRGB(0, 0, 0)
 PingBox.TextSize = 14
 PingBox.Font = Enum.Font.Gotham
 PingBox.PlaceholderText = "Ping (ms)"
-PingBox.Text = ""
+PingBox.Text = Config.CustomPing and tostring(Config.CustomPing) or ""
 PingBox.ClearTextOnFocus = false
 PingBox.Parent = MenuTitle
 Instance.new("UICorner", PingBox).CornerRadius = UDim.new(0, 6)
@@ -693,9 +794,6 @@ local function CreateButton(parent, name, callback)
     keyBox.Parent = buttonFrame
     Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 6)
 
-    local screenGui
-    local screenBtn
-
     local function applyBind(text)
         text = text:lower()
         if getgenv().Keybinds[name] then
@@ -703,56 +801,50 @@ local function CreateButton(parent, name, callback)
             getgenv().Keybinds[name] = nil
         end
         if text == "button" then
-            if not screenGui then
-                screenGui = Instance.new("ScreenGui")
-                screenGui.IgnoreGuiInset = true
-                screenGui.Parent = game:GetService("CoreGui")
+            local screenGui = Instance.new("ScreenGui")
+            screenGui.IgnoreGuiInset = true
+            screenGui.Parent = game:GetService("CoreGui")
 
-                screenBtn = Instance.new("TextButton")
-                screenBtn.Size = UDim2.new(0, 70, 0, 30)
-                screenBtn.Position = UDim2.new(0, 100, 0, 300)
-                screenBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 255)
-                screenBtn.Text = name
-                screenBtn.TextColor3 = Color3.new(0, 0, 0)
-                screenBtn.TextSize = 10
-                screenBtn.Font = Enum.Font.GothamBold
-                screenBtn.Parent = screenGui
-                Instance.new("UICorner", screenBtn).CornerRadius = UDim.new(0, 6)
+            local screenBtn = Instance.new("TextButton")
+            screenBtn.Size = UDim2.new(0, 70, 0, 30)
+            screenBtn.Position = UDim2.new(0, 100, 0, 300)
+            screenBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 255)
+            screenBtn.Text = name
+            screenBtn.TextColor3 = Color3.new(0, 0, 0)
+            screenBtn.TextSize = 10
+            screenBtn.Font = Enum.Font.GothamBold
+            screenBtn.Parent = screenGui
+            Instance.new("UICorner", screenBtn).CornerRadius = UDim.new(0, 6)
 
-                local dragging = false
-                local dragStart, startPos
-                screenBtn.InputBegan:Connect(function(input)
-                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                        dragging = true
-                        dragStart = input.Position
-                        startPos = screenBtn.Position
-                        input.Changed:Connect(function()
-                            if input.UserInputState == Enum.UserInputState.End then
-                                dragging = false
-                            end
-                        end)
-                    end
-                end)
-                UserInputService.InputChanged:Connect(function(input)
-                    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                        local delta = input.Position - dragStart
-                        screenBtn.Position = UDim2.new(
-                            startPos.X.Scale, startPos.X.Offset + delta.X,
-                            startPos.Y.Scale, startPos.Y.Offset + delta.Y
-                        )
-                    end
-                end)
+            local dragging = false
+            local dragStart, startPos
+            screenBtn.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    dragging = true
+                    dragStart = input.Position
+                    startPos = screenBtn.Position
+                    input.Changed:Connect(function()
+                        if input.UserInputState == Enum.UserInputState.End then
+                            dragging = false
+                        end
+                    end)
+                end
+            end)
+            UserInputService.InputChanged:Connect(function(input)
+                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                    local delta = input.Position - dragStart
+                    screenBtn.Position = UDim2.new(
+                        startPos.X.Scale, startPos.X.Offset + delta.X,
+                        startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                    )
+                end
+            end)
 
-                screenBtn.MouseButton1Click:Connect(function()
-                    callback()
-                end)
-            end
+            screenBtn.MouseButton1Click:Connect(function()
+                callback()
+            end)
+
         else
-            if screenGui then
-                screenGui:Destroy()
-                screenGui = nil
-                screenBtn = nil
-            end
             local keyName = text:upper()
             if Enum.KeyCode[keyName] then
                 getgenv().Keybinds[name] = UserInputService.InputBegan:Connect(function(input, gp)
@@ -774,6 +866,61 @@ local function CreateButton(parent, name, callback)
 
     return button
 end
+
+-- Logic tự động nạp đạn cho tất cả súng
+local function AutoReload()
+    if not noReloadEnabled then return end
+    local player = LocalPlayer
+    local character = player.Character
+    if not character then return end
+
+    local guns = {}
+    for _, tool in pairs(player.Backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool:FindFirstChild("Ammo") then
+            table.insert(guns, tool)
+        end
+    end
+    for _, tool in pairs(character:GetChildren()) do
+        if tool:IsA("Tool") and tool:FindFirstChild("Ammo") then
+            table.insert(guns, tool)
+        end
+    end
+
+    for _, gun in pairs(guns) do
+        if gun.Ammo.Value <= 0 then
+            local shopPath = nil
+            for _, ammo in pairs(AmmoList) do
+                if string.find(ammo.Name:lower(), gun.Name:lower()) then
+                    shopPath = ammo.ShopPath
+                    break
+                end
+            end
+            if shopPath and shopPath:FindFirstChild("Head") then
+                local root = character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local mag = (shopPath.Head.Position - root.Position).Magnitude
+                    if mag <= 8 then
+                        fireclickdetector(shopPath.Parent.ClickDetector)
+                    else
+                        root.CFrame = CFrame.new(shopPath.Head.Position + Vector3.new(0, 3, 0))
+                        task.wait(0.1)
+                        fireclickdetector(shopPath.Parent.ClickDetector)
+                    end
+                    gun.Ammo.Value = gun.MaxAmmo.Value
+                end
+            end
+        end
+    end
+end
+
+task.spawn(function()
+    while true do
+        if noReloadEnabled then
+            AutoReload()
+        end
+        task.wait(0.1)
+    end
+end)
 
 -- Nút cho trang 1
 espButton = CreateButton(ButtonFrame1, "ESP: " .. (Config.ESPEnabled and "ON" or "OFF"), function()
@@ -887,9 +1034,12 @@ autoKillButton = CreateButton(ButtonFrame1, "AutoKill: " .. (autoKillEnabled and
 
                     local gun = LocalPlayer.Character:FindFirstChildOfClass("Tool")
                     if not gun or not gun:FindFirstChild("Ammo") then
-                        gun = LocalPlayer.Backpack:FindFirstChild("[Double-Barrel SG]") or LocalPlayer.Backpack:FindFirstChild("[Revolver]")
-                        if gun then
-                            gun.Parent = LocalPlayer.Character
+                        for _, g in pairs(GunList) do
+                            gun = LocalPlayer.Backpack:FindFirstChild(g.Name)
+                            if gun then
+                                gun.Parent = LocalPlayer.Character
+                                break
+                            end
                         end
                     end
 
@@ -954,147 +1104,178 @@ antiLockSkyButton = CreateButton(ButtonFrame1, "Anti Lock Sky: " .. (antiLockSky
     SaveSettings()
 end)
 
--- Nút Select Gun
-local gunListFrame
-selectGunButton = CreateButton(ButtonFrame1, "Select Gun", function()
-    if gunListFrame then
-        gunListFrame:Destroy()
-        gunListFrame = nil
-        return
-    end
-
-    gunListFrame = Instance.new("ScrollingFrame")
-    gunListFrame.Size = UDim2.new(0.5, -5, 0, 150)
-    gunListFrame.Position = UDim2.new(0.5, 0, 0, 40)
-    gunListFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    gunListFrame.BackgroundTransparency = 0.2
-    gunListFrame.ScrollBarThickness = 4
-    gunListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    gunListFrame.Parent = Page1
-
-    local gunListLayout = Instance.new("UIListLayout")
-    gunListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    gunListLayout.Padding = UDim.new(0, 4)
-    gunListLayout.Parent = gunListFrame
-    gunListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        gunListFrame.CanvasSize = UDim2.new(0, 0, 0, gunListLayout.AbsoluteContentSize.Y)
-    end)
-
-    for gunName, gunData in pairs(Guns) do
-        local gunButton = Instance.new("TextButton")
-        gunButton.Size = UDim2.new(1, -4, 0, 20)
-        gunButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-        gunButton.BackgroundTransparency = 0.2
-        gunButton.TextColor3 = Color3.fromRGB(0, 0, 0)
-        gunButton.TextSize = 14
-        gunButton.Font = Enum.Font.Gotham
-        gunButton.Text = gunData.Name
-        gunButton.Parent = gunListFrame
-        Instance.new("UICorner", gunButton).CornerRadius = UDim.new(0, 6)
-        animateButton(gunButton)
-
-        gunButton.MouseButton1Click:Connect(function()
-            Config.SelectedGun = gunName
-            sendNotification("Select Gun", "Đã chọn: " .. gunData.Name)
-            SaveSettings()
-            gunListFrame:Destroy()
-            gunListFrame = nil
-        end)
-    end
-end)
-
-tpGunButton = CreateButton(ButtonFrame1, "TP Gun", function()
-    if not Config.SelectedGun then
-        sendNotification("TP Gun", "Vui lòng chọn súng trước!")
-        return
-    end
-
-    local gunData = Guns[Config.SelectedGun]
-    if not gunData then return end
-
-    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if root then
-        root.CFrame = gunData.Position
-        task.wait(0.5)
-        local shop = Workspace.Ignored.Shop:FindFirstChild(gunData.Name)
-        if shop and shop:FindFirstChild("Head") and shop.Head:FindFirstChild("ClickDetector") then
-            fireclickdetector(shop.Head.ClickDetector)
-            sendNotification("TP Gun", "Đã mua: " .. gunData.Name)
-        else
-            sendNotification("TP Gun", "Không tìm thấy cửa hàng súng!")
+-- Anti Lock Sky Logic
+task.spawn(function()
+    while true do
+        if antiLockSkyEnabled then
+            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                root.CFrame = CFrame.new(root.Position + Vector3.new(0, 1000, 0))
+            end
         end
+        task.wait(0.1)
     end
 end)
 
--- Nút Select Ammo
-local ammoListFrame
-selectAmmoButton = CreateButton(ButtonFrame1, "Select Ammo", function()
-    if ammoListFrame then
-        ammoListFrame:Destroy()
-        ammoListFrame = nil
-        return
-    end
+-- Select Gun Dropdown
+local selectGunFrame = Instance.new("Frame")
+selectGunFrame.Size = UDim2.new(1, -10, 0, 30)
+selectGunFrame.BackgroundTransparency = 1
+selectGunFrame.Parent = ButtonFrame1
 
-    ammoListFrame = Instance.new("ScrollingFrame")
-    ammoListFrame.Size = UDim2.new(0.5, -5, 0, 150)
-    ammoListFrame.Position = UDim2.new(0.5, 0, 0, 40)
-    ammoListFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    ammoListFrame.BackgroundTransparency = 0.2
-    ammoListFrame.ScrollBarThickness = 4
-    ammoListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    ammoListFrame.Parent = Page1
+local selectGunButton = Instance.new("TextButton")
+selectGunButton.Size = UDim2.new(0.7, -5, 1, 0)
+selectGunButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+selectGunButton.BackgroundTransparency = 0.2
+selectGunButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+selectGunButton.TextSize = 14
+selectGunButton.Font = Enum.Font.Gotham
+selectGunButton.Text = Config.SelectedGun and GunList[Config.SelectedGun].Name or "Select Gun"
+selectGunButton.Parent = selectGunFrame
+Instance.new("UICorner", selectGunButton).CornerRadius = UDim.new(0, 6)
+animateButton(selectGunButton)
 
-    local ammoListLayout = Instance.new("UIListLayout")
-    ammoListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    ammoListLayout.Padding = UDim.new(0, 4)
-    ammoListLayout.Parent = ammoListFrame
-    ammoListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-        ammoListFrame.CanvasSize = UDim2.new(0, 0, 0, ammoListLayout.AbsoluteContentSize.Y)
+local gunDropdown = Instance.new("Frame")
+gunDropdown.Size = UDim2.new(0.7, -5, 0, 0)
+gunDropdown.Position = UDim2.new(0, 0, 1, 5)
+gunDropdown.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+gunDropdown.BackgroundTransparency = 0.2
+gunDropdown.Visible = false
+gunDropdown.Parent = selectGunFrame
+Instance.new("UICorner", gunDropdown).CornerRadius = UDim.new(0, 6)
+
+local gunListLayout = Instance.new("UIListLayout")
+gunListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+gunListLayout.Padding = UDim.new(0, 2)
+gunListLayout.Parent = gunDropdown
+
+for gunName, _ in pairs(GunList) do
+    local gunItem = Instance.new("TextButton")
+    gunItem.Size = UDim2.new(1, 0, 0, 20)
+    gunItem.BackgroundTransparency = 0.2
+    gunItem.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+    gunItem.Text = gunName
+    gunItem.TextColor3 = Color3.fromRGB(0, 0, 0)
+    gunItem.TextSize = 14
+    gunItem.Font = Enum.Font.Gotham
+    gunItem.Parent = gunDropdown
+    Instance.new("UICorner", gunItem).CornerRadius = UDim.new(0, 6)
+    animateButton(gunItem)
+
+    gunItem.MouseButton1Click:Connect(function()
+        Config.SelectedGun = gunName
+        selectGunButton.Text = GunList[gunName].Name
+        gunDropdown.Visible = false
+        SaveSettings()
     end)
+end
 
-    for ammoName, ammoData in pairs(Ammo) do
-        local ammoButton = Instance.new("TextButton")
-        ammoButton.Size = UDim2.new(1, -4, 0, 20)
-        ammoButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-        ammoButton.BackgroundTransparency = 0.2
-        ammoButton.TextColor3 = Color3.fromRGB(0, 0, 0)
-        ammoButton.TextSize = 14
-        ammoButton.Font = Enum.Font.Gotham
-        ammoButton.Text = ammoData.Name
-        ammoButton.Parent = ammoListFrame
-        Instance.new("UICorner", ammoButton).CornerRadius = UDim.new(0, 6)
-        animateButton(ammoButton)
+gunListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    gunDropdown.Size = UDim2.new(0.7, -5, 0, gunListLayout.AbsoluteContentSize.Y + 4)
+end)
 
-        ammoButton.MouseButton1Click:Connect(function()
-            Config.SelectedAmmo = ammoName
-            sendNotification("Select Ammo", "Đã chọn: " .. ammoData.Name)
-            SaveSettings()
-            ammoListFrame:Destroy()
-            ammoListFrame = nil
-        end)
+selectGunButton.MouseButton1Click:Connect(function()
+    gunDropdown.Visible = not gunDropdown.Visible
+end)
+
+-- TP Gun Button
+CreateButton(ButtonFrame1, "TP Gun", function()
+    if Config.SelectedGun and GunList[Config.SelectedGun] then
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            local gunInfo = GunList[Config.SelectedGun]
+            root.CFrame = CFrame.new(gunInfo.BuyPosition)
+            task.wait(0.1)
+            if gunInfo.ShopPath and gunInfo.ShopPath:FindFirstChild("Head") then
+                fireclickdetector(gunInfo.ShopPath.Parent.ClickDetector)
+                sendNotification("TP Gun", "Đã teleport và mua " .. gunInfo.Name)
+            else
+                sendNotification("TP Gun", "Không tìm thấy shop súng!")
+            end
+        end
+    else
+        sendNotification("TP Gun", "Chưa chọn súng!")
     end
 end)
 
-tpAmmoButton = CreateButton(ButtonFrame1, "TP Ammo", function()
-    if not Config.SelectedAmmo then
-        sendNotification("TP Ammo", "Vui lòng chọn đạn trước!")
-        return
-    end
+-- Select Ammo Dropdown
+local selectAmmoFrame = Instance.new("Frame")
+selectAmmoFrame.Size = UDim2.new(1, -10, 0, 30)
+selectAmmoFrame.BackgroundTransparency = 1
+selectAmmoFrame.Parent = ButtonFrame1
 
-    local ammoData = Ammo[Config.SelectedAmmo]
-    if not ammoData then return end
+local selectAmmoButton = Instance.new("TextButton")
+selectAmmoButton.Size = UDim2.new(0.7, -5, 1, 0)
+selectAmmoButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+selectAmmoButton.BackgroundTransparency = 0.2
+selectAmmoButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+selectAmmoButton.TextSize = 14
+selectAmmoButton.Font = Enum.Font.Gotham
+selectAmmoButton.Text = Config.SelectedAmmo and AmmoList[Config.SelectedAmmo].Name or "Select Ammo"
+selectAmmoButton.Parent = selectAmmoFrame
+Instance.new("UICorner", selectAmmoButton).CornerRadius = UDim.new(0, 6)
+animateButton(selectAmmoButton)
 
-    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if root then
-        root.CFrame = ammoData.Position
-        task.wait(0.5)
-        local shop = Workspace.Ignored.Shop:FindFirstChild(ammoData.Name)
-        if shop and shop:FindFirstChild("Head") and shop.Head:FindFirstChild("ClickDetector") then
-            fireclickdetector(shop.Head.ClickDetector)
-            sendNotification("TP Ammo", "Đã mua: " .. ammoData.Name)
-        else
-            sendNotification("TP Ammo", "Không tìm thấy cửa hàng đạn!")
+local ammoDropdown = Instance.new("Frame")
+ammoDropdown.Size = UDim2.new(0.7, -5, 0, 0)
+ammoDropdown.Position = UDim2.new(0, 0, 1, 5)
+ammoDropdown.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+ammoDropdown.BackgroundTransparency = 0.2
+ammoDropdown.Visible = false
+ammoDropdown.Parent = selectAmmoFrame
+Instance.new("UICorner", ammoDropdown).CornerRadius = UDim.new(0, 6)
+
+local ammoListLayout = Instance.new("UIListLayout")
+ammoListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ammoListLayout.Padding = UDim.new(0, 2)
+ammoListLayout.Parent = ammoDropdown
+
+for ammoName, _ in pairs(AmmoList) do
+    local ammoItem = Instance.new("TextButton")
+    ammoItem.Size = UDim2.new(1, 0, 0, 20)
+    ammoItem.BackgroundTransparency = 0.2
+    ammoItem.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+    ammoItem.Text = ammoName
+    ammoItem.TextColor3 = Color3.fromRGB(0, 0, 0)
+    ammoItem.TextSize = 14
+    ammoItem.Font = Enum.Font.Gotham
+    ammoItem.Parent = ammoDropdown
+    Instance.new("UICorner", ammoItem).CornerRadius = UDim.new(0, 6)
+    animateButton(ammoItem)
+
+    ammoItem.MouseButton1Click:Connect(function()
+        Config.SelectedAmmo = ammoName
+        selectAmmoButton.Text = AmmoList[ammoName].Name
+        ammoDropdown.Visible = false
+        SaveSettings()
+    end)
+end
+
+ammoListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ammoDropdown.Size = UDim2.new(0.7, -5, 0, ammoListLayout.AbsoluteContentSize.Y + 4)
+end)
+
+selectAmmoButton.MouseButton1Click:Connect(function()
+    ammoDropdown.Visible = not ammoDropdown.Visible
+end)
+
+-- TP Ammo Button
+CreateButton(ButtonFrame1, "TP Ammo", function()
+    if Config.SelectedAmmo and AmmoList[Config.SelectedAmmo] then
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            local ammoInfo = AmmoList[Config.SelectedAmmo]
+            root.CFrame = CFrame.new(ammoInfo.BuyPosition)
+            task.wait(0.1)
+            if ammoInfo.ShopPath and ammoInfo.ShopPath:FindFirstChild("Head") then
+                fireclickdetector(ammoInfo.ShopPath.Parent.ClickDetector)
+                sendNotification("TP Ammo", "Đã teleport và mua " .. ammoInfo.Name)
+            else
+                sendNotification("TP Ammo", "Không tìm thấy shop ammo!")
+            end
         end
+    else
+        sendNotification("TP Ammo", "Chưa chọn ammo!")
     end
 end)
 
@@ -1214,12 +1395,13 @@ end)
 
 infiniteJumpButton = CreateButton(ButtonFrame2Right, "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF"), function()
     Config.infiniteJumpEnabled = not Config.infiniteJumpEnabled
-    sendNotification("INFINITEJUMP", Config.infiniteJumpEnabled and "ON" or "OFF")
+    sendNotification("INFINITE JUMP", Config.infiniteJumpEnabled and "ON" or "OFF")
     infiniteJumpButton.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
     SaveSettings()
 end)
 
 antiAfkEnabled = false
+antiAfkLoop = nil
 antiAfkButton = CreateButton(ButtonFrame2Right, "Anti AFK: " .. (antiAfkEnabled and "ON" or "OFF"), function()
     antiAfkEnabled = not antiAfkEnabled
     antiAfkButton.Text = "Anti AFK: " .. (antiAfkEnabled and "ON" or "OFF")
@@ -1266,7 +1448,7 @@ end
 
 clickTpButton = CreateButton(ButtonFrame2Right, "Click TP: " .. (Config.clickTpEnabled and "ON" or "OFF"), function()
     Config.clickTpEnabled = not Config.clickTpEnabled
-    sendNotification("GIVECLICKTOOL", Config.clickTpEnabled and "ON" or "OFF")
+    sendNotification("CLICK TP", Config.clickTpEnabled and "ON" or "OFF")
     clickTpButton.Text = "Click TP: " .. (Config.clickTpEnabled and "ON" or "OFF")
     SaveSettings()
 
@@ -1363,25 +1545,12 @@ local function FlingAll()
             for i = 1, 10 do
                 myRoot.CFrame = targetRoot.CFrame + Vector3.new(math.random(-2, 2), 0, math.random(-2, 2))
                 task.wait(0.05)
-                myRoot.CFrame = targetRoot.CFrame + Vector3.new(math.random(-2, 2), 0, math.random(-2, 2))
-                task.wait(0.05)
             end
         end
     end
 end
 
 flingAllButton = CreateButton(ButtonFrame2Right, "Fling All", FlingAll)
-
--- Anti Lock Sky Logic
-task.spawn(function()
-    while true do
-        task.wait(0.1)
-        if antiLockSkyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local root = LocalPlayer.Character.HumanoidRootPart
-            root.CFrame = root.CFrame * CFrame.Angles(math.rad(90), 0, 0) -- Nhìn thẳng lên trời
-        end
-    end
-end)
 
 -- ESP
 local espGui = Instance.new("ScreenGui")
@@ -1502,134 +1671,214 @@ end
 local function UpdateFly(deltaTime)
     if Config.FlyEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
         local root = LocalPlayer.Character.HumanoidRootPart
-        local moveDirection = LocalPlayer.Character.Humanoid.MoveDirection
-        local flySpeed = Config.FlySpeed
-        local vertical = UserInputService:IsKeyDown(Enum.KeyCode.Space) and flySpeed / 8 or UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) and -flySpeed / 8 or 0
-        root.CFrame = root.CFrame + moveDirection * deltaTime * flySpeed * 10
-        root.CFrame = root.CFrame + Vector3.new(0, vertical, 0)
-        root.Velocity = root.Velocity * Vector3.new(1, 0, 1) + Vector3.new(0, 1.9, 0)
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if not root or not humanoid then return end
+
+        local moveDirection = Vector3.new()
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            moveDirection = moveDirection + Camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            moveDirection = moveDirection - Camera.CFrame.LookVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
+            moveDirection = moveDirection - Camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
+            moveDirection = moveDirection + Camera.CFrame.RightVector
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+            moveDirection = moveDirection + Vector3.new(0, 1, 0)
+        end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+            moveDirection = moveDirection - Vector3.new(0, 1, 0)
+        end
+
+        if moveDirection.Magnitude > 0 then
+            moveDirection = moveDirection.Unit * Config.FlySpeed * deltaTime
+            root.CFrame = root.CFrame + moveDirection
+        end
+
+        humanoid.PlatformStand = true
+        root.Velocity = Vector3.new(0, 0, 0)
+        root.Anchored = false
+    elseif LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character.Humanoid.PlatformStand = false
     end
 end
 
-local function UpdatePlayerList()
-    for _, cd in pairs(PlayerList:GetChildren()) do
-        if cd:IsA("TextButton") then cd:Destroy() end
-    end
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local button = Instance.new("TextButton")
-            button.Size = UDim2.new(1, -4, 0, 20)
-            button.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-            button.BackgroundTransparency = 0.2
-            button.TextColor3 = Color3.fromRGB(0, 0, 0)
-            button.TextSize = 14
-            button.Font = Enum.Font.Gotham
-            button.AutoButtonColor = false
-            button.Parent = PlayerList
-            local function UpdateButtonText()
-                local isSelected = Config.SelectedPlayers[player.Name]
-                button.Text = (isSelected and "✓ " or "") .. player.DisplayName
-            end
-            button.MouseButton1Click:Connect(function()
-                Config.SelectedPlayers[player.Name] = not Config.SelectedPlayers[player.Name]
-                UpdateButtonText()
-                SaveSettings()
-            end)
-            animateButton(button)
-            UpdateButtonText()
-        end
-    end
-end
-
-UserInputService.InputBegan:Connect(function(input, processed)
-    if processed then return end
-    if input.KeyCode == Enum.KeyCode.Y then
-        autoSelect = not autoSelect
-        if autoSelect then
-            for _, player in pairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer then
-                    Config.SelectedPlayers[player.Name] = true
-                end
-            end
-        else
-            Config.SelectedPlayers = {}
-        end
-        UpdatePlayerList()
-        SaveSettings()
-    elseif input.KeyCode == Enum.KeyCode.Space and Config.infiniteJumpEnabled then
-        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum:ChangeState(Enum.HumanoidStateType.Jumping)
-        end
+-- Infinite Jump Logic
+UserInputService.JumpRequest:Connect(function()
+    if Config.infiniteJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
     end
 end)
 
-local hitParts = {
-    "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "LeftUpperArm", "LeftLowerArm", "LeftHand",
-    "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
-    "RightUpperLeg", "RightLowerLeg", "RightFoot", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"
-}
+-- Aimbot Logic
+local function GetClosestPlayerToMouse()
+    local closestPlayer = nil
+    local minDist = fovRadius
+    local mousePos = UserInputService:GetMouseLocation()
 
-local function validPart(p)
-    if not p or not p.Parent or not p.Parent:FindFirstChild("Humanoid") then return false end
-    local player = Players:GetPlayerFromCharacter(p.Parent)
-    if not player or not Config.SelectedPlayers[player.Name] then return false end
-    for _, n in ipairs(hitParts) do
-        if p.Name:lower() == n:lower() then return true end
-    end
-    return false
-end
-
-local function distToCursor(part)
-    local v, vis = Camera:WorldToViewportPoint(part.Position)
-    if not vis then return math.huge end
-    local m = UserInputService.TouchEnabled and Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2) or UserInputService:GetMouseLocation()
-    return (Vector2.new(v.X, v.Y) - Vector2.new(m.X, m.Y)).Magnitude
-end
-
-local function click()
-    if UserInputService.TouchEnabled then
-        local touchPos = UserInputService:GetMouseLocation()
-        VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.Begin, touchPos)
-        task.wait()
-        VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.End, touchPos)
-    else
-        if mouse1press then
-            mouse1press()
-            mouse1release()
-        elseif mouse1click then
-            mouse1click()
-        end
-    end
-end
-
-local function GetBestTargetPart()
-    local bestPart, bestDist = nil, fovRadius
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and Config.SelectedPlayers[plr.Name] and IsValidTarget(plr) and plr.Character then
-            for _, partName in ipairs(hitParts) do
-                local part = plr.Character:FindFirstChild(partName)
-                if part and part:IsA("BasePart") then
-                    local dist = distToCursor(part)
-                    if dist < bestDist then
-                        bestPart = part
-                        bestDist = dist
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and IsValidTarget(player) and Config.SelectedPlayers[player.Name] then
+            local character = player.Character
+            local head = character and character:FindFirstChild("Head")
+            if head then
+                local screenPos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                if onScreen then
+                    local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                        closestPlayer = player
                     end
                 end
             end
         end
     end
-    return bestPart
+    return closestPlayer
 end
 
-getgenv().Aimbot = {
-    Status = true,
-    Hitpart = "Head",
-}
-
-local function GetPing()
-    if Config.CustomPing then
-        return Config.CustomPing
+local function UpdateAimbot()
+    if not Config.AimbotEnabled then
+        if camConnection then
+            camConnection:Disconnect()
+            camConnection = nil
+        end
+        return
     end
-    local stats = game:GetService("Stats"):FindFirstChild("Network")
-    local
+
+    if not camConnection then
+        camConnection = RunService.RenderStepped:Connect(function()
+            local target = GetClosestPlayerToMouse()
+            if target and target.Character and target.Character:FindFirstChild("Head") then
+                local headPos = target.Character.Head.Position
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, headPos)
+            end
+        end)
+    end
+end
+
+-- TriggerBot Logic
+local function UpdateTriggerBot()
+    if not tbEnabled then return end
+    local mouse = LocalPlayer:GetMouse()
+    local target = mouse.Target
+    if target and target.Parent then
+        local character = target.Parent
+        local player = Players:GetPlayerFromCharacter(character)
+        if player and player ~= LocalPlayer and Config.SelectedPlayers[player.Name] and IsValidTarget(player) then
+            mouse1click()
+        end
+    end
+end
+
+-- Instant Stomp Logic
+local function UpdateInstantStomp()
+    if not instantStompEnabled then return end
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and IsValidTarget(player) then
+            local bodyEffects = player.Character:FindFirstChild("BodyEffects")
+            local koValue = bodyEffects and bodyEffects:FindFirstChild("K.O")
+            if koValue and koValue.Value then
+                local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    root.CFrame = player.Character.HumanoidRootPart.CFrame
+                    task.wait(0.1)
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                    task.wait(0.1)
+                    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                end
+            end
+        end
+    end
+end
+
+-- Player List
+local function UpdatePlayerList()
+    for _, v in ipairs(PlayerList:GetChildren()) do
+        if v:IsA("Frame") then
+            v:Destroy()
+        end
+    end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local plrFrame = Instance.new("Frame")
+            plrFrame.Size = UDim2.new(1, -10, 0, 25)
+            plrFrame.BackgroundTransparency = 0.2
+            plrFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+            plrFrame.Parent = PlayerList
+            Instance.new("UICorner", plrFrame).CornerRadius = UDim.new(0, 6)
+
+            local plrLabel = Instance.new("TextLabel")
+            plrLabel.Size = UDim2.new(0.7, 0, 1, 0)
+            plrLabel.Position = UDim2.new(0, 5, 0, 0)
+            plrLabel.BackgroundTransparency = 1
+            plrLabel.Text = player.DisplayName
+            plrLabel.TextColor3 = Config.SelectedPlayers[player.Name] and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(0, 0, 0)
+            plrLabel.TextSize = 14
+            plrLabel.Font = Enum.Font.Gotham
+            plrLabel.TextXAlignment = Enum.TextXAlignment.Left
+            plrLabel.Parent = plrFrame
+
+            local selectBtn = Instance.new("TextButton")
+            selectBtn.Size = UDim2.new(0.3, -5, 1, -4)
+            selectBtn.Position = UDim2.new(0.7, 5, 0, 2)
+            selectBtn.BackgroundColor3 = Config.SelectedPlayers[player.Name] and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(100, 200, 100)
+            selectBtn.Text = Config.SelectedPlayers[player.Name] and "Deselect" or "Select"
+            selectBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+            selectBtn.TextSize = 14
+            selectBtn.Font = Enum.Font.Gotham
+            selectBtn.Parent = plrFrame
+            Instance.new("UICorner", selectBtn).CornerRadius = UDim.new(0, 6)
+            animateButton(selectBtn)
+
+            selectBtn.MouseButton1Click:Connect(function()
+                Config.SelectedPlayers[player.Name] = not Config.SelectedPlayers[player.Name]
+                selectBtn.Text = Config.SelectedPlayers[player.Name] and "Deselect" or "Select"
+                selectBtn.BackgroundColor3 = Config.SelectedPlayers[player.Name] and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(100, 200, 100)
+                plrLabel.TextColor3 = Config.SelectedPlayers[player.Name] and Color3.fromRGB(255, 100, 100) or Color3.fromRGB(0, 0, 0)
+                SaveSettings()
+            end)
+        end
+    end
+end
+
+-- Update Loop
+RunService.RenderStepped:Connect(function(deltaTime)
+    UpdateESP()
+    UpdateSpeed()
+    UpdateFly(deltaTime)
+    UpdateAimbot()
+    UpdateTriggerBot()
+    UpdateInstantStomp()
+end)
+
+Players.PlayerAdded:Connect(UpdatePlayerList)
+Players.PlayerRemoving:Connect(function(player)
+    RemoveESP(player)
+    Config.SelectedPlayers[player.Name] = nil
+    SaveSettings()
+    UpdatePlayerList()
+end)
+UpdatePlayerList()
+
+-- Cleanup on script end
+game:BindToClose(function()
+    if noclipConnection then noclipConnection:Disconnect() end
+    if camConnection then camConnection:Disconnect() end
+    if autoKillLoop then task.cancel(autoKillLoop) end
+    if antiAfkLoop then task.cancel(antiAfkLoop) end
+    if clickTpTool then clickTpTool:Destroy() end
+    for _, esp in pairs(ESPs) do
+        pcall(function()
+            esp.label:Destroy()
+            esp.highlight:Destroy()
+        end)
+    end
+    ESPs = {}
+end)
+
+-- Thông báo script đã load
+sendNotification("DhuyxDtuyen", "Script loaded successfully!")
