@@ -901,159 +901,283 @@ checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O Aimbot: OFF", functi
     SaveSettings()
 end)
 
--- ======= CONFIG MẶC ĐỊNH =======
-Config.AntiLockEnabled = Config.AntiLockEnabled or false
-Config.AntiLockType = Config.AntiLockType or "Behind"
-Config.AutoStompEnabled = Config.AutoStompEnabled or false
+-- ============= Services & Base =============
+local Players        = game:GetService("Players")
+local RunService     = game:GetService("RunService")
+local Replicated     = game:GetService("ReplicatedStorage")
+local StarterGui     = game:GetService("StarterGui")
+local LocalPlayer    = Players.LocalPlayer
+local MainEvent      = Replicated:WaitForChild("MainEvent")
 
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
+-- ============= Config defaults =============
+Config.AntiLockEnabled   = Config.AntiLockEnabled   or false
+Config.AntiLockType      = Config.AntiLockType      or "Behind"
+Config.ResolverEnabled   = Config.ResolverEnabled   or false
+Config.ResolverOffset    = Config.ResolverOffset    or 3
+Config.TPBulletEnabled   = Config.TPBulletEnabled   or false
+Config.AutoStompEnabled  = Config.AutoStompEnabled  or false
 
-local antiLockModes = {
-    Behind = true, Down = true, ForWard = true,
-    Left = true, One = true, Right = true,
-    Up = true, Zero = true
-}
-
--- ======= NÚT ANTILOCK =======
-CreateButton(ButtonFrame1, "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF"), function(btn)
-    Config.AntiLockEnabled = not Config.AntiLockEnabled
-    btn.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
-    notify("AntiLock " .. (Config.AntiLockEnabled and "Enabled" or "Disabled"))
-    SaveSettings()
-end)
-
--- Ô nhập mode cho AntiLock
-local modeBox = Instance.new("TextBox")
-modeBox.Size = UDim2.new(1, 0, 0, 20)
-modeBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-modeBox.TextColor3 = Color3.new(1, 1, 1)
-modeBox.Font = Enum.Font.GothamBold
-modeBox.TextSize = 12
-modeBox.ClearTextOnFocus = false
-modeBox.PlaceholderText = "Enter mode (default Behind)"
-modeBox.Text = Config.AntiLockType
-Instance.new("UICorner", modeBox).CornerRadius = UDim.new(0, 4)
-modeBox.Parent = ButtonFrame1
-
-modeBox.FocusLost:Connect(function()
-    local input = modeBox.Text
-    if input == "" then
-        Config.AntiLockType = "Behind"
-    elseif antiLockModes[input] then
-        Config.AntiLockType = input
-    else
-        notify("Invalid AntiLock mode! Keeping: " .. Config.AntiLockType)
-        modeBox.Text = Config.AntiLockType
-        return
-    end
-    notify("AntiLock Type set to: " .. Config.AntiLockType)
-    SaveSettings()
-end)
-
--- ======= LOGIC ANTILOCK =======
-if _G.__vhuyhub_antilock_conn then
-    _G.__vhuyhub_antilock_conn:Disconnect()
+-- ============= Notify (đảm bảo hiện) =============
+local function notify(msg, dur)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = "VHuyHub",
+            Text  = tostring(msg),
+            Duration = dur or 2
+        })
+    end)
 end
 
-_G.__vhuyhub_antilock_conn = RunService.Heartbeat:Connect(function()
-    if not Config.AntiLockEnabled then return end
+-- ============= Utils =============
+local function myHRP()
+    local ch = LocalPlayer.Character
+    return ch and ch:FindFirstChild("HumanoidRootPart")
+end
 
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    local dir = Vector3.new(0, 0, -1) -- default Behind
-    local t = Config.AntiLockType
-    if     t == "Behind"  then dir = Vector3.new(0,  0, -1)
-    elseif t == "Down"    then dir = Vector3.new(0, -1,  0)
-    elseif t == "ForWard" then dir = Vector3.new(0,  0,  1)
-    elseif t == "Left"    then dir = Vector3.new(-1, 0,  0)
-    elseif t == "One"     then dir = Vector3.new(1,  1,  1)
-    elseif t == "Right"   then dir = Vector3.new(1,  0,  0)
-    elseif t == "Up"      then dir = Vector3.new(0,  1,  0)
-    elseif t == "Zero"    then dir = Vector3.new(0,  0,  0)
+local function getNearestSelected()
+    local me = myHRP()
+    if not me then return nil end
+    local best, dmin = nil, math.huge
+    for name, sel in pairs(Config.SelectedPlayers or {}) do
+        if sel then
+            local plr = Players:FindFirstChild(name)
+            local hrp = plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local d = (hrp.Position - me.Position).Magnitude
+                if d < dmin then dmin, best = d, plr end
+            end
+        end
     end
+    return best
+end
 
-    local oldVel = hrp.Velocity
+-- =========================================
+-- AntiLock (velocity spike) + UI chuẩn
+-- =========================================
+local antiLockDirSelf = {
+    Behind  = Vector3.new( 0,  0, -1),
+    Forward = Vector3.new( 0,  0,  1),
+    Left    = Vector3.new(-1,  0,  0),
+    Right   = Vector3.new( 1,  0,  0),
+    Up      = Vector3.new( 0,  1,  0),
+    Down    = Vector3.new( 0, -1,  0),
+    Zero    = Vector3.new( 0,  0,  0),
+    One     = Vector3.new( 1,  1,  1).Unit
+}
+
+do
+    local btn = CreateButton(ButtonFrame1, "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF"), function(self)
+        Config.AntiLockEnabled = not Config.AntiLockEnabled
+        self.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
+        notify("AntiLock " .. (Config.AntiLockEnabled and "Enabled" or "Disabled"))
+        SaveSettings()
+    end)
+
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(1, 0, 0, 20)
+    box.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    box.TextColor3 = Color3.new(1,1,1)
+    box.Font = Enum.Font.GothamBold
+    box.TextSize = 12
+    box.ClearTextOnFocus = false
+    box.PlaceholderText = "Mode (Behind/Forward/Left/Right/Up/Down/Zero/One)"
+    box.Text = tostring(Config.AntiLockType)
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0,4)
+    box.Parent = ButtonFrame1
+
+    box.FocusLost:Connect(function()
+        if antiLockDirSelf[box.Text] then
+            Config.AntiLockType = box.Text
+            notify("AntiLock mode: " .. Config.AntiLockType)
+            SaveSettings()
+        else
+            notify("Invalid mode, keeping: " .. Config.AntiLockType)
+            box.Text = Config.AntiLockType
+        end
+    end)
+end
+
+if _G.VHUB_AL_CONN then _G.VHUB_AL_CONN:Disconnect() end
+_G.VHUB_AL_CONN = RunService.Heartbeat:Connect(function()
+    if not Config.AntiLockEnabled then return end
+    local hrp = myHRP(); if not hrp then return end
+    local dir = antiLockDirSelf[Config.AntiLockType] or antiLockDirSelf.Behind
+    local old = hrp.Velocity
     hrp.Velocity = dir * (2^16)
     RunService.RenderStepped:Wait()
     if hrp and hrp.Parent then
-        hrp.Velocity = oldVel
+        hrp.Velocity = old
     end
 end)
 
--- ======= NÚT AUTOSTOMP =======
-CreateButton(ButtonFrame1, "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF"), function(btn)
-    Config.AutoStompEnabled = not Config.AutoStompEnabled
-    btn.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
-    notify("AutoStomp " .. (Config.AutoStompEnabled and "Enabled" or "Disabled"))
-    SaveSettings()
-end)
+-- =========================================
+-- Resolver (chuẩn Catus – dùng trục CFrame của TARGET)
+-- + TP Bullet (KHÔNG hook): UpdateMousePos liên tục
+-- =========================================
+local function resolvedPosByTarget(target)
+    if not target then return nil end
+    local thrp = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+    if not thrp then return nil end
 
--- ======= LOGIC AUTOSTOMP (Check K.O) =======
+    if not Config.ResolverEnabled then
+        return thrp.Position
+    end
+
+    -- Hướng theo CFrame của target (chuẩn Catus)
+    local c = thrp.CFrame
+    local dir = -c.LookVector  -- Behind default
+    local t = Config.AntiLockType
+    if     t == "Forward" then dir =  c.LookVector
+    elseif t == "Left"    then dir = -c.RightVector
+    elseif t == "Right"   then dir =  c.RightVector
+    elseif t == "Up"      then dir =  c.UpVector
+    elseif t == "Down"    then dir = -c.UpVector
+    elseif t == "Zero"    then dir =  Vector3.new(0,0,0)
+    elseif t == "One"     then dir = (c.LookVector + c.UpVector + c.RightVector).Unit
+    end
+    return thrp.Position + (dir * (tonumber(Config.ResolverOffset) or 3))
+end
+
+do
+    local btn = CreateButton(ButtonFrame1, "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF"), function(self)
+        Config.ResolverEnabled = not Config.ResolverEnabled
+        self.Text = "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF")
+        notify("Resolver " .. (Config.ResolverEnabled and "Enabled" or "Disabled"))
+        SaveSettings()
+    end)
+
+    local box = Instance.new("TextBox")
+    box.Size = UDim2.new(1, 0, 0, 20)
+    box.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    box.TextColor3 = Color3.new(1,1,1)
+    box.Font = Enum.Font.GothamBold
+    box.TextSize = 12
+    box.ClearTextOnFocus = false
+    box.PlaceholderText = "Resolver Offset (default 3)"
+    box.Text = tostring(Config.ResolverOffset)
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0,4)
+    box.Parent = ButtonFrame1
+
+    box.FocusLost:Connect(function()
+        local n = tonumber(box.Text)
+        if n then
+            Config.ResolverOffset = n
+            notify("Resolver offset: "..n)
+            SaveSettings()
+        else
+            notify("Invalid offset")
+            box.Text = tostring(Config.ResolverOffset)
+        end
+    end)
+end
+
+do
+    local btn = CreateButton(ButtonFrame1, "TP Bullet: " .. (Config.TPBulletEnabled and "ON" or "OFF"), function(self)
+        Config.TPBulletEnabled = not Config.TPBulletEnabled
+        self.Text = "TP Bullet: " .. (Config.TPBulletEnabled and "ON" or "OFF")
+        notify("TP Bullet " .. (Config.TPBulletEnabled and "Enabled" or "Disabled"))
+        SaveSettings()
+    end)
+
+    -- Loop: liên tục cập nhật UpdateMousePos tới vị trí đã resolve của target gần nhất trong danh sách
+    if _G.VHUB_TP_LOOP then _G.VHUB_TP_LOOP:Disconnect() end
+    _G.VHUB_TP_LOOP = RunService.Heartbeat:Connect(function(dt)
+        if not Config.TPBulletEnabled then return end
+        local target = getNearestSelected()
+        local aimPos = resolvedPosByTarget(target)
+        if aimPos then
+            -- Không hook: chỉ cập nhật MousePos. Khi bạn bắn bình thường, server dùng pos này.
+            pcall(function()
+                MainEvent:FireServer("UpdateMousePos", aimPos)
+            end)
+        end
+    end)
+end
+
+-- =========================================
+-- AutoStomp (fix không văng/không nằm ngang) + UI
+-- =========================================
 local function isKO(plr)
-    local char = plr.Character
-    if not char then return false end
-    local bodyEffects = char:FindFirstChild("BodyEffects")
-    if bodyEffects and bodyEffects:FindFirstChild("K.O") and bodyEffects["K.O"].Value == true then
-        return true
-    end
-    return false
+    local ch = plr.Character
+    if not ch then return false end
+    local be = ch:FindFirstChild("BodyEffects")
+    local ko = be and be:FindChild("K.O") or be and be:FindFirstChild("K.O")
+    return ko and ko.Value == true
 end
 
 local function getKOSelected()
-    for name, selected in pairs(Config.SelectedPlayers or {}) do
-        if selected then
-            local plr = Players:FindFirstChild(name)
-            if plr and isKO(plr) then
-                return plr
-            end
+    for name, sel in pairs(Config.SelectedPlayers or {}) do
+        if sel then
+            local p = Players:FindFirstChild(name)
+            if p and isKO(p) then return p end
         end
     end
     return nil
 end
 
-local function stompTarget(target)
+local function stompOnce(target)
     local myChar = LocalPlayer.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
-    if not myHRP or not myHum then return end
+    local hrp   = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local hum   = myChar and myChar:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum then return end
 
-    local lowerTorso = target.Character and target.Character:FindFirstChild("LowerTorso")
-    if not lowerTorso then return end
+    local lower = target.Character and target.Character:FindFirstChild("LowerTorso")
+    if not lower then return end
 
-    local oldCFrame = myHRP.CFrame
+    local oldCF = hrp.CFrame
+    local oldAR = hum.AutoRotate
 
-    -- Dừng mọi hành động
-    myHum:ChangeState(Enum.HumanoidStateType.Physics)
+    -- Giữ hướng đứng (không Physics để khỏi “nằm ngang”)
+    hum.AutoRotate = false
+    hrp.AssemblyLinearVelocity = Vector3.new()
+    hrp.AssemblyAngularVelocity = Vector3.new()
 
-    -- TP tới target
-    myHRP.CFrame = lowerTorso.CFrame + Vector3.new(0, 2, 0)
+    -- TP đứng thẳng ngay trên LowerTorso, nhìn theo hướng cũ
+    local lookDir = oldCF.LookVector
+    local destPos = lower.Position + Vector3.new(0, 2.1, 0)
+    hrp.CFrame = CFrame.new(destPos, destPos + lookDir)
+    hrp.AssemblyLinearVelocity = Vector3.new()
 
-    -- Giả lập bấm E
-    keypress(Enum.KeyCode.E)
-    task.wait(0.05)
-    keyrelease(Enum.KeyCode.E)
+    -- Nhấn E
+    local function pressE()
+        if keypress then
+            keypress(Enum.KeyCode.E); task.wait(0.06); keyrelease(Enum.KeyCode.E)
+        else
+            local VIM = game:GetService("VirtualInputManager")
+            VIM:SendKeyEvent(true,  Enum.KeyCode.E, false, game)
+            task.wait(0.06)
+            VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        end
+    end
+    pressE()
 
-    -- Chờ 1.5 giây
-    task.wait(1.5)
+    -- Chờ ngắn, giữ đứng thẳng
+    task.wait(0.2)
+    hrp.AssemblyLinearVelocity = Vector3.new()
 
-    -- Trả về vị trí cũ
-    myHRP.CFrame = oldCFrame
+    -- Đợi đủ stomp (1.5s)
+    task.wait(1.3)
 
-    -- Cho phép cử động lại
-    myHum:ChangeState(Enum.HumanoidStateType.Running)
+    -- Trả về
+    hrp.CFrame = oldCF
+    hum.AutoRotate = oldAR
 end
 
-RunService.Heartbeat:Connect(function()
-    if not Config.AutoStompEnabled then return end
-    local target = getKOSelected()
-    if target then
-        stompTarget(target)
-    end
-end)
+do
+    local btn = CreateButton(ButtonFrame1, "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF"), function(self)
+        Config.AutoStompEnabled = not Config.AutoStompEnabled
+        self.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
+        notify("AutoStomp " .. (Config.AutoStompEnabled and "Enabled" or "Disabled"))
+        SaveSettings()
+    end)
+
+    if _G.VHUB_STOMP_CONN then _G.VHUB_STOMP_CONN:Disconnect() end
+    _G.VHUB_STOMP_CONN = RunService.Heartbeat:Connect(function()
+        if not Config.AutoStompEnabled then return end
+        local t = getKOSelected()
+        if t then stompOnce(t) end
+    end)
+end
 
 -- ==== CONFIG ====
 if Config.LookAtEnabled == nil then Config.LookAtEnabled = false end
@@ -1194,7 +1318,15 @@ if Config.CsyncRadius == nil then Config.CsyncRadius = 10 end
 if Config.CsyncHeight == nil then Config.CsyncHeight = 5 end
 if Config.CsyncSpeed == nil then Config.CsyncSpeed = 2 end
 
--- Hàm tìm target gần nhất trong danh sách
+-- Hàm check K.O
+local function isKO(plr)
+    local char = plr and plr.Character
+    local be = char and char:FindFirstChild("BodyEffects")
+    local ko = be and be:FindFirstChild("K.O")
+    return ko and ko.Value
+end
+
+-- Hàm tìm target gần nhất
 local function getClosestSelected()
     local myChar = LocalPlayer.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -1231,7 +1363,7 @@ CreateButton(ButtonFrame1, "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON"
     SaveSettings()
 end)
 
--- Frame chứa 3 ô input
+-- Frame 3 ô input
 local boxFrame = Instance.new("Frame")
 boxFrame.Size = UDim2.new(1, 0, 0, 40)
 boxFrame.BackgroundTransparency = 1
@@ -1247,7 +1379,6 @@ local function createLabeledBox(parent, labelText, default, onChange, pos)
 
     local label = Instance.new("TextLabel")
     label.Size = UDim2.new(1, 0, 0, 10)
-    label.Position = UDim2.new(0, 0, 0, 0)
     label.BackgroundTransparency = 1
     label.Text = labelText
     label.TextSize = 10
@@ -1278,6 +1409,60 @@ local function createLabeledBox(parent, labelText, default, onChange, pos)
         end
     end)
 end
+
+-- 3 ô textbox
+createLabeledBox(boxFrame, "Radius", Config.CsyncRadius, function(v) Config.CsyncRadius = v end, UDim2.new(0, 0, 0, 0))
+createLabeledBox(boxFrame, "Height", Config.CsyncHeight, function(v) Config.CsyncHeight = v end, UDim2.new(1/3, 0, 0, 0))
+createLabeledBox(boxFrame, "Speed",  Config.CsyncSpeed,  function(v) Config.CsyncSpeed  = v end, UDim2.new(2/3, 0, 0, 0))
+
+-- ========================
+-- Logic chạy Orbit/Random
+-- ========================
+local pausedRandom, pausedOrbit = false, false
+
+if _G.VHUB_CSYNC_LOOP then _G.VHUB_CSYNC_LOOP:Disconnect() end
+_G.VHUB_CSYNC_LOOP = RunService.Heartbeat:Connect(function()
+    local target = getClosestSelected()
+    if target then
+        if isKO(target) then
+            -- Nếu target bị KO thì pause
+            if Config.CsyncRandomEnabled then
+                pausedRandom = true
+                Config.CsyncRandomEnabled = false
+                notify("Csync Random paused (target KO)")
+            end
+            if Config.CsyncOrbitEnabled then
+                pausedOrbit = true
+                Config.CsyncOrbitEnabled = false
+                notify("Csync Orbit paused (target KO)")
+            end
+        else
+            -- Hết KO thì resume
+            if pausedRandom then
+                Config.CsyncRandomEnabled = true
+                pausedRandom = false
+                notify("Csync Random resumed")
+            end
+            if pausedOrbit then
+                Config.CsyncOrbitEnabled = true
+                pausedOrbit = false
+                notify("Csync Orbit resumed")
+            end
+        end
+    end
+
+    -- Logic di chuyển Orbit/Random bạn tự nhúng ở đây...
+end)
+
+-- ========================
+-- Giữ nút khi chết (bỏ xoá nút)
+-- ========================
+LocalPlayer.CharacterAdded:Connect(function()
+    -- KHÔNG destroy nút ở đây
+    -- Chỉ reset trạng thái logic nếu muốn
+    Config.CsyncRandomEnabled = false
+    Config.CsyncOrbitEnabled = false
+end)
 
 -- Tạo 3 ô
 createLabeledBox(boxFrame, "Radius", Config.CsyncRadius, function(val) Config.CsyncRadius = val end, UDim2.new(0, 0, 0, 0))
