@@ -85,42 +85,114 @@ local Config = {
     CustomPing = nil
 }
 
-getgenv().AntiLockType = Config.AntiLockType or "Behind"
-getgenv().Desync = Config.AntiLockEnabled or false
-getgenv().Direction = Vector3.new(0, 0, -1) -- mặc định "Behind"
+-- ===== AntiLock & LookAt: State + Logic =====
+-- Bổ sung default nếu thiếu trong Config
+if Config.AntiLockEnabled == nil then Config.AntiLockEnabled = false end
+if Config.AntiLockType == nil then Config.AntiLockType = "Behind" end
+if Config.LookAtEnabled  == nil then Config.LookAtEnabled  = false end
 
--- Chạy AntiLock
-task.spawn(function()
-    game:GetService("RunService").Heartbeat:Connect(function()
-        if getgenv().Desync and game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            local HRP = game.Players.LocalPlayer.Character.HumanoidRootPart
-            local vel = HRP.Velocity
-            local t = getgenv().AntiLockType
+-- Đồng bộ với getgenv như script gốc
+getgenv().Desync       = Config.AntiLockEnabled
+getgenv().AntiLockType = Config.AntiLockType
 
-            if t == "Behind" then
-                getgenv().Direction = Vector3.new(0, 0, -1)
-            elseif t == "Down" then
-                getgenv().Direction = Vector3.new(0, -1, 0)
-            elseif t == "ForWard" then
-                getgenv().Direction = Vector3.new(0, 0, 1)
-            elseif t == "Left" then
-                getgenv().Direction = Vector3.new(-1, 0, 0)
-            elseif t == "One" then
-                getgenv().Direction = Vector3.new(1, 1, 1)
-            elseif t == "Right" then
-                getgenv().Direction = Vector3.new(1, 0, 0)
-            elseif t == "Up" then
-                getgenv().Direction = Vector3.new(0, 1, 0)
-            elseif t == "Zero" then
-                getgenv().Direction = Vector3.new(0, 0, 0)
-            end
-
-            HRP.Velocity = getgenv().Direction * (2 ^ 16)
-            game:GetService("RunService").RenderStepped:Wait()
-            HRP.Velocity = vel
-        end
+-- Notify an toàn
+local function Notify(title, text, dur)
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {Title = title, Text = text, Duration = dur or 2})
     end)
+end
+
+-- Tiện ích lấy người chơi từ Config.SelectedPlayers (hỗ trợ Name hoặc UserId)
+local function ResolveSelectedPlayer()
+    local sel = Config.SelectedPlayers
+    if typeof(sel) == "table" and #sel > 0 then sel = sel[1] end
+    if typeof(sel) == "string" then
+        return game.Players:FindFirstChild(sel)
+    elseif typeof(sel) == "number" then
+        return game.Players:GetPlayerByUserId(sel)
+    end
+    return nil
+end
+
+-- ========== Look At ==========
+local _connLookAt
+
+local function StartLookAt()
+    local lp = game.Players.LocalPlayer
+    local char = lp.Character or lp.CharacterAdded:Wait()
+    local hrp  = char:WaitForChild("HumanoidRootPart")
+    local hum  = char:WaitForChild("Humanoid")
+
+    local target = ResolveSelectedPlayer()
+    if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
+        Config.LookAtEnabled = false
+        Notify("Look At", "Không tìm thấy người chơi đã chọn.", 2)
+        return
+    end
+
+    hum.AutoRotate = false
+    _connLookAt = game:GetService("RunService").RenderStepped:Connect(function()
+        if not Config.LookAtEnabled then return end
+        if not target or not target.Character then return end
+        local tHRP = target.Character:FindFirstChild("HumanoidRootPart")
+        if not tHRP or not hrp then return end
+
+        -- Giữ trục Y để không “ngước/xuống” quá nhiều
+        local from = hrp.Position
+        local to   = Vector3.new(tHRP.Position.X, from.Y, tHRP.Position.Z)
+        hrp.CFrame = CFrame.lookAt(from, to)
+    end)
+end
+
+local function StopLookAt()
+    local lp = game.Players.LocalPlayer
+    local hum = lp.Character and lp.Character:FindFirstChildOfClass("Humanoid")
+    if hum then hum.AutoRotate = true end
+    if _connLookAt then _connLookAt:Disconnect() _connLookAt = nil end
+end
+
+-- Tự re-apply sau khi chết/spawn lại
+game.Players.LocalPlayer.CharacterAdded:Connect(function()
+    if Config.LookAtEnabled then
+        task.defer(StartLookAt)
+    end
 end)
+
+-- ========== AntiLock ==========
+local _connAntiLock
+local _dirMap = {
+    Behind  = Vector3.new( 0,  0, -1),
+    Down    = Vector3.new( 0, -1,  0),
+    ForWard = Vector3.new( 0,  0,  1),
+    Left    = Vector3.new(-1,  0,  0),
+    One     = Vector3.new( 1,  1,  1),
+    Right   = Vector3.new( 1,  0,  0),
+    Up      = Vector3.new( 0,  1,  0),
+    Zero    = Vector3.new( 0,  0,  0),
+}
+
+local function StartAntiLock()
+    if _connAntiLock then _connAntiLock:Disconnect() _connAntiLock = nil end
+    _connAntiLock = game:GetService("RunService").Heartbeat:Connect(function()
+        local lp = game.Players.LocalPlayer
+        local char = lp.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if not (hrp and Config.AntiLockEnabled) then return end
+
+        local t = Config.AntiLockType
+        local dir = _dirMap[t] or Vector3.new(0,0,-1)
+
+        -- Lưu lại vận tốc, đẩy 1 frame giống script kia rồi khôi phục
+        local saved = hrp.AssemblyLinearVelocity
+        hrp.AssemblyLinearVelocity = dir * (2^16)
+        game:GetService("RunService").RenderStepped:Wait()
+        hrp.AssemblyLinearVelocity = saved
+    end)
+end
+
+local function StopAntiLock()
+    if _connAntiLock then _connAntiLock:Disconnect() _connAntiLock = nil end
+end
 
 -- Hàm lưu config
 local function SaveSettings()
@@ -184,11 +256,16 @@ local function ApplyConfigToGUI()
     flintTouchButton.Text = "FlintTouch: " .. (hiddenFling and "ON" or "OFF")
 end
 
+-- ===== Re-apply runtime sau khi Load & GUI xong =====
+getgenv().Desync       = Config.AntiLockEnabled
+getgenv().AntiLockType = Config.AntiLockType
+
 if Config.AntiLockEnabled then
-    getgenv().Desync = true
+    StartAntiLock()
 end
-if Config.AntiLockType then
-    getgenv().AntiLockType = Config.AntiLockType
+
+if Config.LookAtEnabled then
+    StartLookAt()
 end
 
 local autoSelect = false
@@ -1022,34 +1099,6 @@ checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O Aimbot: OFF", functi
     SaveSettings()
 end)
 
-local lookAtBtn -- để có thể đổi text sau khi tạo nút
-
-lookAtBtn = CreateButton(ButtonFrame1, "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF"), function()
-    Config.LookAtEnabled = not Config.LookAtEnabled
-    lookAtBtn.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF") -- cập nhật nút
-    SaveSettings()
-
-    if Config.LookAtEnabled then
-        Notify("Look At Enabled", 2)
-        task.spawn(function()
-            while Config.LookAtEnabled do
-                task.wait()
-                local targetName = Config.SelectedPlayers[1] -- lấy người đầu tiên trong danh sách
-                local target = targetName and game.Players:FindFirstChild(targetName)
-                if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
-                and game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    
-                    local myHRP = game.Players.LocalPlayer.Character.HumanoidRootPart
-                    local targetHRP = target.Character.HumanoidRootPart
-                    myHRP.CFrame = CFrame.new(myHRP.Position, Vector3.new(targetHRP.Position.X, myHRP.Position.Y, targetHRP.Position.Z))
-                end
-            end
-        end)
-    else
-        Notify("Look At Disabled", 2)
-    end
-end)
-
 triggerBotButton = CreateButton(ButtonFrame1, "TriggerBot: " .. (tbEnabled and "ON" or "OFF"), function()
     tbEnabled = not tbEnabled
     sendNotification("TRIGGERBOT", tbEnabled and "ON" or "OFF")
@@ -1278,6 +1327,186 @@ AntiLockTypeBtn.MouseButton1Click:Connect(function()
         typeButtons = {}
     end
 end)
+
+-- ===== Page 1: AntiLock + AntiLockType (collapsible) + Look At =====
+local ui = ButtonFrame1  -- theo đúng bạn yêu cầu dùng ButtonFrame1
+
+-- Helper đổi chữ ON/OFF cho nút TextButton
+local function SetToggleText(btn, base, state)
+    if not btn then return end
+    btn.Text = string.format("%s: %s", base, state and "ON" or "OFF")
+    btn.TextColor3 = state and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+end
+
+-- [A] Nút AntiLock (ON/OFF) + vùng chọn Type (collapsible)
+do
+    local item = Instance.new("Frame")
+    item.Name = "AntiLockItem"
+    item.Parent = ui
+    item.BackgroundTransparency = 1
+    item.Size = UDim2.new(1, 0, 0, 36) -- chiều cao sẽ tăng khi mở dropdown
+
+    local toggle = Instance.new("TextButton")
+    toggle.Name = "AntiLockToggle"
+    toggle.Parent = item
+    toggle.Size = UDim2.new(0, 180, 0, 32)
+    toggle.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    toggle.TextSize = 16
+    toggle.Font = Enum.Font.GothamBold
+    toggle.TextColor3 = Color3.fromRGB(255,0,0)
+    SetToggleText(toggle, "AntiLock", Config.AntiLockEnabled)
+
+    local corner = Instance.new("UICorner", toggle) corner.CornerRadius = UDim.new(0,6)
+
+    local expand = Instance.new("TextButton")
+    expand.Name = "AntiLockExpand"
+    expand.Parent = item
+    expand.Size = UDim2.new(0, 32, 0, 32)
+    expand.Position = UDim2.new(0, 190, 0, 0)
+    expand.BackgroundColor3 = Color3.fromRGB(35,35,35)
+    expand.Text = "▼"
+    expand.TextSize = 16
+    expand.Font = Enum.Font.GothamBold
+    expand.TextColor3 = Color3.fromRGB(200,200,200)
+    Instance.new("UICorner", expand).CornerRadius = UDim.new(0,6)
+
+    local list = Instance.new("Frame")
+    list.Name = "AntiLockTypeList"
+    list.Parent = item
+    list.BackgroundTransparency = 1
+    list.Position = UDim2.new(0, 0, 0, 36)
+    list.Size = UDim2.new(1, 0, 0, 0) -- đóng mặc định
+
+    local layout = Instance.new("UIListLayout", list)
+    layout.Padding = UDim.new(0, 6)
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    -- Tạo các nút type đúng như script gốc
+    local types = {"Behind","Down","ForWard","Left","One","Right","Up","Zero"} -- từ script kia 
+    local function makeTypeButton(name)
+        local b = Instance.new("TextButton")
+        b.Name = "Type_"..name
+        b.Parent = list
+        b.Size = UDim2.new(0, 140, 0, 28)
+        b.BackgroundColor3 = Color3.fromRGB(45,45,45)
+        b.Text = name .. (Config.AntiLockType==name and " ✓" or "")
+        b.Font = Enum.Font.Gotham
+        b.TextSize = 14
+        b.TextColor3 = Color3.fromRGB(230,230,230)
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
+        b.MouseButton1Click:Connect(function()
+            -- cập nhật type
+            Config.AntiLockType = name
+            getgenv().AntiLockType = name
+            -- refresh dấu ✓
+            for _,child in ipairs(list:GetChildren()) do
+                if child:IsA("TextButton") then
+                    child.Text = child.Name:sub(6) .. (child.Name:sub(6)==name and " ✓" or "")
+                end
+            end
+            Notify("AntiLock", "Type: "..name, 1.5)
+            SaveSettings()
+        end)
+        return b
+    end
+    for _,t in ipairs(types) do makeTypeButton(t) end
+
+    local dropdownOpen = false
+    local function refreshHeights()
+        if dropdownOpen then
+            -- tính chiều cao list theo số nút
+            local count = 0
+            for _,c in ipairs(list:GetChildren()) do
+                if c:IsA("TextButton") then count += 1 end
+            end
+            list.Size = UDim2.new(1, 0, 0, count*28 + (count-1)*6)
+            item.Size = UDim2.new(1, 0, 0, 36 + list.Size.Y.Offset + 6)
+        else
+            list.Size = UDim2.new(1, 0, 0, 0)
+            item.Size = UDim2.new(1, 0, 0, 36)
+        end
+    end
+    refreshHeights()
+
+    expand.MouseButton1Click:Connect(function()
+        dropdownOpen = not dropdownOpen
+        expand.Text = dropdownOpen and "▲" or "▼"
+        refreshHeights()
+    end)
+
+    toggle.MouseButton1Click:Connect(function()
+        Config.AntiLockEnabled = not Config.AntiLockEnabled
+        getgenv().Desync = Config.AntiLockEnabled
+        SetToggleText(toggle, "AntiLock", Config.AntiLockEnabled)
+        if Config.AntiLockEnabled then
+            StartAntiLock()
+            Notify("AntiLock", "ĐÃ BẬT", 1.5)
+        else
+            StopAntiLock()
+            Notify("AntiLock", "ĐÃ TẮT", 1.5)
+        end
+        SaveSettings()
+    end)
+end
+
+-- [B] Nút Look At (dùng CreateButton như bạn yêu cầu), không keybind, có ON/OFF + thông báo
+do
+    local btn = nil
+    if typeof(CreateButton) == "function" then
+        -- Tận dụng CreateButton nhưng KHÔNG tạo keybind
+        btn = CreateButton(ButtonFrame1, "Look At", function()
+            Config.LookAtEnabled = not Config.LookAtEnabled
+            if Config.LookAtEnabled then
+                StartLookAt()
+                Notify("Look At", "ĐÃ BẬT", 1.5)
+            else
+                StopLookAt()
+                Notify("Look At", "ĐÃ TẮT", 1.5)
+            end
+            -- Hiển thị ON/OFF trực tiếp trên nút
+            if typeof(btn) == "Instance" then
+                btn.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF")
+                btn.TextColor3 = Config.LookAtEnabled and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+            elseif typeof(btn) == "table" and btn.Button then
+                btn.Button.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF")
+                btn.Button.TextColor3 = Config.LookAtEnabled and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+            end
+            SaveSettings()
+        end, { noKeybind = true })
+        -- set text ban đầu
+        if typeof(btn) == "Instance" then
+            btn.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF")
+            btn.TextColor3 = Config.LookAtEnabled and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+        elseif typeof(btn) == "table" and btn.Button then
+            btn.Button.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF")
+            btn.Button.TextColor3 = Config.LookAtEnabled and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+        end
+    else
+        -- Fallback nếu CreateButton không tồn tại
+        local fallback = Instance.new("TextButton")
+        fallback.Parent = ButtonFrame1
+        fallback.Size = UDim2.new(0, 180, 0, 32)
+        fallback.BackgroundColor3 = Color3.fromRGB(35,35,35)
+        fallback.Font = Enum.Font.GothamBold
+        fallback.TextSize = 16
+        fallback.TextColor3 = Config.LookAtEnabled and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+        fallback.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF")
+        Instance.new("UICorner", fallback).CornerRadius = UDim.new(0,6)
+        fallback.MouseButton1Click:Connect(function()
+            Config.LookAtEnabled = not Config.LookAtEnabled
+            if Config.LookAtEnabled then
+                StartLookAt()
+                Notify("Look At", "ĐÃ BẬT", 1.5)
+            else
+                StopLookAt()
+                Notify("Look At", "ĐÃ TẮT", 1.5)
+            end
+            fallback.TextColor3 = Config.LookAtEnabled and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
+            fallback.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF")
+            SaveSettings()
+        end)
+    end
+end
 
 -- Nút cho trang 2 (chia trái phải)
 local customFovEnabled = false
