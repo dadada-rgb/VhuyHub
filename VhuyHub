@@ -1521,11 +1521,6 @@ _G.VHUB_CSYNC_LOOP = RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Tạo 3 ô
-createLabeledBox(boxFrame, "Radius", Config.CsyncRadius, function(val) Config.CsyncRadius = val end, UDim2.new(0, 0, 0, 0))
-createLabeledBox(boxFrame, "Height", Config.CsyncHeight, function(val) Config.CsyncHeight = val end, UDim2.new(1/3, 5, 0, 0))
-createLabeledBox(boxFrame, "Speed", Config.CsyncSpeed, function(val) Config.CsyncSpeed = val end, UDim2.new(2/3, 10, 0, 0))
-
 -- Logic Csync
 RunService.RenderStepped:Connect(function()
     local target = getClosestSelected()
