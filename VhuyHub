@@ -416,7 +416,7 @@ ScreenGui.IgnoreGuiInset = true
 ScreenGui.Parent = PlayerGui
 
 local MenuFrame = Instance.new("Frame")
-MenuFrame.Size = UDim2.new(0, 300, 0, 250)
+MenuFrame.Size = UDim2.new(0, 400, 0, 250)
 MenuFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
 MenuFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MenuFrame.BackgroundTransparency = 0.1
