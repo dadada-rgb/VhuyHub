@@ -916,9 +916,9 @@ local antiLockModes = {
 }
 
 -- ======= NÚT ANTILOCK =======
-local antiLockButton = CreateButton(ButtonFrame1, "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF"), function(btn)
+local antiLockButton = CreateButton(ButtonFrame1, "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF"), function()
     Config.AntiLockEnabled = not Config.AntiLockEnabled
-    btn.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
+    antiLockButton.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
     sendNotification("AntiLock", Config.AntiLockEnabled and "Enabled" or "Disabled")
     SaveSettings()
 end)
@@ -984,9 +984,9 @@ _G.__vhuyhub_antilock_conn = RunService.Heartbeat:Connect(function()
 end)
 
 -- ======= NÚT AUTOSTOMP =======
-local autoStompButton = CreateButton(ButtonFrame1, "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF"), function(btn)
+local autoStompButton = CreateButton(ButtonFrame1, "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF"), function()
     Config.AutoStompEnabled = not Config.AutoStompEnabled
-    btn.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
+    autoStompButton.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
     sendNotification("AutoStomp", Config.AutoStompEnabled and "Enabled" or "Disabled")
     SaveSettings()
 end)
@@ -1105,9 +1105,9 @@ Config.ResolverEnabled = Config.ResolverEnabled or false
 Config.ResolverPrediction = Config.ResolverPrediction or 0.15
 
 -- ======= NÚT RESOLVER =======
-local resolverButton = CreateButton(ButtonFrame1, "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF"), function(btn)
+local resolverButton = CreateButton(ButtonFrame1, "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF"), function()
     Config.ResolverEnabled = not Config.ResolverEnabled
-    btn.Text = "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF")
+    resolverButton.Text = "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF")
     sendNotification("Resolver", Config.ResolverEnabled and "Enabled" or "Disabled")
     SaveSettings()
 end)
@@ -1326,17 +1326,17 @@ local function getClosestSelected()
 end
 
 -- Nút Random
-local csyncRandomButton = CreateButton(ButtonFrame1, "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF"), function(btn)
+local csyncRandomButton = CreateButton(ButtonFrame1, "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF"), function()
     Config.CsyncRandomEnabled = not Config.CsyncRandomEnabled
-    btn.Text = "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF")
+    csyncRandomButton.Text = "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF")
     sendNotification("Csync Random", Config.CsyncRandomEnabled and "Enabled" or "Disabled")
     SaveSettings()
 end)
 
 -- Nút Orbit
-local csyncOrbitButton = CreateButton(ButtonFrame1, "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF"), function(btn)
+local csyncOrbitButton = CreateButton(ButtonFrame1, "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF"), function()
     Config.CsyncOrbitEnabled = not Config.CsyncOrbitEnabled
-    btn.Text = "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF")
+    csyncOrbitButton.Text = "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF")
     sendNotification("Csync Orbit", Config.CsyncOrbitEnabled and "Enabled" or "Disabled")
     SaveSettings()
 end)
