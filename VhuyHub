@@ -901,56 +901,100 @@ checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O Aimbot: OFF", functi
     SaveSettings()
 end)
 
--- Thêm biến lưu vào config
-if Config.LookAtEnabled == nil then
-    Config.LookAtEnabled = false
+-- ==== CONFIG ====
+if Config.LookAtEnabled == nil then Config.LookAtEnabled = false end
+
+-- ==== UTILS ====
+local function getMyHumanoid()
+    local char = LocalPlayer.Character
+    if not char then return nil,nil,nil end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    return char, hum, hrp
 end
 
-local lastTargetName = nil
-
--- Hàm tìm người gần nhất trong danh sách chọn
 local function getClosestSelected()
-    local closest, minDist = nil, math.huge
-    local myChar = LocalPlayer.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local _, _, myHRP = getMyHumanoid()
     if not myHRP then return nil end
+    local myPos = myHRP.Position
+    local closest, dmin = nil, math.huge
 
-    for name, selected in pairs(Config.SelectedPlayers) do
+    for name, selected in pairs(Config.SelectedPlayers or {}) do
         if selected then
             local plr = Players:FindFirstChild(name)
-            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local dist = (myHRP.Position - plr.Character.HumanoidRootPart.Position).Magnitude
-                if dist < minDist then
-                    closest = plr
-                    minDist = dist
-                end
+            local chr = plr and plr.Character
+            local thrp = chr and chr:FindFirstChild("HumanoidRootPart")
+            if thrp then
+                local d = (myPos - thrp.Position).Magnitude
+                if d < dmin then closest, dmin = plr, d end
             end
         end
     end
     return closest
 end
 
--- Tạo nút bằng hàm có sẵn của vhuyhub
-CreateButton(ButtonFrame1, "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF"), function(btn)
+-- ==== NÚT LOOK AT (dùng CreateButton) ====
+local lookAtBtnRef
+local lastTargetName, lastNotify = nil, 0
+
+lookAtBtnRef = CreateButton(ButtonFrame1, "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF"), function(btn)
+    local b = btn or lookAtBtnRef
     Config.LookAtEnabled = not Config.LookAtEnabled
-    btn.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF")
+    b.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF")
+
+    -- đồng bộ AutoRotate như catus (khi enable thì tắt autorotate để mình điều khiển hướng)
+    local _, hum = getMyHumanoid()
+    if hum then hum.AutoRotate = not Config.LookAtEnabled end
+
+    if not Config.LookAtEnabled then
+        lastTargetName = nil
+        lastNotify = 0
+    end
     SaveSettings()
 end)
 
--- Logic xoay nhìn
+-- ==== LOOP XOAY NHÂN VẬT NHÌN TARGET (theo logic catus: xoay HRP) ====
 RunService.RenderStepped:Connect(function()
-    if Config.LookAtEnabled then
-        local target = getClosestSelected()
-        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.HumanoidRootPart.Position)
-            if lastTargetName ~= target.Name then
-                lastTargetName = target.Name
-                sendNotification("Look At", "Đang nhìn: " .. target.Name)
-            end
+    if not Config.LookAtEnabled then return end
+
+    local char, hum, hrp = getMyHumanoid()
+    if not (hum and hrp) then return end
+
+    -- đảm bảo autorotate tắt khi đang bật look-at
+    if hum.AutoRotate ~= false then hum.AutoRotate = false end
+
+    local targetPlr = getClosestSelected()
+    if not targetPlr then return end
+
+    local thrp = targetPlr.Character and targetPlr.Character:FindFirstChild("HumanoidRootPart")
+    if not thrp then return end
+
+    -- CHỈ xoay yaw như catus (không ngẩng cúi), giữ nguyên cao độ
+    local myPos = hrp.Position
+    local tPos = thrp.Position
+    local facePos = Vector3.new(tPos.X, myPos.Y, tPos.Z)
+
+    -- set hướng: dùng lookAt + lerp nhẹ để mượt (giống feel của catus)
+    local desired = CFrame.lookAt(myPos, facePos)
+    hrp.CFrame = hrp.CFrame:Lerp(desired, 0.35)
+
+    -- Thông báo khi đổi target (anti-spam)
+    if targetPlr.Name ~= lastTargetName then
+        lastTargetName = targetPlr.Name
+        local now = tick()
+        if now - lastNotify > 0.25 then
+            sendNotification("Look At", "Đang hướng vào: " .. lastTargetName)
+            lastNotify = now
         end
-    else
-        lastTargetName = nil
     end
+end)
+
+-- (tuỳ chọn) khi nhân vật respawn, khôi phục AutoRotate đúng trạng thái
+LocalPlayer.CharacterAdded:Connect(function()
+    task.defer(function()
+        local _, hum = getMyHumanoid()
+        if hum then hum.AutoRotate = not Config.LookAtEnabled end
+    end)
 end)
 
 triggerBotButton = CreateButton(ButtonFrame1, "TriggerBot: " .. (tbEnabled and "ON" or "OFF"), function()
@@ -960,68 +1004,234 @@ triggerBotButton = CreateButton(ButtonFrame1, "TriggerBot: " .. (tbEnabled and "
     SaveSettings()
 end)
 
--- Thêm vào Config
-if Config.MacroEnabled == nil then
-    Config.MacroEnabled = false
+-- ==== DEFAULTS (đồng bộ với catus) ====
+getgenv().Sentinel = getgenv().Sentinel or {}
+if getgenv().Sentinel.MacroSpeed == nil then
+    getgenv().Sentinel.MacroSpeed = 0.1 -- mặc định catus
 end
 
--- Macro Speed mặc định từ catus
-if Config.MacroSpeed == nil then
-    Config.MacroSpeed = 0.1
+if Config.MacroUI == nil then Config.MacroUI = false end
+if Config.MacroEnabled == nil then Config.MacroEnabled = false end
+
+-- ==== SERVICE ALIASES ====
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- ==== BIẾN TOÀN CỤC CHO MACRO UI ====
+local MacroUI -- ScreenGui
+local MacroActiveConn -- RenderStepped connection (khi shiftlock enable)
+local MacroLoopThread -- vòng lặp toggle shiftlock
+local MacroIcon -- ImageLabel trong UI (để đổi icon ON/OFF nhanh)
+
+-- ==== HÀM SHIFTLOCK THEO LOGIC CATUS ====
+local MAX_LENGTH = 900000
+local ENABLED_OFFSET = CFrame.new(0, 0, 0)
+local DISABLED_OFFSET = CFrame.new(0, 0, 0)
+
+local function getHumanoidAndRoot()
+    local char = LocalPlayer.Character
+    if not char then return nil, nil end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local root = hum and hum.RootPart
+    return hum, root
 end
 
-local MacroButtonUI = nil
+local function UpdateAutoRotate(state)
+    local hum = getHumanoidAndRoot()
+    if hum then
+        hum.AutoRotate = state
+    end
+end
 
--- Hàm tạo nút macro ngoài GUI
-local function CreateMacroButton()
-    if MacroButtonUI then MacroButtonUI:Destroy() end
+local function GetUpdatedCameraCFrame(rootPos)
+    local cam = workspace.CurrentCamera
+    if cam then
+        local lv = cam.CFrame.LookVector
+        -- catus: dùng LookVector * MAX_LENGTH để tạo điểm nhìn xa -> quay HRP về hướng camera
+        return CFrame.new(rootPos, Vector3.new(lv.X * MAX_LENGTH, lv.Y * MAX_LENGTH, lv.Z * MAX_LENGTH))
+    end
+end
 
+local function EnableShiftlock()
+    local hum, root = getHumanoidAndRoot()
+    if not (hum and root) then return end
+    UpdateAutoRotate(false)
+    local cf = GetUpdatedCameraCFrame(root.Position)
+    if cf then
+        root.CFrame = cf
+    end
+    local cam = workspace.CurrentCamera
+    if cam then
+        cam.CFrame = cam.CFrame * ENABLED_OFFSET
+    end
+end
+
+local function DisableShiftlock()
+    UpdateAutoRotate(true)
+    local cam = workspace.CurrentCamera
+    if cam then
+        cam.CFrame = cam.CFrame * DISABLED_OFFSET
+    end
+    if MacroActiveConn then
+        pcall(function() MacroActiveConn:Disconnect() end)
+        MacroActiveConn = nil
+    end
+end
+
+local function ShiftLockToggleTick()
+    -- Giống catus: mỗi “tick” sẽ toggle giữa kết nối RenderStepped (Enable) và Disable.
+    if not Config.MacroEnabled then return end
+    if not MacroActiveConn then
+        MacroActiveConn = RunService.RenderStepped:Connect(EnableShiftlock)
+    else
+        DisableShiftlock()
+    end
+end
+
+-- ==== UI MACRO NỔI (y như catus) ====
+local function MakeDraggable(frame)
+    local dragging, dragStart, startPos, dragInput
+    local function update(input)
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and input == dragInput then
+            update(input)
+        end
+    end)
+end
+
+local function CreateMacroFloatingUI()
+    if MacroUI then MacroUI:Destroy() MacroUI = nil end
+
+    local pg = LocalPlayer:FindFirstChild("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui")
     local gui = Instance.new("ScreenGui")
-    gui.Name = "MacroButtonGui"
+    gui.Name = "CatusMacroUI"
     gui.ResetOnSpawn = false
-    gui.Parent = game.CoreGui -- ngoài GUI chính
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.Parent = pg
 
-    local btn = Instance.new("ImageButton")
-    btn.Name = "MacroButton"
-    btn.Size = UDim2.new(0, 60, 0, 60)
-    btn.Position = UDim2.new(1, -70, 0.5, -30) -- góc phải giữa
-    btn.BackgroundTransparency = 1
-    btn.Image = "rbxassetid://126818107683779" -- icon từ catus
-    btn.Active = true
-    btn.Draggable = true
-    btn.Parent = gui
+    local frame = Instance.new("Frame")
+    frame.Name = "MacroFrame"
+    frame.Parent = gui
+    frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    frame.BackgroundTransparency = 0.5
+    frame.Position = UDim2.new(1, -128, 0, 0)
+    frame.Size = UDim2.new(0, 90, 0, 32)
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 8)
 
-    -- Toggle macro khi click
-    btn.MouseButton1Click:Connect(function()
+    local icon = Instance.new("ImageLabel")
+    icon.Name = "Icon"
+    icon.Parent = frame
+    icon.BackgroundTransparency = 1
+    icon.Size = UDim2.new(0, 26, 0, 26)
+    icon.AnchorPoint = Vector2.new(0, 0.5)
+    icon.Position = UDim2.new(0.05, 0, 0.5, 0)
+    icon.Image = Config.MacroEnabled and "rbxassetid://10735024209" or "rbxassetid://10734923214" -- ON/OFF icon như catus
+    MacroIcon = icon
+
+    local toggle = Instance.new("TextButton")
+    toggle.Name = "Toggle"
+    toggle.Parent = frame
+    toggle.BackgroundTransparency = 1
+    toggle.Size = UDim2.new(0, 52, 0, 26)
+    toggle.AnchorPoint = Vector2.new(0.5, 0.5)
+    toggle.Position = UDim2.new(0.65, 0, 0.5, 0)
+    toggle.Font = Enum.Font.Arimo
+    toggle.Text = "Macro"
+    toggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    toggle.TextScaled = true
+    local constraint = Instance.new("UITextSizeConstraint", toggle)
+    constraint.MaxTextSize = 30
+
+    toggle.MouseButton1Down:Connect(function()
         Config.MacroEnabled = not Config.MacroEnabled
-        sendNotification("Macro", Config.MacroEnabled and "Macro ON" or "Macro OFF")
+        MacroIcon.Image = Config.MacroEnabled and "rbxassetid://10735024209" or "rbxassetid://10734923214"
+        if not Config.MacroEnabled then
+            DisableShiftlock()
+        end
+        sendNotification("Macro", Config.MacroEnabled and "ON" or "OFF")
         SaveSettings()
     end)
 
-    MacroButtonUI = gui
+    -- Theo catus: đảm bảo UI tồn tại qua respawn
+    LocalPlayer.CharacterAdded:Connect(function()
+        gui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+    end)
+    LocalPlayer.CharacterRemoving:Connect(function()
+        gui.Parent = nil
+    end)
+
+    MakeDraggable(frame)
+    MacroUI = gui
 end
 
--- Nút trong menu chính để bật/tắt macro UI
-CreateButton(ButtonFrame1, "Macro UI: " .. (Config.MacroEnabled and "ON" or "OFF"), function(btn)
-    if MacroButtonUI then
-        MacroButtonUI:Destroy()
-        MacroButtonUI = nil
-        Config.MacroEnabled = false
-    else
-        CreateMacroButton()
+-- ==== VÒNG LẶP MACRO (đúng catus): toggle shiftlock theo MacroSpeed ====
+local function StartMacroLoop()
+    if MacroLoopThread then return end
+    MacroLoopThread = task.spawn(function()
+        while MacroUI do
+            task.wait(getgenv().Sentinel.MacroSpeed or 0.1)
+            ShiftLockToggleTick()
+        end
+        MacroLoopThread = nil
+    end)
+end
+
+local function DestroyMacroUI()
+    if MacroUI then
+        pcall(function() MacroUI:Destroy() end)
+        MacroUI = nil
     end
-    btn.Text = "Macro UI: " .. (MacroButtonUI and "ON" or "OFF")
+    DisableShiftlock()
+end
+
+-- ==== NÚT TRONG MENU (dùng CreateButton) ====
+local macroUIButton
+macroUIButton = CreateButton(ButtonFrame1, "Macro UI: " .. (Config.MacroUI and "ON" or "OFF"), function(btn)
+    Config.MacroUI = not Config.MacroUI
+    if Config.MacroUI then
+        CreateMacroFloatingUI()
+        StartMacroLoop()
+    else
+        DestroyMacroUI()
+        Config.MacroEnabled = false
+    end
+    btn.Text = "Macro UI: " .. (Config.MacroUI and "ON" or "OFF")
     SaveSettings()
 end)
 
--- Logic macro từ catus
-RunService.RenderStepped:Connect(function()
-    if Config.MacroEnabled then
-        keypress(0x57) -- W key
-        task.wait(Config.MacroSpeed)
-        keyrelease(0x57)
+-- (khởi động theo config lưu sẵn)
+if Config.MacroUI then
+    CreateMacroFloatingUI()
+    StartMacroLoop()
+    if MacroIcon then
+        MacroIcon.Image = Config.MacroEnabled and "rbxassetid://10735024209" or "rbxassetid://10734923214"
     end
-end)
+end
 
 tpAndStompButton = CreateButton(ButtonFrame1, "TP Player", function()
     local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
@@ -1047,91 +1257,140 @@ tpAndStompButton = CreateButton(ButtonFrame1, "TP Player", function()
         local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if root then
             local pos = closestPlayer.Character.HumanoidRootPart.Position
-            root.CFrame = CFrame.new(pos + Vector3.new(8, 3, 8))
+            root.CFrame = CFrame.new(pos + Vector3.new(3, 0, 0))
         end
     end
 end)
 
--- AutoKill Button
-autoKillButton = CreateButton(ButtonFrame1, "AutoKill: OFF", function()
-    autoKillEnabled = not autoKillEnabled
-    autoKillButton.Text = "AutoKill: " .. (autoKillEnabled and "ON" or "OFF")
-    sendNotification("AUTOKILL", autoKillEnabled and "ON" or "OFF")
-    SaveSettings()
+-- =====================
+-- CONFIG CƠ BẢN
+-- =====================
+if Config.CsyncRandomEnabled == nil then Config.CsyncRandomEnabled = false end
+if Config.CsyncOrbitEnabled == nil then Config.CsyncOrbitEnabled = false end
+if Config.CsyncRadius == nil then Config.CsyncRadius = 10 end
+if Config.CsyncHeight == nil then Config.CsyncHeight = 5 end
+if Config.CsyncSpeed == nil then Config.CsyncSpeed = 2 end
 
-    if autoKillEnabled then
-        autoKillLoop = task.spawn(function()
-            while autoKillEnabled do
-                local closestTarget = nil
-                local minDist = math.huge
-                local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if not myRoot then task.wait(1) continue end
-                local myPos = myRoot.Position
+-- =====================
+-- HÀM TÌM TARGET GẦN NHẤT
+-- =====================
+local function getClosestSelected()
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return nil end
 
-                for name, selected in pairs(Config.SelectedPlayers) do
-                    if selected then
-                        local plr = Players:FindFirstChild(name)
-                        if plr and IsValidTarget(plr) then
-                            local targetRoot = plr.Character:FindFirstChild("HumanoidRootPart")
-                            if targetRoot then
-                                local dist = (myPos - targetRoot.Position).Magnitude
-                                if dist < minDist then
-                                    minDist = dist
-                                    closestTarget = plr
-                                end
-                            end
-                        end
-                    end
+    local closest, minDist = nil, math.huge
+    for name, selected in pairs(Config.SelectedPlayers or {}) do
+        if selected then
+            local plr = Players:FindFirstChild(name)
+            local hrp = plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dist = (myHRP.Position - hrp.Position).Magnitude
+                if dist < minDist then
+                    closest, minDist = plr, dist
                 end
-
-                if closestTarget then
-                    local targetRoot = closestTarget.Character.HumanoidRootPart
-                    local targetHead = closestTarget.Character:FindFirstChild("Head")
-                    local targetHum = closestTarget.Character.Humanoid
-                    local bodyEffects = closestTarget.Character:FindFirstChild("BodyEffects")
-                    local koValue = bodyEffects and bodyEffects:FindFirstChild("K.O")
-
-                    -- TP gần target
-                    myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 5, 3)
-
-                    local spinConnection
-                    spinConnection = RunService.Heartbeat:Connect(function()
-                        if not autoKillEnabled then spinConnection:Disconnect() return end
-                        local angle = os.clock() * 10 -- Tốc độ xoay
-                        myRoot.CFrame = targetRoot.CFrame * CFrame.new(math.sin(angle) * 3, 2, math.cos(angle) * 3) * CFrame.lookAt(myRoot.Position, targetRoot.Position)
-                    end)
-
-                    while autoKillEnabled and IsValidTarget(closestTarget) and not (koValue and koValue.Value) do
-                        -- Aim vào head
-                        if targetHead then
-                            Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetHead.Position)
-                        end
-
-                        -- Bắn (click)
-                        click()
-                        task.wait(0.1) -- Fire rate giả định
-                    end
-
-                    spinConnection:Disconnect()
-
-                    -- Nếu KO, stomp nếu cần
-                    if koValue and koValue.Value then
-                        myRoot.CFrame = targetRoot.CFrame
-                        task.wait(0.2)
-                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-                        task.wait(0.1)
-                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-                    end
-                end
-
-                task.wait(0.5)
             end
-        end)
-    else
-        if autoKillLoop then
-            task.cancel(autoKillLoop)
-            autoKillLoop = nil
         end
+    end
+    return closest
+end
+
+-- =====================
+-- TẠO NÚT CSYNC + 2 NÚT CON
+-- =====================
+-- Frame chứa nút và ô input
+local csyncFrame = Instance.new("Frame")
+csyncFrame.Size = UDim2.new(1, -10, 0, 120) -- đủ cao để chứa 2 nút + 3 ô
+csyncFrame.BackgroundTransparency = 1
+csyncFrame.Parent = ButtonFrame1
+
+-- Nút Random
+CreateButton(csyncFrame, "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF"), function(btn)
+    Config.CsyncRandomEnabled = not Config.CsyncRandomEnabled
+    if Config.CsyncRandomEnabled then Config.CsyncOrbitEnabled = false end -- chỉ chọn 1 chế độ
+    btn.Text = "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF")
+    SaveSettings()
+end)
+
+-- Nút Orbit
+CreateButton(csyncFrame, "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF"), function(btn)
+    Config.CsyncOrbitEnabled = not Config.CsyncOrbitEnabled
+    if Config.CsyncOrbitEnabled then Config.CsyncRandomEnabled = false end -- chỉ chọn 1 chế độ
+    btn.Text = "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF")
+    SaveSettings()
+end)
+
+-- =====================
+-- 3 Ô TEXTBOX
+-- =====================
+local boxFrame = Instance.new("Frame")
+boxFrame.Size = UDim2.new(1, 0, 0, 25)
+boxFrame.Position = UDim2.new(0, 0, 0, 70) -- đặt dưới 2 nút
+boxFrame.BackgroundTransparency = 1
+boxFrame.Parent = csyncFrame
+
+local function createSmallBox(parent, placeholder, default, onChange)
+    local tb = Instance.new("TextBox")
+    tb.Size = UDim2.new(1/3 - 0.02, 0, 1, 0) -- chia đều 3 ô
+    tb.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    tb.TextColor3 = Color3.new(1, 1, 1)
+    tb.Text = tostring(default)
+    tb.PlaceholderText = placeholder
+    tb.ClearTextOnFocus = false
+    tb.Font = Enum.Font.GothamBold
+    tb.TextSize = 12
+    tb.Parent = parent
+    Instance.new("UICorner", tb).CornerRadius = UDim.new(0, 4)
+
+    tb.FocusLost:Connect(function()
+        local num = tonumber(tb.Text)
+        if num then
+            onChange(num)
+            SaveSettings()
+        else
+            tb.Text = tostring(default)
+        end
+    end)
+    return tb
+end
+
+-- Tạo 3 ô
+local radiusBox = createSmallBox(boxFrame, "Radius", Config.CsyncRadius, function(val)
+    Config.CsyncRadius = val
+end)
+radiusBox.Position = UDim2.new(0, 0, 0, 0)
+
+local heightBox = createSmallBox(boxFrame, "Height", Config.CsyncHeight, function(val)
+    Config.CsyncHeight = val
+end)
+heightBox.Position = UDim2.new(1/3, 5, 0, 0)
+
+local speedBox = createSmallBox(boxFrame, "Speed", Config.CsyncSpeed, function(val)
+    Config.CsyncSpeed = val
+end)
+speedBox.Position = UDim2.new(2/3, 10, 0, 0)
+
+-- =====================
+-- LOGIC CSYNC (Random / Orbit) từ catus
+-- =====================
+RunService.RenderStepped:Connect(function(dt)
+    local target = getClosestSelected()
+    if not target then return end
+    local thrp = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not thrp or not myHRP then return end
+
+    if Config.CsyncRandomEnabled then
+        -- Logic Random: di chuyển vị trí quanh target ngẫu nhiên
+        local angle = math.random() * math.pi * 2
+        local offset = Vector3.new(math.cos(angle) * Config.CsyncRadius, Config.CsyncHeight, math.sin(angle) * Config.CsyncRadius)
+        myHRP.CFrame = CFrame.new(thrp.Position + offset, thrp.Position)
+    elseif Config.CsyncOrbitEnabled then
+        -- Logic Orbit: quay vòng quanh target
+        local time = tick() * Config.CsyncSpeed
+        local offset = Vector3.new(math.cos(time) * Config.CsyncRadius, Config.CsyncHeight, math.sin(time) * Config.CsyncRadius)
+        myHRP.CFrame = CFrame.new(thrp.Position + offset, thrp.Position)
     end
 end)
 
