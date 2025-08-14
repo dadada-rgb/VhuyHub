@@ -556,10 +556,14 @@ PingBox.TextColor3 = Color3.fromRGB(0, 0, 0)
 PingBox.TextSize = 14
 PingBox.Font = Enum.Font.Gotham
 PingBox.PlaceholderText = "Ping (ms)"
-PingBox.Text = ""
-PingBox.ClearTextOnFocus = false
+PingBox.ClearTextOnFocus = true
 PingBox.Parent = MenuTitle
 Instance.new("UICorner", PingBox).CornerRadius = UDim.new(0, 6)
+
+-- Nếu config có sẵn giá trị ping thì áp dụng luôn và hiển thị
+if Config.CustomPing and tonumber(Config.CustomPing) then
+    PingBox.Text = tostring(Config.CustomPing)
+end
 
 PingBox:GetPropertyChangedSignal("Text"):Connect(function()
     local input = tonumber(PingBox.Text)
@@ -973,49 +977,6 @@ checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O Aimbot: OFF", functi
     SaveSettings()
 end)
 
-infiniteJumpButton = CreateButton(ButtonFrame1, "Infinite Jump: OFF", function()
-    Config.infiniteJumpEnabled = not Config.infiniteJumpEnabled
-    sendNotification("INFINITIEJUMP", Config.infiniteJumpEnabled and "ON" or "OFF")
-    infiniteJumpButton.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
-    SaveSettings()
-end)
-
--- JumpRequest chạy khi bấm Space (PC) hoặc nút nhảy mặc định (Mobile)
-UserInputService.JumpRequest:Connect(function()
-    if Config.infiniteJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
-    end
-end)
-
-local antiAfkEnabled = false
-local antiAfkLoop
-
-antiAfkButton = CreateButton(ButtonFrame1, "Anti AFK: OFF", function()
-    antiAfkEnabled = not antiAfkEnabled
-    antiAfkButton.Text = "Anti AFK: " .. (antiAfkEnabled and "ON" or "OFF")
-    sendNotification("ANTI AFK", antiAfkEnabled and "ON" or "OFF")
-
-    if antiAfkEnabled then
-        -- Vòng lặp tự nhảy mỗi 60 giây
-        antiAfkLoop = task.spawn(function()
-            while antiAfkEnabled do
-                task.wait(60) -- Đợi 60 giây
-                pcall(function()
-                    local hum = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                    if hum then
-                        hum:ChangeState(Enum.HumanoidStateType.Jumping)
-                    end
-                end)
-            end
-        end)
-    else
-        if antiAfkLoop then
-            task.cancel(antiAfkLoop)
-            antiAfkLoop = nil
-        end
-    end
-end)
-
 triggerBotButton = CreateButton(ButtonFrame1, "TriggerBot: " .. (tbEnabled and "ON" or "OFF"), function()
     tbEnabled = not tbEnabled
     sendNotification("TRIGGERBOT", tbEnabled and "ON" or "OFF")
@@ -1157,7 +1118,6 @@ customFovButton = CreateButton(ButtonFrame2Left, "Custom FOV: OFF", function()
     SaveSettings()
 end)
 
--- Ô nhập giá trị FOV
 local fovBox = Instance.new("TextBox")
 fovBox.Size = UDim2.new(1, -10, 0, 25)
 fovBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1165,18 +1125,65 @@ fovBox.BackgroundTransparency = 0.2
 fovBox.TextColor3 = Color3.fromRGB(0, 0, 0)
 fovBox.TextSize = 14
 fovBox.Font = Enum.Font.Gotham
-fovBox.PlaceholderText = "Nhập FOV (mặc định: "..defaultFov..")"
-fovBox.ClearTextOnFocus = false
+fovBox.PlaceholderText = tostring(defaultFov)
+fovBox.ClearTextOnFocus = true
 fovBox.Parent = ButtonFrame2Left
 Instance.new("UICorner", fovBox).CornerRadius = UDim.new(0, 6)
 
+-- Nếu config có sẵn giá trị FOV thì áp dụng luôn và hiển thị
+if Config.FOVValue and tonumber(Config.FOVValue) then
+    fovBox.Text = tostring(Config.FOVValue)
+    Workspace.CurrentCamera.FieldOfView = tonumber(Config.FOVValue)
+end
+
 fovBox:GetPropertyChangedSignal("Text"):Connect(function()
-    if customFovEnabled then
-        local num = tonumber(fovBox.Text)
-        if num and num >= 40 and num <= 120 then
-            Workspace.CurrentCamera.FieldOfView = num
-            sendNotification("Custom FOV", "Đã đặt FOV thành " .. num)
-            SaveSettings()
+    local num = tonumber(fovBox.Text)
+    if num and num >= 40 and num <= 120 then
+        Config.FOVValue = num
+        Workspace.CurrentCamera.FieldOfView = num
+        SaveSettings()
+    end
+end)
+
+infiniteJumpButton = CreateButton(ButtonFrame2Left, "Infinite Jump: OFF", function()
+    Config.infiniteJumpEnabled = not Config.infiniteJumpEnabled
+    sendNotification("INFINITIEJUMP", Config.infiniteJumpEnabled and "ON" or "OFF")
+    infiniteJumpButton.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
+    SaveSettings()
+end)
+
+-- JumpRequest chạy khi bấm Space (PC) hoặc nút nhảy mặc định (Mobile)
+UserInputService.JumpRequest:Connect(function()
+    if Config.infiniteJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+local antiAfkEnabled = false
+local antiAfkLoop
+
+antiAfkButton = CreateButton(ButtonFrame2Left, "Anti AFK: OFF", function()
+    antiAfkEnabled = not antiAfkEnabled
+    antiAfkButton.Text = "Anti AFK: " .. (antiAfkEnabled and "ON" or "OFF")
+    sendNotification("ANTI AFK", antiAfkEnabled and "ON" or "OFF")
+
+    if antiAfkEnabled then
+        -- Vòng lặp tự nhảy mỗi 60 giây
+        antiAfkLoop = task.spawn(function()
+            while antiAfkEnabled do
+                task.wait(60) -- Đợi 60 giây
+                pcall(function()
+                    local hum = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        hum:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end
+                end)
+            end
+        end)
+    else
+        if antiAfkLoop then
+            task.cancel(antiAfkLoop)
+            antiAfkLoop = nil
         end
     end
 end)
