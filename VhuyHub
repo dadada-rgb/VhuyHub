@@ -1010,36 +1010,30 @@ local function getKOSelected()
     return nil
 end
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
 local function stompTarget(target)
     local myChar = LocalPlayer.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
-    if not myHRP or not myHum then return end
+    if not myHRP then return end
 
     local lowerTorso = target.Character and target.Character:FindFirstChild("LowerTorso")
     if not lowerTorso then return end
 
     local oldCFrame = myHRP.CFrame
+    local mainEvent = ReplicatedStorage:FindFirstChild("MainEvent")
+    if not mainEvent then return end
 
-    -- Dừng mọi hành động
-    myHum:ChangeState(Enum.HumanoidStateType.Physics)
-
-    -- TP tới target
+    -- Teleport 1 frame ngay trên target
     myHRP.CFrame = lowerTorso.CFrame + Vector3.new(0, 2, 0)
+    RunService.Heartbeat:Wait()
 
-    -- Giả lập bấm E
-    keypress(Enum.KeyCode.E)
-    task.wait(0.05)
-    keyrelease(Enum.KeyCode.E)
+    -- Instant stomp (bỏ animation)
+    mainEvent:FireServer("Stomp")
 
-    -- Chờ 1.5 giây
-    task.wait(1.5)
-
-    -- Trả về vị trí cũ
+    -- Trả về vị trí cũ ngay lập tức
     myHRP.CFrame = oldCFrame
-
-    -- Cho phép cử động lại
-    myHum:ChangeState(Enum.HumanoidStateType.Running)
 end
 
 -- AutoStomp + Auto disable/enable AntiLock
@@ -1066,6 +1060,47 @@ RunService.Heartbeat:Connect(function()
             pausedAntiLock = false
         end
     end
+end)
+
+-- ======= CONFIG MẶC ĐỊNH =======
+Config.AutoShiftlockEnabled = Config.AutoShiftlockEnabled or false
+
+-- ======= NÚT AUTO SHIFTLOCK =======
+local autoShiftlockBtn = CreateButton(ButtonFrame1, "Auto Shiftlock: " .. (Config.AutoShiftlockEnabled and "ON" or "OFF"), function()
+    Config.AutoShiftlockEnabled = not Config.AutoShiftlockEnabled
+    autoShiftlockBtn.Text = "Auto Shiftlock: " .. (Config.AutoShiftlockEnabled and "ON" or "OFF")
+    sendNotification("Auto Shiftlock", Config.AutoShiftlockEnabled and "Enabled" or "Disabled")
+    SaveSettings()
+end)
+
+-- ======= LOGIC AUTO SHIFTLOCK =======
+local function applyShiftlock(state)
+    local playerModule = require(LocalPlayer.PlayerScripts:WaitForChild("PlayerModule"))
+    local camModule = playerModule:GetCameras()
+    if state then
+        -- Bật shiftlock
+        camModule:SetCameraMode(Enum.CameraMode.LockFirstPerson)
+        LocalPlayer.DevEnableMouseLock = true
+        LocalPlayer.DevMouseLock = true
+    else
+        -- Tắt shiftlock
+        camModule:SetCameraMode(Enum.CameraMode.Classic)
+        LocalPlayer.DevEnableMouseLock = false
+        LocalPlayer.DevMouseLock = false
+    end
+end
+
+-- Khi load game hoặc hồi sinh
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    if Config.AutoShiftlockEnabled then
+        applyShiftlock(true)
+    end
+end)
+
+-- Chạy ngay khi bật/tắt nút
+RunService.Heartbeat:Connect(function()
+    applyShiftlock(Config.AutoShiftlockEnabled)
 end)
 
 -- ==== CONFIG ====
@@ -1251,6 +1286,43 @@ LocalPlayer.CharacterAdded:Connect(function()
         local _, hum = getMyHumanoid()
         if hum then hum.AutoRotate = not Config.LookAtEnabled end
     end)
+end)
+
+-- ======= CONFIG MẶC ĐỊNH =======
+Config.AutoReloadEnabled = Config.AutoReloadEnabled or false
+
+-- ======= NÚT AUTO RELOAD =======
+local autoReloadButton = CreateButton(ButtonFrame1, "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF"), function()
+    Config.AutoReloadEnabled = not Config.AutoReloadEnabled
+    autoReloadButton.Text = "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF")
+    sendNotification("Auto Reload", Config.AutoReloadEnabled and "Enabled" or "Disabled")
+    SaveSettings()
+end)
+
+-- ======= LOGIC AUTO RELOAD (Bỏ animation) =======
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+if _G.__vhuyhub_autoreload_conn then
+    _G.__vhuyhub_autoreload_conn:Disconnect()
+end
+
+_G.__vhuyhub_autoreload_conn = RunService.Heartbeat:Connect(function()
+    if not Config.AutoReloadEnabled then return end
+
+    local char = LocalPlayer.Character
+    local tool = char and char:FindFirstChildOfClass("Tool")
+    if not tool then return end
+
+    -- Kiểm tra thuộc tính Ammo
+    local ammoVal = tool:FindFirstChild("Ammo") or tool:FindFirstChild("AmmoCount")
+    if ammoVal and ammoVal.Value <= 0 then
+        -- Gọi remote reload trực tiếp (không animation)
+        local mainEvent = ReplicatedStorage:FindFirstChild("MainEvent")
+        if mainEvent then
+            mainEvent:FireServer("Reload", tool)
+        end
+        task.wait(1) -- tránh spam
+    end
 end)
 
 triggerBotButton = CreateButton(ButtonFrame1, "TriggerBot: " .. (tbEnabled and "ON" or "OFF"), function()
