@@ -901,11 +901,126 @@ checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O Aimbot: OFF", functi
     SaveSettings()
 end)
 
+-- Thêm biến lưu vào config
+if Config.LookAtEnabled == nil then
+    Config.LookAtEnabled = false
+end
+
+local lastTargetName = nil
+
+-- Hàm tìm người gần nhất trong danh sách chọn
+local function getClosestSelected()
+    local closest, minDist = nil, math.huge
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return nil end
+
+    for name, selected in pairs(Config.SelectedPlayers) do
+        if selected then
+            local plr = Players:FindFirstChild(name)
+            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local dist = (myHRP.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+                if dist < minDist then
+                    closest = plr
+                    minDist = dist
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- Tạo nút bằng hàm có sẵn của vhuyhub
+CreateButton(ButtonFrame1, "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF"), function(btn)
+    Config.LookAtEnabled = not Config.LookAtEnabled
+    btn.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF")
+    SaveSettings()
+end)
+
+-- Logic xoay nhìn
+RunService.RenderStepped:Connect(function()
+    if Config.LookAtEnabled then
+        local target = getClosestSelected()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Character.HumanoidRootPart.Position)
+            if lastTargetName ~= target.Name then
+                lastTargetName = target.Name
+                sendNotification("Look At", "Đang nhìn: " .. target.Name)
+            end
+        end
+    else
+        lastTargetName = nil
+    end
+end)
+
 triggerBotButton = CreateButton(ButtonFrame1, "TriggerBot: " .. (tbEnabled and "ON" or "OFF"), function()
     tbEnabled = not tbEnabled
     sendNotification("TRIGGERBOT", tbEnabled and "ON" or "OFF")
     triggerBotButton.Text = "TriggerBot: " .. (tbEnabled and "ON" or "OFF")
     SaveSettings()
+end)
+
+-- Thêm vào Config
+if Config.MacroEnabled == nil then
+    Config.MacroEnabled = false
+end
+
+-- Macro Speed mặc định từ catus
+if Config.MacroSpeed == nil then
+    Config.MacroSpeed = 0.1
+end
+
+local MacroButtonUI = nil
+
+-- Hàm tạo nút macro ngoài GUI
+local function CreateMacroButton()
+    if MacroButtonUI then MacroButtonUI:Destroy() end
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "MacroButtonGui"
+    gui.ResetOnSpawn = false
+    gui.Parent = game.CoreGui -- ngoài GUI chính
+
+    local btn = Instance.new("ImageButton")
+    btn.Name = "MacroButton"
+    btn.Size = UDim2.new(0, 60, 0, 60)
+    btn.Position = UDim2.new(1, -70, 0.5, -30) -- góc phải giữa
+    btn.BackgroundTransparency = 1
+    btn.Image = "rbxassetid://126818107683779" -- icon từ catus
+    btn.Active = true
+    btn.Draggable = true
+    btn.Parent = gui
+
+    -- Toggle macro khi click
+    btn.MouseButton1Click:Connect(function()
+        Config.MacroEnabled = not Config.MacroEnabled
+        sendNotification("Macro", Config.MacroEnabled and "Macro ON" or "Macro OFF")
+        SaveSettings()
+    end)
+
+    MacroButtonUI = gui
+end
+
+-- Nút trong menu chính để bật/tắt macro UI
+CreateButton(ButtonFrame1, "Macro UI: " .. (Config.MacroEnabled and "ON" or "OFF"), function(btn)
+    if MacroButtonUI then
+        MacroButtonUI:Destroy()
+        MacroButtonUI = nil
+        Config.MacroEnabled = false
+    else
+        CreateMacroButton()
+    end
+    btn.Text = "Macro UI: " .. (MacroButtonUI and "ON" or "OFF")
+    SaveSettings()
+end)
+
+-- Logic macro từ catus
+RunService.RenderStepped:Connect(function()
+    if Config.MacroEnabled then
+        keypress(0x57) -- W key
+        task.wait(Config.MacroSpeed)
+        keyrelease(0x57)
+    end
 end)
 
 tpAndStompButton = CreateButton(ButtonFrame1, "TP Player", function()
