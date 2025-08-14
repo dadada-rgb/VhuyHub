@@ -183,6 +183,13 @@ local function ApplyConfigToGUI()
     flintTouchButton.Text = "FlintTouch: " .. (hiddenFling and "ON" or "OFF")
 end
 
+if Config.AntiLockEnabled then
+    getgenv().Desync = true
+end
+if Config.AntiLockType then
+    getgenv().AntiLockType = Config.AntiLockType
+end
+
 local autoSelect = false
 local tbEnabled = false
 local fovRadius = 20
