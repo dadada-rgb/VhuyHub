@@ -887,6 +887,76 @@ flyButton = CreateButton(ButtonFrame1, "Fly: OFF", function()
     SaveSettings()
 end)
 
+-- Config mặc định
+if Config.AutoStompEnabled == nil then Config.AutoStompEnabled = false end
+
+-- Nút AutoStomp
+CreateButton(ButtonFrame1, "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF"), function(btn)
+    Config.AutoStompEnabled = not Config.AutoStompEnabled
+    btn.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
+    notify("AutoStomp " .. (Config.AutoStompEnabled and "Enabled" or "Disabled"))
+    SaveSettings()
+end)
+
+-- Hàm tìm người chơi gần nhất trong danh sách chọn và đang bị KO
+local function getKOSelected()
+    for name, selected in pairs(Config.SelectedPlayers or {}) do
+        if selected then
+            local plr = Players:FindFirstChild(name)
+            if plr and plr.Character then
+                local hum = plr.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.Health <= 0 then
+                    return plr
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- Hàm stomp
+local function stompTarget(target)
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+    if not myHRP or not myHum then return end
+
+    local lowerTorso = target.Character and target.Character:FindFirstChild("LowerTorso")
+    if not lowerTorso then return end
+
+    -- Lưu vị trí cũ
+    local oldCFrame = myHRP.CFrame
+
+    -- Dừng mọi hành động
+    myHum:ChangeState(Enum.HumanoidStateType.Physics)
+
+    -- TP tới target
+    myHRP.CFrame = lowerTorso.CFrame + Vector3.new(0, 2, 0)
+
+    -- Giả lập bấm E
+    keypress(Enum.KeyCode.E)
+    task.wait(0.05)
+    keyrelease(Enum.KeyCode.E)
+
+    -- Chờ 1.5s
+    task.wait(1.5)
+
+    -- Trả về vị trí cũ
+    myHRP.CFrame = oldCFrame
+
+    -- Cho phép cử động lại
+    myHum:ChangeState(Enum.HumanoidStateType.Running)
+end
+
+-- Vòng lặp AutoStomp
+RunService.Heartbeat:Connect(function()
+    if not Config.AutoStompEnabled then return end
+    local target = getKOSelected()
+    if target then
+        stompTarget(target)
+    end
+end)
+
 aimbotButton = CreateButton(ButtonFrame1, "Aimbot: OFF", function()
     Config.AimbotEnabled = not Config.AimbotEnabled
     sendNotification("AIMBOT", Config.AimbotEnabled and "ON" or "OFF")
@@ -1346,6 +1416,59 @@ LocalPlayer.CharacterAdded:Connect(function()
     if Config.clickTpEnabled then
         task.wait(0.5) -- đợi nhân vật load
         giveClickTpTool()
+    end
+end)
+
+-- Config mặc định
+Config.AntiLockEnabled = Config.AntiLockEnabled or false
+Config.AntiLockType = Config.AntiLockType or "Behind"
+
+local antiLockModes = {"Behind","Down","ForWard","Left","One","Right","Up","Zero"}
+
+-- Nút AntiLock ON/OFF (trang 2 - right)
+CreateButton(ButtonFrame2Right, "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF"), function(btn)
+    Config.AntiLockEnabled = not Config.AntiLockEnabled
+    btn.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
+    notify("AntiLock " .. (Config.AntiLockEnabled and "Enabled" or "Disabled"))
+    SaveSettings()
+end)
+
+-- Dropdown chọn type (trang 2 - right)
+CreateDropdown(ButtonFrame2Right, "AntiLock Type", antiLockModes, Config.AntiLockType, function(choice)
+    Config.AntiLockType = choice
+    notify("AntiLock Type set to: " .. choice)
+    SaveSettings()
+end)
+
+-- Logic AntiLock (chuẩn catus)
+if _G.__vhuyhub_antilock_conn then
+    _G.__vhuyhub_antilock_conn:Disconnect()
+end
+
+_G.__vhuyhub_antilock_conn = RunService.Heartbeat:Connect(function()
+    if not Config.AntiLockEnabled then return end
+
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local dir = Vector3.new(0, 0, -1) -- default Behind
+    local t = Config.AntiLockType
+    if     t == "Behind"  then dir = Vector3.new(0,  0, -1)
+    elseif t == "Down"    then dir = Vector3.new(0, -1,  0)
+    elseif t == "ForWard" then dir = Vector3.new(0,  0,  1)
+    elseif t == "Left"    then dir = Vector3.new(-1, 0,  0)
+    elseif t == "One"     then dir = Vector3.new(1,  1,  1)
+    elseif t == "Right"   then dir = Vector3.new(1,  0,  0)
+    elseif t == "Up"      then dir = Vector3.new(0,  1,  0)
+    elseif t == "Zero"    then dir = Vector3.new(0,  0,  0)
+    end
+
+    local oldVel = hrp.Velocity
+    hrp.Velocity = dir * (2^16)
+    RunService.RenderStepped:Wait()
+    if hrp and hrp.Parent then
+        hrp.Velocity = oldVel
     end
 end)
 
