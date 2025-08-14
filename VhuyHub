@@ -1145,7 +1145,7 @@ local typeMenuVisible = false
 local typeButtons = {}
 
 -- Nút AntiLock ON/OFF
-CreateButton(Page1Frame, "AntiLock", function()
+CreateButton(ButtonFrame1, "AntiLock", function()
     getgenv().Desync = not getgenv().Desync
     Config.AntiLockEnabled = getgenv().Desync
     SaveSettings()
