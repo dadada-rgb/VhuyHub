@@ -63,7 +63,6 @@ local LocalPlayer = game:GetService("Players").LocalPlayer
 -- Tạo file config riêng cho mỗi người chơi
 local ConfigFile = "mygui_config_" .. LocalPlayer.UserId .. ".json"
 
--- Cấu trúc config mặc định
 local Config = {
     Buttons = {}, -- Lưu keybind + trạng thái của từng chức năng
     GuiPosition = {X = 0, Y = 0}, -- Vị trí GUI
@@ -81,7 +80,12 @@ local Config = {
     infiniteJumpEnabled = false,
     clickTpEnabled = false,
     checkKOAimbot = false,
-    CustomPing = nil
+    AutoStompEnabled = false,
+    CustomPing = nil,
+
+    -- AntiLock mặc định
+    AntiLockEnabled = false,
+    AntiLockType = "Behind"
 }
 
 -- Hàm lưu config
@@ -129,6 +133,16 @@ local noclipConnection = nil
 local autoKillEnabled = false
 local autoKillLoop = nil
 
+AntiLockDirections = {
+    Behind  = Vector3.new( 0,  0, -1),
+    Forward = Vector3.new( 0,  0,  1),
+    Left    = Vector3.new(-1,  0,  0),
+    Right   = Vector3.new( 1,  0,  0),
+    Up      = Vector3.new( 0,  1,  0),
+    Down    = Vector3.new( 0, -1,  0),
+    Zero    = Vector3.new( 0,  0,  0),
+    One     = Vector3.new( 1,  1,  1).Unit
+}
 
 -- Biến lưu trạng thái Lighting cũ cho Fullbright
 local oldLighting = {
@@ -901,315 +915,66 @@ checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O Aimbot: OFF", functi
     SaveSettings()
 end)
 
--- ============= Services & Base =============
-local Players        = game:GetService("Players")
-local RunService     = game:GetService("RunService")
-local Replicated     = game:GetService("ReplicatedStorage")
-local StarterGui     = game:GetService("StarterGui")
-local LocalPlayer    = Players.LocalPlayer
-local MainEvent      = Replicated:WaitForChild("MainEvent")
+-- =========================
+-- UI (ApplyGui)
+-- =========================
+CreateButton(ButtonFrame1, "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF"), function(btn)
+    Config.AntiLockEnabled = not Config.AntiLockEnabled
+    btn.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
+    notify("AntiLock " .. (Config.AntiLockEnabled and "Enabled" or "Disabled"))
+    SaveSettings()
+end)
 
--- ============= Config defaults =============
-Config.AntiLockEnabled   = Config.AntiLockEnabled   or false
-Config.AntiLockType      = Config.AntiLockType      or "Behind"
-Config.ResolverEnabled   = Config.ResolverEnabled   or false
-Config.ResolverOffset    = Config.ResolverOffset    or 3
-Config.TPBulletEnabled   = Config.TPBulletEnabled   or false
-Config.AutoStompEnabled  = Config.AutoStompEnabled  or false
+local modeBox = Instance.new("TextBox")
+modeBox.Size = UDim2.new(1, 0, 0, 20)
+modeBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+modeBox.TextColor3 = Color3.new(1, 1, 1)
+modeBox.Font = Enum.Font.GothamBold
+modeBox.TextSize = 12
+modeBox.ClearTextOnFocus = false
+modeBox.PlaceholderText = "Mode (Behind)"
+modeBox.Text = tostring(Config.AntiLockType)
+Instance.new("UICorner", modeBox).CornerRadius = UDim.new(0, 4)
+modeBox.Parent = ButtonFrame1
 
--- ============= Notify (đảm bảo hiện) =============
-local function notify(msg, dur)
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title = "VHuyHub",
-            Text  = tostring(msg),
-            Duration = dur or 2
-        })
-    end)
-end
-
--- ============= Utils =============
-local function myHRP()
-    local ch = LocalPlayer.Character
-    return ch and ch:FindFirstChild("HumanoidRootPart")
-end
-
-local function getNearestSelected()
-    local me = myHRP()
-    if not me then return nil end
-    local best, dmin = nil, math.huge
-    for name, sel in pairs(Config.SelectedPlayers or {}) do
-        if sel then
-            local plr = Players:FindFirstChild(name)
-            local hrp = plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local d = (hrp.Position - me.Position).Magnitude
-                if d < dmin then dmin, best = d, plr end
-            end
-        end
+modeBox.FocusLost:Connect(function()
+    if AntiLockDirections[modeBox.Text] then
+        Config.AntiLockType = modeBox.Text
+        notify("AntiLock mode set: " .. Config.AntiLockType)
+    else
+        notify("Invalid mode! Keeping: " .. Config.AntiLockType)
+        modeBox.Text = Config.AntiLockType
     end
-    return best
-end
+    SaveSettings()
+end)
 
--- =========================================
--- AntiLock (velocity spike) + UI chuẩn
--- =========================================
-local antiLockDirSelf = {
-    Behind  = Vector3.new( 0,  0, -1),
-    Forward = Vector3.new( 0,  0,  1),
-    Left    = Vector3.new(-1,  0,  0),
-    Right   = Vector3.new( 1,  0,  0),
-    Up      = Vector3.new( 0,  1,  0),
-    Down    = Vector3.new( 0, -1,  0),
-    Zero    = Vector3.new( 0,  0,  0),
-    One     = Vector3.new( 1,  1,  1).Unit
-}
-
-do
-    local btn = CreateButton(ButtonFrame1, "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF"), function(self)
-        Config.AntiLockEnabled = not Config.AntiLockEnabled
-        self.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
-        notify("AntiLock " .. (Config.AntiLockEnabled and "Enabled" or "Disabled"))
-        SaveSettings()
-    end)
-
-    local box = Instance.new("TextBox")
-    box.Size = UDim2.new(1, 0, 0, 20)
-    box.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    box.TextColor3 = Color3.new(1,1,1)
-    box.Font = Enum.Font.GothamBold
-    box.TextSize = 12
-    box.ClearTextOnFocus = false
-    box.PlaceholderText = "Mode (Behind/Forward/Left/Right/Up/Down/Zero/One)"
-    box.Text = tostring(Config.AntiLockType)
-    Instance.new("UICorner", box).CornerRadius = UDim.new(0,4)
-    box.Parent = ButtonFrame1
-
-    box.FocusLost:Connect(function()
-        if antiLockDirSelf[box.Text] then
-            Config.AntiLockType = box.Text
-            notify("AntiLock mode: " .. Config.AntiLockType)
-            SaveSettings()
-        else
-            notify("Invalid mode, keeping: " .. Config.AntiLockType)
-            box.Text = Config.AntiLockType
-        end
-    end)
-end
-
-if _G.VHUB_AL_CONN then _G.VHUB_AL_CONN:Disconnect() end
-_G.VHUB_AL_CONN = RunService.Heartbeat:Connect(function()
+-- =========================
+-- Logic (Heartbeat)
+-- =========================
+if _G.VHUB_AntiLockConn then _G.VHUB_AntiLockConn:Disconnect() end
+_G.VHUB_AntiLockConn = game:GetService("RunService").Heartbeat:Connect(function()
     if not Config.AntiLockEnabled then return end
-    local hrp = myHRP(); if not hrp then return end
-    local dir = antiLockDirSelf[Config.AntiLockType] or antiLockDirSelf.Behind
-    local old = hrp.Velocity
+
+    local char = game.Players.LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local dir = AntiLockDirections[Config.AntiLockType] or AntiLockDirections.Behind
+    local oldVel = hrp.Velocity
     hrp.Velocity = dir * (2^16)
-    RunService.RenderStepped:Wait()
+    game:GetService("RunService").RenderStepped:Wait()
     if hrp and hrp.Parent then
-        hrp.Velocity = old
+        hrp.Velocity = oldVel
     end
 end)
 
--- =========================================
--- Resolver (chuẩn Catus – dùng trục CFrame của TARGET)
--- + TP Bullet (KHÔNG hook): UpdateMousePos liên tục
--- =========================================
-local function resolvedPosByTarget(target)
-    if not target then return nil end
-    local thrp = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
-    if not thrp then return nil end
-
-    if not Config.ResolverEnabled then
-        return thrp.Position
-    end
-
-    -- Hướng theo CFrame của target (chuẩn Catus)
-    local c = thrp.CFrame
-    local dir = -c.LookVector  -- Behind default
-    local t = Config.AntiLockType
-    if     t == "Forward" then dir =  c.LookVector
-    elseif t == "Left"    then dir = -c.RightVector
-    elseif t == "Right"   then dir =  c.RightVector
-    elseif t == "Up"      then dir =  c.UpVector
-    elseif t == "Down"    then dir = -c.UpVector
-    elseif t == "Zero"    then dir =  Vector3.new(0,0,0)
-    elseif t == "One"     then dir = (c.LookVector + c.UpVector + c.RightVector).Unit
-    end
-    return thrp.Position + (dir * (tonumber(Config.ResolverOffset) or 3))
-end
-
-do
-    local btn = CreateButton(ButtonFrame1, "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF"), function(self)
-        Config.ResolverEnabled = not Config.ResolverEnabled
-        self.Text = "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF")
-        notify("Resolver " .. (Config.ResolverEnabled and "Enabled" or "Disabled"))
-        SaveSettings()
-    end)
-
-    local box = Instance.new("TextBox")
-    box.Size = UDim2.new(1, 0, 0, 20)
-    box.BackgroundColor3 = Color3.fromRGB(40,40,40)
-    box.TextColor3 = Color3.new(1,1,1)
-    box.Font = Enum.Font.GothamBold
-    box.TextSize = 12
-    box.ClearTextOnFocus = false
-    box.PlaceholderText = "Resolver Offset (default 3)"
-    box.Text = tostring(Config.ResolverOffset)
-    Instance.new("UICorner", box).CornerRadius = UDim.new(0,4)
-    box.Parent = ButtonFrame1
-
-    box.FocusLost:Connect(function()
-        local n = tonumber(box.Text)
-        if n then
-            Config.ResolverOffset = n
-            notify("Resolver offset: "..n)
-            SaveSettings()
-        else
-            notify("Invalid offset")
-            box.Text = tostring(Config.ResolverOffset)
-        end
-    end)
-end
-
-do
-    local btn = CreateButton(ButtonFrame1, "TP Bullet: " .. (Config.TPBulletEnabled and "ON" or "OFF"), function(self)
-        Config.TPBulletEnabled = not Config.TPBulletEnabled
-        self.Text = "TP Bullet: " .. (Config.TPBulletEnabled and "ON" or "OFF")
-        notify("TP Bullet " .. (Config.TPBulletEnabled and "Enabled" or "Disabled"))
-        SaveSettings()
-    end)
-
-    -- Loop: liên tục cập nhật UpdateMousePos tới vị trí đã resolve của target gần nhất trong danh sách
-    if _G.VHUB_TP_LOOP then _G.VHUB_TP_LOOP:Disconnect() end
-    _G.VHUB_TP_LOOP = RunService.Heartbeat:Connect(function(dt)
-        if not Config.TPBulletEnabled then return end
-        local target = getNearestSelected()
-        local aimPos = resolvedPosByTarget(target)
-        if aimPos then
-            -- Không hook: chỉ cập nhật MousePos. Khi bạn bắn bình thường, server dùng pos này.
-            pcall(function()
-                MainEvent:FireServer("UpdateMousePos", aimPos)
-            end)
-        end
-    end)
-end
-
--- =========================================
--- AutoStomp (fix không văng/không nằm ngang) + UI
--- =========================================
-local function isKO(plr)
-    local ch = plr.Character
-    if not ch then return false end
-    local be = ch:FindFirstChild("BodyEffects")
-    local ko = be and be:FindChild("K.O") or be and be:FindFirstChild("K.O")
-    return ko and ko.Value == true
-end
-
-local function getKOSelected()
-    for name, sel in pairs(Config.SelectedPlayers or {}) do
-        if sel then
-            local p = Players:FindFirstChild(name)
-            if p and isKO(p) then return p end
-        end
-    end
-    return nil
-end
-
-local function stompOnce(target)
-    local myChar = LocalPlayer.Character
-    local hrp   = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    local hum   = myChar and myChar:FindFirstChildOfClass("Humanoid")
-    if not hrp or not hum then return end
-
-    local lower = target.Character and target.Character:FindFirstChild("LowerTorso")
-    if not lower then return end
-
-    local oldCF = hrp.CFrame
-    local oldAR = hum.AutoRotate
-
-    -- Giữ hướng đứng (không Physics để khỏi “nằm ngang”)
-    hum.AutoRotate = false
-    hrp.AssemblyLinearVelocity = Vector3.new()
-    hrp.AssemblyAngularVelocity = Vector3.new()
-
-    -- TP đứng thẳng ngay trên LowerTorso, nhìn theo hướng cũ
-    local lookDir = oldCF.LookVector
-    local destPos = lower.Position + Vector3.new(0, 2.1, 0)
-    hrp.CFrame = CFrame.new(destPos, destPos + lookDir)
-    hrp.AssemblyLinearVelocity = Vector3.new()
-
-    -- Nhấn E
-    local function pressE()
-        if keypress then
-            keypress(Enum.KeyCode.E); task.wait(0.06); keyrelease(Enum.KeyCode.E)
-        else
-            local VIM = game:GetService("VirtualInputManager")
-            VIM:SendKeyEvent(true,  Enum.KeyCode.E, false, game)
-            task.wait(0.06)
-            VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-        end
-    end
-    pressE()
-
-    -- Chờ ngắn, giữ đứng thẳng
-    task.wait(0.2)
-    hrp.AssemblyLinearVelocity = Vector3.new()
-
-    -- Đợi đủ stomp (1.5s)
-    task.wait(1.3)
-
-    -- Trả về
-    hrp.CFrame = oldCF
-    hum.AutoRotate = oldAR
-end
-
-do
-    local btn = CreateButton(ButtonFrame1, "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF"), function(self)
-        Config.AutoStompEnabled = not Config.AutoStompEnabled
-        self.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
-        notify("AutoStomp " .. (Config.AutoStompEnabled and "Enabled" or "Disabled"))
-        SaveSettings()
-    end)
-
-    if _G.VHUB_STOMP_CONN then _G.VHUB_STOMP_CONN:Disconnect() end
-    _G.VHUB_STOMP_CONN = RunService.Heartbeat:Connect(function()
-        if not Config.AutoStompEnabled then return end
-        local t = getKOSelected()
-        if t then stompOnce(t) end
-    end)
-end
-
--- ==== CONFIG ====
-if Config.LookAtEnabled == nil then Config.LookAtEnabled = false end
-
--- ==== UTILS ====
-local function getMyHumanoid()
-    local char = LocalPlayer.Character
-    if not char then return nil,nil,nil end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    return char, hum, hrp
-end
-
-local function getClosestSelected()
-    local _, _, myHRP = getMyHumanoid()
-    if not myHRP then return nil end
-    local myPos = myHRP.Position
-    local closest, dmin = nil, math.huge
-
-    for name, selected in pairs(Config.SelectedPlayers or {}) do
-        if selected then
-            local plr = Players:FindFirstChild(name)
-            local chr = plr and plr.Character
-            local thrp = chr and chr:FindFirstChild("HumanoidRootPart")
-            if thrp then
-                local d = (myPos - thrp.Position).Magnitude
-                if d < dmin then closest, dmin = plr, d end
-            end
-        end
-    end
-    return closest
-end
+-- Nút AutoStomp
+CreateButton(ButtonFrame1, "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF"), function(btn)
+    Config.AutoStompEnabled = not Config.AutoStompEnabled
+    btn.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
+    notify("AutoStomp " .. (Config.AutoStompEnabled and "Enabled" or "Disabled"))
+    SaveSettings()
+end)
 
 -- ==== NÚT LOOK AT (dùng CreateButton) ====
 local lookAtBtnRef
@@ -2128,5 +1893,53 @@ task.spawn(function()
     while true do
         UpdatePlayerList()
         task.wait(math.random(12, 15))
+    end
+end)
+
+if _G.VHUB_AutoStompConn then _G.VHUB_AutoStompConn:Disconnect() end
+_G.VHUB_AutoStompConn = game:GetService("RunService").Heartbeat:Connect(function()
+    if not Config.AutoStompEnabled then return end
+
+    local target
+    local myChar = game.Players.LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return end
+
+    -- Tìm target từ danh sách gần nhất
+    local minDist
+    for name, selected in pairs(Config.SelectedPlayers or {}) do
+        if selected then
+            local plr = game.Players:FindFirstChild(name)
+            local hrp = plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+            local koVal = plr and plr.Character and plr.Character:FindFirstChild("BodyEffects") and plr.Character.BodyEffects:FindFirstChild("K.O")
+            if hrp and koVal and koVal.Value == true then
+                local dist = (myHRP.Position - hrp.Position).Magnitude
+                if not minDist or dist < minDist then
+                    minDist = dist
+                    target = plr
+                end
+            end
+        end
+    end
+
+    if target then
+        -- Lưu vị trí ban đầu
+        local oldPos = myHRP.CFrame
+        local torso = target.Character:FindFirstChild("LowerTorso")
+        if torso then
+            -- Dịch chuyển tới target
+            myHRP.CFrame = torso.CFrame + Vector3.new(0, 1, 0)
+
+            -- Giả lập bấm E
+            game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            task.wait(0.05)
+            game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
+
+            -- Đợi stomp xong
+            task.wait(1.5)
+
+            -- Quay lại vị trí cũ
+            myHRP.CFrame = oldPos
+        end
     end
 end)
