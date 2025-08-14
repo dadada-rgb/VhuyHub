@@ -1175,6 +1175,45 @@ local typeMenuVisible = false
 local typeButtons = {}
 local AntiLockTypes = {"Behind", "Down", "ForWard", "Left", "One", "Right", "Up", "Zero"}
 
+-- Nút AntiLock ON/OFF
+local AntiLockBtn = Instance.new("TextButton")
+AntiLockBtn.Size = UDim2.new(0, 200, 0, 30)
+AntiLockBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+AntiLockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AntiLockBtn.Font = Enum.Font.SourceSans
+AntiLockBtn.TextSize = 20
+AntiLockBtn.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
+AntiLockBtn.Parent = ButtonFrame1
+
+AntiLockBtn.MouseButton1Click:Connect(function()
+    getgenv().Desync = not getgenv().Desync
+    Config.AntiLockEnabled = getgenv().Desync
+    AntiLockBtn.Text = "AntiLock: " .. (getgenv().Desync and "ON" or "OFF")
+    SaveSettings()
+
+    -- Thông báo khi bật/tắt
+    if getgenv().Desync then
+        Notify("AntiLock Enabled", 2) -- 2 giây
+    else
+        Notify("AntiLock Disabled", 2)
+    end
+end)
+
+-- Nút AntiLock Type (nút con)
+local AntiLockTypeBtn = Instance.new("TextButton")
+AntiLockTypeBtn.Size = UDim2.new(0, 200, 0, 25)
+AntiLockTypeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+AntiLockTypeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+AntiLockTypeBtn.Font = Enum.Font.SourceSans
+AntiLockTypeBtn.TextSize = 18
+AntiLockTypeBtn.Text = "AntiLock Type: " .. (Config.AntiLockType or "Behind")
+AntiLockTypeBtn.Position = UDim2.new(0, 0, 0, AntiLockBtn.Position.Y.Offset + 35)
+AntiLockTypeBtn.Parent = ButtonFrame1
+
+local typeMenuVisible = false
+local typeButtons = {}
+local AntiLockTypes = {"Behind", "Down", "ForWard", "Left", "One", "Right", "Up", "Zero"}
+
 AntiLockTypeBtn.MouseButton1Click:Connect(function()
     typeMenuVisible = not typeMenuVisible
     if typeMenuVisible then
@@ -1195,6 +1234,7 @@ AntiLockTypeBtn.MouseButton1Click:Connect(function()
                 Config.AntiLockType = t
                 AntiLockTypeBtn.Text = "AntiLock Type: " .. t
                 SaveSettings()
+                Notify("AntiLock Type set to: " .. t, 2)
                 -- Đóng menu
                 for _, b in ipairs(typeButtons) do b:Destroy() end
                 typeButtons = {}
