@@ -915,8 +915,7 @@ local antiLockModes = {
     Up = true, Zero = true
 }
 
--- ======= NÚT ANTILOCK =======
-local antiLockButton = CreateButton(ButtonFrame1, "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF"), function()
+antiLockButton = CreateButton(ButtonFrame1, "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF"), function()
     Config.AntiLockEnabled = not Config.AntiLockEnabled
     antiLockButton.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
     sendNotification("AntiLock", Config.AntiLockEnabled and "Enabled" or "Disabled")
@@ -983,8 +982,7 @@ _G.__vhuyhub_antilock_conn = RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ======= NÚT AUTOSTOMP =======
-local autoStompButton = CreateButton(ButtonFrame1, "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF"), function()
+autoStompButton = CreateButton(ButtonFrame1, "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF"), function()
     Config.AutoStompEnabled = not Config.AutoStompEnabled
     autoStompButton.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
     sendNotification("AutoStomp", Config.AutoStompEnabled and "Enabled" or "Disabled")
@@ -1065,45 +1063,69 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ======= CONFIG MẶC ĐỊNH =======
-Config.AutoShiftlockEnabled = Config.AutoShiftlockEnabled or false
+-- ==== CONFIG ====
+Config.AutoShiftLockEnabled = Config.AutoShiftLockEnabled or false
 
--- ======= NÚT AUTO SHIFTLOCK =======
-local autoShiftlockBtn = CreateButton(ButtonFrame1, "Auto Shiftlock: " .. (Config.AutoShiftlockEnabled and "ON" or "OFF"), function()
-    Config.AutoShiftlockEnabled = not Config.AutoShiftlockEnabled
-    autoShiftlockBtn.Text = "Auto Shiftlock: " .. (Config.AutoShiftlockEnabled and "ON" or "OFF")
-    sendNotification("Auto Shiftlock", Config.AutoShiftlockEnabled and "Enabled" or "Disabled")
+-- ==== NÚT AUTO SHIFTLOCK ====
+autoShiftLockButton = CreateButton(ButtonFrame1, "AutoShiftLock: " .. (Config.AutoShiftLockEnabled and "ON" or "OFF"), function()
+    Config.AutoShiftLockEnabled = not Config.AutoShiftLockEnabled
+    autoShiftLockButton.Text = "AutoShiftLock: " .. (Config.AutoShiftLockEnabled and "ON" or "OFF")
+    sendNotification("AutoShiftLock", Config.AutoShiftLockEnabled and "Enabled" or "Disabled")
     SaveSettings()
 end)
 
--- ======= LOGIC AUTO SHIFTLOCK =======
-local function applyShiftlock(state)
-    local playerModule = require(LocalPlayer.PlayerScripts:WaitForChild("PlayerModule"))
-    local camModule = playerModule:GetCameras()
-    if state then
-        -- Bật shiftlock
-        camModule:SetCameraMode(Enum.CameraMode.LockFirstPerson)
-        LocalPlayer.DevEnableMouseLock = true
-        LocalPlayer.DevMouseLock = true
-    else
-        -- Tắt shiftlock
-        camModule:SetCameraMode(Enum.CameraMode.Classic)
-        LocalPlayer.DevEnableMouseLock = false
-        LocalPlayer.DevMouseLock = false
+-- ==== LOGIC AUTO SHIFTLOCK ====
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local function enableShiftLock()
+    -- Ép bật chế độ ShiftLock
+    LocalPlayer.DevEnableMouseLock = true
+    LocalPlayer.DevComputerCameraMode = Enum.DevComputerCameraMovementMode.LockFirstPerson
+
+    -- Ép hiện crosshair
+    local gui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if gui then
+        local crosshair = gui:FindFirstChild("Crosshair", true)
+        if crosshair and crosshair:IsA("GuiObject") then
+            crosshair.Visible = true
+        else
+            -- Tạo crosshair custom nếu game không có
+            if not gui:FindFirstChild("VHUB_Crosshair") then
+                local frame = Instance.new("Frame")
+                frame.Name = "VHUB_Crosshair"
+                frame.Size = UDim2.new(0, 4, 0, 4)
+                frame.Position = UDim2.new(0.5, -2, 0.5, -2)
+                frame.BackgroundColor3 = Color3.new(1, 1, 1)
+                frame.BorderSizePixel = 0
+                frame.Parent = gui
+            end
+        end
     end
 end
 
--- Khi load game hoặc hồi sinh
-LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(1)
-    if Config.AutoShiftlockEnabled then
-        applyShiftlock(true)
+-- Loop giữ trạng thái AutoShiftLock
+if _G.__vhuyhub_shiftlock then
+    _G.__vhuyhub_shiftlock:Disconnect()
+end
+
+_G.__vhuyhub_shiftlock = RunService.Heartbeat:Connect(function()
+    if Config.AutoShiftLockEnabled then
+        pcall(enableShiftLock)
     end
 end)
 
--- Chạy ngay khi bật/tắt nút
+-- Trả camera về mặc định khi tắt
+local function disableShiftLock()
+    LocalPlayer.DevComputerCameraMode = Enum.DevComputerCameraMovementMode.Follow
+end
+
+-- Theo dõi khi tắt AutoShiftLock
 RunService.Heartbeat:Connect(function()
-    applyShiftlock(Config.AutoShiftlockEnabled)
+    if not Config.AutoShiftLockEnabled then
+        disableShiftLock()
+    end
 end)
 
 -- ==== CONFIG ====
@@ -1143,7 +1165,7 @@ Config.ResolverEnabled = Config.ResolverEnabled or false
 Config.ResolverPrediction = Config.ResolverPrediction or 0.15
 
 -- ======= NÚT RESOLVER =======
-local resolverButton = CreateButton(ButtonFrame1, "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF"), function()
+resolverButton = CreateButton(ButtonFrame1, "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF"), function()
     Config.ResolverEnabled = not Config.ResolverEnabled
     resolverButton.Text = "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF")
     sendNotification("Resolver", Config.ResolverEnabled and "Enabled" or "Disabled")
@@ -1291,28 +1313,6 @@ LocalPlayer.CharacterAdded:Connect(function()
     end)
 end)
 
-do
-    local mt = getrawmetatable(game)
-    setreadonly(mt, false)
-    local oldNamecall = mt.__namecall
-
-    mt.__namecall = newcclosure(function(self, ...)
-        local args = {...}
-        local method = getnamecallmethod()
-
-        if Config.LookAtEnabled and method == "FireServer" and tostring(self) == "MainEvent" and args[1] == "Shoot" then
-            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local dir = hrp.CFrame.LookVector * 1000
-                args[2] = hrp.Position + dir
-            end
-            return oldNamecall(self, unpack(args))
-        end
-
-        return oldNamecall(self, ...)
-    end)
-end
-
 -- ======= CONFIG MẶC ĐỊNH =======
 Config.AutoReloadEnabled = Config.AutoReloadEnabled or false
 
@@ -1418,7 +1418,7 @@ local function getClosestSelected()
 end
 
 -- Nút Random
-local csyncRandomButton = CreateButton(ButtonFrame1, "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF"), function()
+csyncRandomButton = CreateButton(ButtonFrame1, "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF"), function()
     Config.CsyncRandomEnabled = not Config.CsyncRandomEnabled
     csyncRandomButton.Text = "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF")
     sendNotification("Csync Random", Config.CsyncRandomEnabled and "Enabled" or "Disabled")
@@ -1426,7 +1426,7 @@ local csyncRandomButton = CreateButton(ButtonFrame1, "Csync Random: " .. (Config
 end)
 
 -- Nút Orbit
-local csyncOrbitButton = CreateButton(ButtonFrame1, "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF"), function()
+csyncOrbitButton = CreateButton(ButtonFrame1, "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF"), function()
     Config.CsyncOrbitEnabled = not Config.CsyncOrbitEnabled
     csyncOrbitButton.Text = "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF")
     sendNotification("Csync Orbit", Config.CsyncOrbitEnabled and "Enabled" or "Disabled")
