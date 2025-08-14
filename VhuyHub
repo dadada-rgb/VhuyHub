@@ -81,6 +81,7 @@ local Config = {
     infiniteJumpEnabled = false,
     clickTpEnabled = false,
     checkKOAimbot = false,
+    LookAtEnabled = false,
     CustomPing = nil
 }
 
@@ -1019,6 +1020,34 @@ checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O Aimbot: OFF", functi
     sendNotification("CHECK K.O AIMBOT", Config.checkKOAimbot and "ON" or "OFF")
     checkKOAimbotButton.Text = "Check K.O Aimbot: " .. (Config.checkKOAimbot and "ON" or "OFF")
     SaveSettings()
+end)
+
+local lookAtBtn -- để có thể đổi text sau khi tạo nút
+
+lookAtBtn = CreateButton(ButtonFrame1, "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF"), function()
+    Config.LookAtEnabled = not Config.LookAtEnabled
+    lookAtBtn.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF") -- cập nhật nút
+    SaveSettings()
+
+    if Config.LookAtEnabled then
+        Notify("Look At Enabled", 2)
+        task.spawn(function()
+            while Config.LookAtEnabled do
+                task.wait()
+                local targetName = Config.SelectedPlayers[1] -- lấy người đầu tiên trong danh sách
+                local target = targetName and game.Players:FindFirstChild(targetName)
+                if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+                and game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    
+                    local myHRP = game.Players.LocalPlayer.Character.HumanoidRootPart
+                    local targetHRP = target.Character.HumanoidRootPart
+                    myHRP.CFrame = CFrame.new(myHRP.Position, Vector3.new(targetHRP.Position.X, myHRP.Position.Y, targetHRP.Position.Z))
+                end
+            end
+        end)
+    else
+        Notify("Look At Disabled", 2)
+    end
 end)
 
 triggerBotButton = CreateButton(ButtonFrame1, "TriggerBot: " .. (tbEnabled and "ON" or "OFF"), function()
