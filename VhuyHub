@@ -778,100 +778,109 @@ Btn3.MouseButton1Click:Connect(function()
     ShowPage(3)
 end)
 
+local UserInputService = game:GetService("UserInputService")
+
 local function CreateButton(parent, name, callback)
-    local buttonFrame = Instance.new("Frame")
-    buttonFrame.Size = UDim2.new(1, -10, 0, 30)
-    buttonFrame.BackgroundTransparency = 1
-    buttonFrame.Parent = parent
-
+    -- Tạo nút trong menu
     local button = Instance.new("TextButton")
-    button.Size = UDim2.new(0.7, -5, 1, 0)
-    button.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-    button.BackgroundTransparency = 0.2
-    button.TextColor3 = Color3.fromRGB(0, 0, 0)
-    button.TextSize = 14
-    button.Font = Enum.Font.Gotham
+    button.Size = UDim2.new(1, 0, 0, 25)
+    button.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    button.TextColor3 = Color3.new(1, 1, 1)
+    button.Font = Enum.Font.GothamBold
+    button.TextSize = 12
     button.Text = name
-    button.Parent = buttonFrame
-    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
-    animateButton(button)
-    button.MouseButton1Click:Connect(callback)
+    button.Parent = parent
+    Instance.new("UICorner", button).CornerRadius = UDim.new(0, 4)
 
+    -- Ô nhập keybind
     local keyBox = Instance.new("TextBox")
-    keyBox.Size = UDim2.new(0.3, 0, 1, 0)
-    keyBox.Position = UDim2.new(0.7, 5, 0, 0)
-    keyBox.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
-    keyBox.PlaceholderText = "Key"
-    keyBox.Text = ""
-    keyBox.TextColor3 = Color3.fromRGB(0, 0, 0)
-    keyBox.TextSize = 14
+    keyBox.Size = UDim2.new(0, 60, 1, 0)
+    keyBox.Position = UDim2.new(1, -65, 0, 0)
+    keyBox.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    keyBox.TextColor3 = Color3.new(1, 1, 1)
     keyBox.Font = Enum.Font.Gotham
+    keyBox.TextSize = 12
     keyBox.ClearTextOnFocus = false
-    keyBox.Parent = buttonFrame
-    Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 6)
+    keyBox.PlaceholderText = "Key"
+    keyBox.Parent = button
+    Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 4)
 
+    -- Khi bấm nút trong menu
+    button.MouseButton1Click:Connect(function()
+        callback(button) -- Truyền chính nút vào callback
+    end)
+
+    -- Khi thay đổi text trong ô keybind
     keyBox:GetPropertyChangedSignal("Text"):Connect(function()
         local text = keyBox.Text:lower()
 
         if text == "button" then
-            -- Tạo ScreenGui riêng ngoài menu
-            local screenGui = Instance.new("ScreenGui")
-            screenGui.IgnoreGuiInset = true
-            screenGui.ResetOnSpawn = false
-            screenGui.Parent = game:GetService("CoreGui")
+            -- Tìm xem đã có nút ngoài menu chưa
+            local existingGui = game.CoreGui:FindFirstChild(name .. "_KeyButtonGui")
+            local screenGui, screenBtn
 
-            -- Tạo nút giống Show/Hide
-            local screenBtn = Instance.new("TextButton")
-            screenBtn.Size = UDim2.new(0, 70, 0, 30)
-            screenBtn.Position = UDim2.new(0, 100, 0, 300)
-            screenBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 255)
-            screenBtn.Text = name
-            screenBtn.TextColor3 = Color3.new(0, 0, 0)
-            screenBtn.TextSize = 10
-            screenBtn.Font = Enum.Font.GothamBold
-            screenBtn.Parent = screenGui
-            Instance.new("UICorner", screenBtn).CornerRadius = UDim.new(0, 6)
+            if existingGui then
+                screenGui = existingGui
+                screenBtn = screenGui:FindFirstChild(name .. "_KeyButton")
+            else
+                -- Tạo ScreenGui ngoài menu
+                screenGui = Instance.new("ScreenGui")
+                screenGui.Name = name .. "_KeyButtonGui"
+                screenGui.IgnoreGuiInset = true
+                screenGui.ResetOnSpawn = false
+                screenGui.Parent = game:GetService("CoreGui")
 
-            -- Kéo di chuyển
-            local dragging = false
-            local dragStart, startPos
-            screenBtn.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    dragging = true
-                    dragStart = input.Position
-                    startPos = screenBtn.Position
-                    input.Changed:Connect(function()
-                        if input.UserInputState == Enum.UserInputState.End then
-                            dragging = false
-                        end
-                    end)
-                end
-            end)
-            UserInputService.InputChanged:Connect(function(input)
-                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                    local delta = input.Position - dragStart
-                    screenBtn.Position = UDim2.new(
-                        startPos.X.Scale, startPos.X.Offset + delta.X,
-                        startPos.Y.Scale, startPos.Y.Offset + delta.Y
-                    )
-                end
-            end)
+                -- Tạo nút ngoài menu
+                screenBtn = Instance.new("TextButton")
+                screenBtn.Name = name .. "_KeyButton"
+                screenBtn.Size = UDim2.new(0, 70, 0, 30)
+                screenBtn.Position = UDim2.new(0, 100, 0, 300)
+                screenBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 255)
+                screenBtn.Text = name
+                screenBtn.TextColor3 = Color3.new(0, 0, 0)
+                screenBtn.TextSize = 10
+                screenBtn.Font = Enum.Font.GothamBold
+                screenBtn.Parent = screenGui
+                Instance.new("UICorner", screenBtn).CornerRadius = UDim.new(0, 6)
 
-            -- Bấm => chạy đúng callback
+                -- Kéo di chuyển nút
+                local dragging = false
+                local dragStart, startPos
+                screenBtn.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        dragging = true
+                        dragStart = input.Position
+                        startPos = screenBtn.Position
+                        input.Changed:Connect(function()
+                            if input.UserInputState == Enum.UserInputState.End then
+                                dragging = false
+                            end
+                        end)
+                    end
+                end)
+                UserInputService.InputChanged:Connect(function(input)
+                    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                        local delta = input.Position - dragStart
+                        screenBtn.Position = UDim2.new(
+                            startPos.X.Scale, startPos.X.Offset + delta.X,
+                            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                        )
+                    end
+                end)
+            end
+
+            -- Khi bấm nút ngoài menu → chạy callback
             screenBtn.MouseButton1Click:Connect(function()
-                callback()
+                callback(screenBtn)
             end)
-
-            -- Chết thì mất
-            
 
         else
-            -- Bind phím (không phân biệt hoa/thường)
+            -- Bind phím
             local keyName = text:upper()
             if Enum.KeyCode[keyName] then
                 UserInputService.InputBegan:Connect(function(input, gp)
                     if not gp and input.KeyCode.Name:upper() == keyName then
-                        callback()
+                        callback(button)
                     end
                 end)
             end
@@ -1074,23 +1083,8 @@ tpAndStompButton = CreateButton(ButtonFrame1, "TP Player", function()
     end
 end)
 
--- Config mặc định
-if Config.CsyncRandomEnabled == nil then Config.CsyncRandomEnabled = false end
-if Config.CsyncOrbitEnabled == nil then Config.CsyncOrbitEnabled = false end
-if Config.CsyncRadius == nil then Config.CsyncRadius = 10 end
-if Config.CsyncHeight == nil then Config.CsyncHeight = 5 end
-if Config.CsyncSpeed == nil then Config.CsyncSpeed = 2 end
-
--- Hàm check K.O
-local function isKO(plr)
-    local char = plr and plr.Character
-    local be = char and char:FindFirstChild("BodyEffects")
-    local ko = be and be:FindFirstChild("K.O")
-    return ko and ko.Value
-end
-
 -- Hàm tìm target gần nhất
-local function getClosestSelected()
+local function getClosestSelectedPlayer()
     local myChar = LocalPlayer.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
     if not myHRP then return nil end
@@ -1903,7 +1897,7 @@ CsyncOrbitConnection = game:GetService("RunService").Heartbeat:Connect(function(
     -- Nếu target bị K.O → dừng Csync
     if targetHum.Health <= 0 then
         orbitPaused = true
-        notify("Csync Orbit paused (target KO)")
+        sendNotification("Csync Orbit paused (target KO)")
         return
     end
 
@@ -1929,7 +1923,7 @@ spawn(function()
             local target = getClosestSelectedPlayer()
             if target and target.Character and target.Character:FindFirstChild("Humanoid") and target.Character.Humanoid.Health > 0 then
                 orbitPaused = false
-                notify("Csync Orbit resumed (target alive)")
+                sendNotification("Csync Orbit resumed (target alive)")
             end
         end
         task.wait(0.5)
@@ -1956,7 +1950,7 @@ CsyncRandomConnection = game:GetService("RunService").Heartbeat:Connect(function
     -- Nếu target bị K.O → tạm dừng
     if targetHum.Health <= 0 then
         randomPaused = true
-        notify("Csync Random paused (target KO)")
+        sendNotification("Csync Random paused (target KO)")
         return
     end
 
@@ -1986,7 +1980,7 @@ spawn(function()
             local target = getClosestSelectedPlayer()
             if target and target.Character and target.Character:FindFirstChild("Humanoid") and target.Character.Humanoid.Health > 0 then
                 randomPaused = false
-                notify("Csync Random resumed (target alive)")
+                sendNotification("Csync Random resumed (target alive)")
             end
         end
         task.wait(0.5)
