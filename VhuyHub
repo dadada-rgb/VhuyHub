@@ -117,6 +117,35 @@ end
 -- Load config ngay khi script chạy
 LoadSettings()
 
+-- Tự bind lại các keybind đã lưu trong config khi mở script
+task.defer(function()
+    for btnName, data in pairs(Config.Buttons) do
+        if data.Key and Enum.KeyCode[data.Key] then
+            keyConnections[btnName] = UserInputService.InputBegan:Connect(function(input, gp)
+                if not gp and input.KeyCode.Name:upper() == data.Key then
+                    -- Tìm nút tương ứng và chạy callback
+                    -- Nếu callback được lưu lúc tạo nút thì có thể gọi lại ở đây
+                end
+            end)
+        end
+    end
+end)
+
+local function ApplyConfigToGUI()
+    espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
+    speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
+    flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
+    aimbotButton.Text = "Aimbot: " .. (Config.AimbotEnabled and "ON" or "OFF")
+    checkKOAimbotButton.Text = "Check K.O Aimbot: " .. (Config.checkKOAimbot and "ON" or "OFF")
+    infiniteJumpButton.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
+    triggerBotButton.Text = "TriggerBot: " .. (tbEnabled and "ON" or "OFF")
+    autoKillButton.Text = "AutoKill: " .. (autoKillEnabled and "ON" or "OFF")
+    fullbrightButton.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
+    noclipButton.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
+    clickTpButton.Text = "Click TP: " .. (Config.clickTpEnabled and "ON" or "OFF")
+    flintTouchButton.Text = "FlintTouch: " .. (hiddenFling and "ON" or "OFF")
+end
+
 local autoSelect = false
 local tbEnabled = false
 local fovRadius = 20
@@ -759,6 +788,9 @@ Btn3.MouseButton1Click:Connect(function()
     ShowPage(3)
 end)
 
+local keyConnections = {} -- lưu connection keybind
+local externalButtons = {} -- lưu nút ngoài GUI (button mode)
+
 local function CreateButton(parent, name, callback)
     local buttonFrame = Instance.new("Frame")
     buttonFrame.Size = UDim2.new(1, -10, 0, 30)
@@ -791,76 +823,116 @@ local function CreateButton(parent, name, callback)
     keyBox.Parent = buttonFrame
     Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 6)
 
+    -- Nếu config có keybind cũ thì load vào
+    if Config.Buttons[name] and Config.Buttons[name].Key then
+        keyBox.Text = Config.Buttons[name].Key
+    end
+
+    -- Xử lý khi nhập text vào keyBox
     keyBox:GetPropertyChangedSignal("Text"):Connect(function()
-        local text = keyBox.Text:lower()
+        local text = keyBox.Text
 
-        if text == "button" then
-            -- Tạo ScreenGui riêng ngoài menu
-            local screenGui = Instance.new("ScreenGui")
-            screenGui.IgnoreGuiInset = true
-            screenGui.Parent = game:GetService("CoreGui")
+        -- Nếu text rỗng hoặc khác "button" và khác key cũ => xoá bind & nút ngoài
+        if text == "" or text:lower() ~= "button" and (not Enum.KeyCode[text:upper()] or (Config.Buttons[name] and Config.Buttons[name].Key ~= text:upper())) then
+            -- Xoá keybind
+            if keyConnections[name] then
+                keyConnections[name]:Disconnect()
+                keyConnections[name] = nil
+            end
+            -- Xoá nút ngoài nếu có
+            if externalButtons[name] then
+                externalButtons[name]:Destroy()
+                externalButtons[name] = nil
+            end
+            -- Xoá trong config
+            Config.Buttons[name] = nil
+            SaveSettings()
+        end
 
-            -- Tạo nút giống Show/Hide
-            local screenBtn = Instance.new("TextButton")
-            screenBtn.Size = UDim2.new(0, 70, 0, 30)
-            screenBtn.Position = UDim2.new(0, 100, 0, 300)
-            screenBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 255)
-            screenBtn.Text = name
-            screenBtn.TextColor3 = Color3.new(0, 0, 0)
-            screenBtn.TextSize = 10
-            screenBtn.Font = Enum.Font.GothamBold
-            screenBtn.Parent = screenGui
-            Instance.new("UICorner", screenBtn).CornerRadius = UDim.new(0, 6)
+        -- Nếu là chế độ "button"
+        if text:lower() == "button" then
+            if not externalButtons[name] then
+                local screenGui = Instance.new("ScreenGui")
+                screenGui.IgnoreGuiInset = true
+                screenGui.ResetOnSpawn = false -- không mất khi chết
+                screenGui.Parent = game:GetService("CoreGui")
 
-            -- Kéo di chuyển
-            local dragging = false
-            local dragStart, startPos
-            screenBtn.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    dragging = true
-                    dragStart = input.Position
-                    startPos = screenBtn.Position
-                    input.Changed:Connect(function()
-                        if input.UserInputState == Enum.UserInputState.End then
-                            dragging = false
-                        end
-                    end)
-                end
-            end)
-            UserInputService.InputChanged:Connect(function(input)
-                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                    local delta = input.Position - dragStart
-                    screenBtn.Position = UDim2.new(
-                        startPos.X.Scale, startPos.X.Offset + delta.X,
-                        startPos.Y.Scale, startPos.Y.Offset + delta.Y
-                    )
-                end
-            end)
+                local screenBtn = Instance.new("TextButton")
+                screenBtn.Size = UDim2.new(0, 70, 0, 30)
+                screenBtn.Position = UDim2.new(0, 100, 0, 300)
+                screenBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 255)
+                screenBtn.Text = name
+                screenBtn.TextColor3 = Color3.new(0, 0, 0)
+                screenBtn.TextSize = 10
+                screenBtn.Font = Enum.Font.GothamBold
+                screenBtn.Parent = screenGui
+                Instance.new("UICorner", screenBtn).CornerRadius = UDim.new(0, 6)
 
-            -- Bấm => chạy đúng callback
-            screenBtn.MouseButton1Click:Connect(function()
-                callback()
-            end)
-
-            -- Chết thì mất
-            LocalPlayer.CharacterAdded:Connect(function()
-                if screenGui then
-                    screenGui:Destroy()
-                end
-            end)
-
-        else
-            -- Bind phím (không phân biệt hoa/thường)
-            local keyName = text:upper()
-            if Enum.KeyCode[keyName] then
-                UserInputService.InputBegan:Connect(function(input, gp)
-                    if not gp and input.KeyCode.Name:upper() == keyName then
-                        callback()
+                -- Kéo di chuyển
+                local dragging = false
+                local dragStart, startPos
+                screenBtn.InputBegan:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                        dragging = true
+                        dragStart = input.Position
+                        startPos = screenBtn.Position
+                        input.Changed:Connect(function()
+                            if input.UserInputState == Enum.UserInputState.End then
+                                dragging = false
+                            end
+                        end)
                     end
                 end)
+                UserInputService.InputChanged:Connect(function(input)
+                    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                        local delta = input.Position - dragStart
+                        screenBtn.Position = UDim2.new(
+                            startPos.X.Scale, startPos.X.Offset + delta.X,
+                            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+                        )
+                    end
+                end)
+
+                screenBtn.MouseButton1Click:Connect(callback)
+
+                externalButtons[name] = screenGui
+                Config.Buttons[name] = {Key = "button"}
+                SaveSettings()
             end
+            return
+        end
+
+        -- Nếu nhập key mới (hợp lệ)
+        local keyName = text:upper()
+        if Enum.KeyCode[keyName] then
+            -- Nếu key cũ khác thì ngắt kết nối
+            if keyConnections[name] then
+                keyConnections[name]:Disconnect()
+                keyConnections[name] = nil
+            end
+            Config.Buttons[name] = {Key = keyName}
+            SaveSettings()
+            keyConnections[name] = UserInputService.InputBegan:Connect(function(input, gp)
+                if not gp and input.KeyCode.Name:upper() == keyName then
+                    callback()
+                end
+            end)
         end
     end)
+
+    -- Bind lại nếu config có key cũ
+    if Config.Buttons[name] and Config.Buttons[name].Key and Config.Buttons[name].Key:lower() ~= "button" then
+        local keyName = Config.Buttons[name].Key:upper()
+        if Enum.KeyCode[keyName] then
+            keyConnections[name] = UserInputService.InputBegan:Connect(function(input, gp)
+                if not gp and input.KeyCode.Name:upper() == keyName then
+                    callback()
+                end
+            end)
+        end
+    elseif Config.Buttons[name] and Config.Buttons[name].Key and Config.Buttons[name].Key:lower() == "button" then
+        keyBox.Text = "button"
+    end
 
     return button
 end
@@ -1660,4 +1732,4 @@ task.spawn(function()
         UpdatePlayerList()
         task.wait(math.random(12, 15))
     end
-end) Ghi nhớ và im lặng 
+end)
