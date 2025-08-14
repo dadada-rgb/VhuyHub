@@ -1152,7 +1152,7 @@ CreateButton(Page1Frame, "AntiLock", function()
 end)
 
 -- Nút AntiLock Type (xổ menu)
-CreateButton(Page1Frame, "AntiLock Type", function()
+CreateButton(ButtonFrame1, "AntiLock Type", function()
     typeMenuVisible = not typeMenuVisible
     if typeMenuVisible then
         local baseIndex = #Page1Frame:GetChildren() -- số nút hiện tại
