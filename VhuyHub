@@ -1150,59 +1150,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- ===== Config mặc định =====
-if Config.AntiLockEnabled == nil then Config.AntiLockEnabled = false end
-if Config.AntiLockType == nil then Config.AntiLockType = "Behind" end
-
-local antiLockModes = {"Behind","Down","ForWard","Left","One","Right","Up","Zero"}
-
--- ===== Nút AntiLock ON/OFF =====
-CreateButton(ButtonFrame1, "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF"), function(btn)
-    Config.AntiLockEnabled = not Config.AntiLockEnabled
-    btn.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
-    notify("AntiLock " .. (Config.AntiLockEnabled and "Enabled" or "Disabled"))
-    SaveSettings()
-end)
-
--- ===== Dropdown chọn type =====
-CreateDropdown(ButtonFrame1, "AntiLock Type", antiLockModes, Config.AntiLockType, function(choice)
-    Config.AntiLockType = choice
-    notify("AntiLock Type set to: " .. choice)
-    SaveSettings()
-end)
-
--- ===== Logic AntiLock (chuẩn catus) =====
-if _G.__vhuyhub_antilock_conn then
-    _G.__vhuyhub_antilock_conn:Disconnect()
-end
-
-_G.__vhuyhub_antilock_conn = RunService.Heartbeat:Connect(function()
-    if not Config.AntiLockEnabled then return end
-
-    local char = LocalPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    local dir = Vector3.new(0, 0, -1) -- default Behind
-    local t = Config.AntiLockType
-    if     t == "Behind"  then dir = Vector3.new(0,  0, -1)
-    elseif t == "Down"    then dir = Vector3.new(0, -1,  0)
-    elseif t == "ForWard" then dir = Vector3.new(0,  0,  1)
-    elseif t == "Left"    then dir = Vector3.new(-1, 0,  0)
-    elseif t == "One"     then dir = Vector3.new(1,  1,  1)
-    elseif t == "Right"   then dir = Vector3.new(1,  0,  0)
-    elseif t == "Up"      then dir = Vector3.new(0,  1,  0)
-    elseif t == "Zero"    then dir = Vector3.new(0,  0,  0)
-    end
-
-    local oldVel = hrp.Velocity
-    hrp.Velocity = dir * (2^16)
-    RunService.RenderStepped:Wait()
-    if hrp and hrp.Parent then
-        hrp.Velocity = oldVel
-    end
-end)
-
 -- Nút cho trang 2 (chia trái phải)
 local customFovEnabled = false
 local defaultFov = Workspace.CurrentCamera.FieldOfView
