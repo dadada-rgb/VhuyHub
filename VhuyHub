@@ -84,6 +84,43 @@ local Config = {
     CustomPing = nil
 }
 
+getgenv().AntiLockType = Config.AntiLockType or "Behind"
+getgenv().Desync = Config.AntiLockEnabled or false
+getgenv().Direction = Vector3.new(0, 0, -1) -- mặc định "Behind"
+
+-- Chạy AntiLock
+task.spawn(function()
+    game:GetService("RunService").Heartbeat:Connect(function()
+        if getgenv().Desync and game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local HRP = game.Players.LocalPlayer.Character.HumanoidRootPart
+            local vel = HRP.Velocity
+            local t = getgenv().AntiLockType
+
+            if t == "Behind" then
+                getgenv().Direction = Vector3.new(0, 0, -1)
+            elseif t == "Down" then
+                getgenv().Direction = Vector3.new(0, -1, 0)
+            elseif t == "ForWard" then
+                getgenv().Direction = Vector3.new(0, 0, 1)
+            elseif t == "Left" then
+                getgenv().Direction = Vector3.new(-1, 0, 0)
+            elseif t == "One" then
+                getgenv().Direction = Vector3.new(1, 1, 1)
+            elseif t == "Right" then
+                getgenv().Direction = Vector3.new(1, 0, 0)
+            elseif t == "Up" then
+                getgenv().Direction = Vector3.new(0, 1, 0)
+            elseif t == "Zero" then
+                getgenv().Direction = Vector3.new(0, 0, 0)
+            end
+
+            HRP.Velocity = getgenv().Direction * (2 ^ 16)
+            game:GetService("RunService").RenderStepped:Wait()
+            HRP.Velocity = vel
+        end
+    end)
+end)
+
 -- Hàm lưu config
 local function SaveSettings()
     local success, err = pcall(function()
@@ -1093,6 +1130,44 @@ autoKillButton = CreateButton(ButtonFrame1, "AutoKill: OFF", function()
             task.cancel(autoKillLoop)
             autoKillLoop = nil
         end
+    end
+end)
+
+local AntiLockTypes = {"Behind", "Down", "ForWard", "Left", "One", "Right", "Up", "Zero"}
+local typeMenuVisible = false
+local typeButtons = {}
+
+-- Nút AntiLock ON/OFF
+CreateButton(Page1Frame, "AntiLock", function()
+    getgenv().Desync = not getgenv().Desync
+    Config.AntiLockEnabled = getgenv().Desync
+    SaveSettings()
+end)
+
+-- Nút AntiLock Type (xổ menu)
+CreateButton(Page1Frame, "AntiLock Type", function()
+    typeMenuVisible = not typeMenuVisible
+    if typeMenuVisible then
+        local baseIndex = #Page1Frame:GetChildren() -- số nút hiện tại
+        local yOffset = 0
+        for _, t in ipairs(AntiLockTypes) do
+            local btn = CreateButton(Page1Frame, "Type: "..t, function()
+                getgenv().AntiLockType = t
+                Config.AntiLockType = t
+                SaveSettings()
+                typeMenuVisible = false
+                -- Ẩn menu sau khi chọn
+                for _, b in ipairs(typeButtons) do b:Destroy() end
+                typeButtons = {}
+            end)
+            btn.Position = UDim2.new(0, 0, 0, (baseIndex * 35) + yOffset)
+            yOffset = yOffset + 35
+            table.insert(typeButtons, btn)
+        end
+    else
+        -- Ẩn menu khi tắt
+        for _, b in ipairs(typeButtons) do b:Destroy() end
+        typeButtons = {}
     end
 end)
 
