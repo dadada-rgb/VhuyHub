@@ -1296,18 +1296,16 @@ local function getClosestSelected()
 end
 
 -- =====================
--- TẠO NÚT CSYNC + 2 NÚT CON
+-- FRAME CHỨA NÚT CSYNC
 -- =====================
--- Frame chứa nút và ô input
 local csyncFrame = Instance.new("Frame")
-csyncFrame.Size = UDim2.new(1, -10, 0, 120) -- đủ cao để chứa 2 nút + 3 ô
+csyncFrame.Size = UDim2.new(1, -10, 0, 150) -- cao hơn để chứa label
 csyncFrame.BackgroundTransparency = 1
 csyncFrame.Parent = ButtonFrame1
 
 -- Nút Random
 CreateButton(csyncFrame, "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF"), function(btn)
     Config.CsyncRandomEnabled = not Config.CsyncRandomEnabled
-    if Config.CsyncRandomEnabled then Config.CsyncOrbitEnabled = false end -- chỉ chọn 1 chế độ
     btn.Text = "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF")
     SaveSettings()
 end)
@@ -1315,31 +1313,48 @@ end)
 -- Nút Orbit
 CreateButton(csyncFrame, "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF"), function(btn)
     Config.CsyncOrbitEnabled = not Config.CsyncOrbitEnabled
-    if Config.CsyncOrbitEnabled then Config.CsyncRandomEnabled = false end -- chỉ chọn 1 chế độ
     btn.Text = "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF")
     SaveSettings()
 end)
 
 -- =====================
--- 3 Ô TEXTBOX
+-- LABEL + TEXTBOX
 -- =====================
 local boxFrame = Instance.new("Frame")
-boxFrame.Size = UDim2.new(1, 0, 0, 25)
-boxFrame.Position = UDim2.new(0, 0, 0, 70) -- đặt dưới 2 nút
+boxFrame.Size = UDim2.new(1, 0, 0, 45) -- cao hơn để chứa label
+boxFrame.Position = UDim2.new(0, 0, 0, 90)
 boxFrame.BackgroundTransparency = 1
 boxFrame.Parent = csyncFrame
 
-local function createSmallBox(parent, placeholder, default, onChange)
+local function createLabeledBox(parent, labelText, default, onChange, position)
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(1/3 - 0.02, 0, 1, 0)
+    container.Position = position
+    container.BackgroundTransparency = 1
+    container.Parent = parent
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, 0, 0, 10)
+    label.Position = UDim2.new(0, 0, 0, 0)
+    label.BackgroundTransparency = 1
+    label.Text = labelText
+    label.TextSize = 10
+    label.TextColor3 = Color3.fromRGB(180, 180, 180)
+    label.Font = Enum.Font.Gotham
+    label.TextScaled = false
+    label.Parent = container
+
     local tb = Instance.new("TextBox")
-    tb.Size = UDim2.new(1/3 - 0.02, 0, 1, 0) -- chia đều 3 ô
+    tb.Size = UDim2.new(1, 0, 0, 20)
+    tb.Position = UDim2.new(0, 0, 0, 12)
     tb.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
     tb.TextColor3 = Color3.new(1, 1, 1)
     tb.Text = tostring(default)
-    tb.PlaceholderText = placeholder
+    tb.PlaceholderText = labelText
     tb.ClearTextOnFocus = false
     tb.Font = Enum.Font.GothamBold
     tb.TextSize = 12
-    tb.Parent = parent
+    tb.Parent = container
     Instance.new("UICorner", tb).CornerRadius = UDim.new(0, 4)
 
     tb.FocusLost:Connect(function()
@@ -1351,29 +1366,24 @@ local function createSmallBox(parent, placeholder, default, onChange)
             tb.Text = tostring(default)
         end
     end)
-    return tb
 end
 
--- Tạo 3 ô
-local radiusBox = createSmallBox(boxFrame, "Radius", Config.CsyncRadius, function(val)
+createLabeledBox(boxFrame, "Radius", Config.CsyncRadius, function(val)
     Config.CsyncRadius = val
-end)
-radiusBox.Position = UDim2.new(0, 0, 0, 0)
+end, UDim2.new(0, 0, 0, 0))
 
-local heightBox = createSmallBox(boxFrame, "Height", Config.CsyncHeight, function(val)
+createLabeledBox(boxFrame, "Height", Config.CsyncHeight, function(val)
     Config.CsyncHeight = val
-end)
-heightBox.Position = UDim2.new(1/3, 5, 0, 0)
+end, UDim2.new(1/3, 5, 0, 0))
 
-local speedBox = createSmallBox(boxFrame, "Speed", Config.CsyncSpeed, function(val)
+createLabeledBox(boxFrame, "Speed", Config.CsyncSpeed, function(val)
     Config.CsyncSpeed = val
-end)
-speedBox.Position = UDim2.new(2/3, 10, 0, 0)
+end, UDim2.new(2/3, 10, 0, 0))
 
 -- =====================
--- LOGIC CSYNC (Random / Orbit) từ catus
+-- LOGIC CSYNC
 -- =====================
-RunService.RenderStepped:Connect(function(dt)
+RunService.RenderStepped:Connect(function()
     local target = getClosestSelected()
     if not target then return end
     local thrp = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
@@ -1382,15 +1392,65 @@ RunService.RenderStepped:Connect(function(dt)
     if not thrp or not myHRP then return end
 
     if Config.CsyncRandomEnabled then
-        -- Logic Random: di chuyển vị trí quanh target ngẫu nhiên
         local angle = math.random() * math.pi * 2
         local offset = Vector3.new(math.cos(angle) * Config.CsyncRadius, Config.CsyncHeight, math.sin(angle) * Config.CsyncRadius)
         myHRP.CFrame = CFrame.new(thrp.Position + offset, thrp.Position)
     elseif Config.CsyncOrbitEnabled then
-        -- Logic Orbit: quay vòng quanh target
         local time = tick() * Config.CsyncSpeed
         local offset = Vector3.new(math.cos(time) * Config.CsyncRadius, Config.CsyncHeight, math.sin(time) * Config.CsyncRadius)
         myHRP.CFrame = CFrame.new(thrp.Position + offset, thrp.Position)
+    end
+end)
+
+-- === AntiLock (catus logic) for vhuyhub ===
+local RS = game:GetService("RunService")
+local LP = game.Players.LocalPlayer
+
+-- defaults lấy từ catus
+getgenv().Desync = getgenv().Desync or false
+getgenv().AntiLockType = getgenv().AntiLockType or "Behind" -- catus default
+
+-- UI: nút AntiLock dùng createbutton có on/off
+local btnAntiLock = createbutton("AntiLock", getgenv().Desync, function(on)
+    getgenv().Desync = on
+    notify(("AntiLock: %s"):format(on and "ON" or "OFF")) -- tuỳ notify() của bạn
+end)
+
+-- UI: dropdown chọn kiểu AntiLock theo catus
+local antiLockModes = {"Behind","Down","ForWard","Left","One","Right","Up","Zero"}
+local ddAntiLockType = createDropdown("AntiLock Type", antiLockModes, getgenv().AntiLockType, function(choice)
+    getgenv().AntiLockType = choice
+    notify("AntiLock Type: "..tostring(choice))
+end)
+
+-- Heartbeat loop: y hệt cốt lõi catus
+if _G.__vhuyhub_antilock_conn then
+    _G.__vhuyhub_antilock_conn:Disconnect()
+end
+
+_G.__vhuyhub_antilock_conn = RS.Heartbeat:Connect(function()
+    if not getgenv().Desync then return end
+    local char = LP.Character
+    if not (char and char:FindFirstChild("HumanoidRootPart")) then return end
+    local hrp = char.HumanoidRootPart
+
+    local dir = Vector3.new(0,0,-1) -- Behind
+    local t = getgenv().AntiLockType
+    if     t == "Behind"  then dir = Vector3.new(0,  0, -1)
+    elseif t == "Down"    then dir = Vector3.new(0, -1,  0)
+    elseif t == "ForWard" then dir = Vector3.new(0,  0,  1)
+    elseif t == "Left"    then dir = Vector3.new(-1, 0,  0)
+    elseif t == "One"     then dir = Vector3.new(1,  1,  1)
+    elseif t == "Right"   then dir = Vector3.new(1,  0,  0)
+    elseif t == "Up"      then dir = Vector3.new(0,  1,  0)
+    elseif t == "Zero"    then dir = Vector3.new(0,  0,  0)
+    end
+
+    local oldVel = hrp.Velocity
+    hrp.Velocity = dir * (2^16)         -- “bật” hướng theo catus
+    RS.RenderStepped:Wait()             -- đợi 1 frame
+    if hrp and hrp.Parent then
+        hrp.Velocity = oldVel           -- trả velocity về như cũ
     end
 end)
 
