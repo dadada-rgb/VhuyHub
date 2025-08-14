@@ -901,30 +901,22 @@ checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O Aimbot: OFF", functi
     SaveSettings()
 end)
 
--- ======= CONFIG =======
+-- ======= CONFIG MẶC ĐỊNH =======
 Config.AntiLockEnabled = Config.AntiLockEnabled or false
 Config.AntiLockType = Config.AntiLockType or "Behind"
-Config.ResolverEnabled = Config.ResolverEnabled or false
-Config.ResolverOffset = Config.ResolverOffset or 3
 Config.AutoStompEnabled = Config.AutoStompEnabled or false
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
--- ======= DATA =======
 local antiLockModes = {
-    Behind = Vector3.new(0, 0, -1),
-    Down = Vector3.new(0, -1, 0),
-    ForWard = Vector3.new(0, 0, 1),
-    Left = Vector3.new(-1, 0, 0),
-    One = Vector3.new(1, 1, 1),
-    Right = Vector3.new(1, 0, 0),
-    Up = Vector3.new(0, 1, 0),
-    Zero = Vector3.new(0, 0, 0)
+    Behind = true, Down = true, ForWard = true,
+    Left = true, One = true, Right = true,
+    Up = true, Zero = true
 }
 
--- ======= ANTI LOCK BUTTON =======
+-- ======= NÚT ANTILOCK =======
 CreateButton(ButtonFrame1, "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF"), function(btn)
     Config.AntiLockEnabled = not Config.AntiLockEnabled
     btn.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
@@ -932,7 +924,7 @@ CreateButton(ButtonFrame1, "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "
     SaveSettings()
 end)
 
--- AntiLock mode textbox
+-- Ô nhập mode cho AntiLock
 local modeBox = Instance.new("TextBox")
 modeBox.Size = UDim2.new(1, 0, 0, 20)
 modeBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -940,7 +932,7 @@ modeBox.TextColor3 = Color3.new(1, 1, 1)
 modeBox.Font = Enum.Font.GothamBold
 modeBox.TextSize = 12
 modeBox.ClearTextOnFocus = false
-modeBox.PlaceholderText = "Enter AntiLock mode (default Behind)"
+modeBox.PlaceholderText = "Enter mode (default Behind)"
 modeBox.Text = Config.AntiLockType
 Instance.new("UICorner", modeBox).CornerRadius = UDim.new(0, 4)
 modeBox.Parent = ButtonFrame1
@@ -952,7 +944,7 @@ modeBox.FocusLost:Connect(function()
     elseif antiLockModes[input] then
         Config.AntiLockType = input
     else
-        notify("Invalid mode! Keeping: " .. Config.AntiLockType)
+        notify("Invalid AntiLock mode! Keeping: " .. Config.AntiLockType)
         modeBox.Text = Config.AntiLockType
         return
     end
@@ -960,16 +952,30 @@ modeBox.FocusLost:Connect(function()
     SaveSettings()
 end)
 
--- AntiLock logic
+-- ======= LOGIC ANTILOCK =======
 if _G.__vhuyhub_antilock_conn then
     _G.__vhuyhub_antilock_conn:Disconnect()
 end
+
 _G.__vhuyhub_antilock_conn = RunService.Heartbeat:Connect(function()
     if not Config.AntiLockEnabled then return end
+
     local char = LocalPlayer.Character
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
-    local dir = antiLockModes[Config.AntiLockType] or Vector3.new(0,0,-1)
+
+    local dir = Vector3.new(0, 0, -1) -- default Behind
+    local t = Config.AntiLockType
+    if     t == "Behind"  then dir = Vector3.new(0,  0, -1)
+    elseif t == "Down"    then dir = Vector3.new(0, -1,  0)
+    elseif t == "ForWard" then dir = Vector3.new(0,  0,  1)
+    elseif t == "Left"    then dir = Vector3.new(-1, 0,  0)
+    elseif t == "One"     then dir = Vector3.new(1,  1,  1)
+    elseif t == "Right"   then dir = Vector3.new(1,  0,  0)
+    elseif t == "Up"      then dir = Vector3.new(0,  1,  0)
+    elseif t == "Zero"    then dir = Vector3.new(0,  0,  0)
+    end
+
     local oldVel = hrp.Velocity
     hrp.Velocity = dir * (2^16)
     RunService.RenderStepped:Wait()
@@ -978,50 +984,7 @@ _G.__vhuyhub_antilock_conn = RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ======= RESOLVER BUTTON =======
-CreateButton(ButtonFrame1, "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF"), function(btn)
-    Config.ResolverEnabled = not Config.ResolverEnabled
-    btn.Text = "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF")
-    notify("Resolver " .. (Config.ResolverEnabled and "Enabled" or "Disabled"))
-    SaveSettings()
-end)
-
--- Resolver offset textbox
-local offsetBox = Instance.new("TextBox")
-offsetBox.Size = UDim2.new(1, 0, 0, 20)
-offsetBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-offsetBox.TextColor3 = Color3.new(1, 1, 1)
-offsetBox.Font = Enum.Font.GothamBold
-offsetBox.TextSize = 12
-offsetBox.ClearTextOnFocus = false
-offsetBox.PlaceholderText = "Resolver offset (default 3)"
-offsetBox.Text = tostring(Config.ResolverOffset)
-Instance.new("UICorner", offsetBox).CornerRadius = UDim.new(0, 4)
-offsetBox.Parent = ButtonFrame1
-
-offsetBox.FocusLost:Connect(function()
-    local num = tonumber(offsetBox.Text)
-    if num then
-        Config.ResolverOffset = num
-        notify("Resolver offset set to: " .. num)
-        SaveSettings()
-    else
-        notify("Invalid offset!")
-        offsetBox.Text = tostring(Config.ResolverOffset)
-    end
-end)
-
--- Hàm tính vị trí bắn với resolver
-function ApplyResolver(targetPos, targetHumanoidRootPart)
-    if Config.ResolverEnabled then
-        local dir = antiLockModes[Config.AntiLockType] or Vector3.new(0,0,-1)
-        return targetHumanoidRootPart.Position + (dir * Config.ResolverOffset)
-    else
-        return targetHumanoidRootPart.Position
-    end
-end
-
--- ======= AUTO STOMP BUTTON =======
+-- ======= NÚT AUTOSTOMP =======
 CreateButton(ButtonFrame1, "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF"), function(btn)
     Config.AutoStompEnabled = not Config.AutoStompEnabled
     btn.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
@@ -1029,7 +992,7 @@ CreateButton(ButtonFrame1, "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or
     SaveSettings()
 end)
 
--- Check KO function
+-- ======= LOGIC AUTOSTOMP (Check K.O) =======
 local function isKO(plr)
     local char = plr.Character
     if not char then return false end
@@ -1040,7 +1003,6 @@ local function isKO(plr)
     return false
 end
 
--- Get KO selected player
 local function getKOSelected()
     for name, selected in pairs(Config.SelectedPlayers or {}) do
         if selected then
@@ -1053,7 +1015,6 @@ local function getKOSelected()
     return nil
 end
 
--- Stomp logic
 local function stompTarget(target)
     local myChar = LocalPlayer.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -1064,15 +1025,25 @@ local function stompTarget(target)
     if not lowerTorso then return end
 
     local oldCFrame = myHRP.CFrame
+
+    -- Dừng mọi hành động
     myHum:ChangeState(Enum.HumanoidStateType.Physics)
+
+    -- TP tới target
     myHRP.CFrame = lowerTorso.CFrame + Vector3.new(0, 2, 0)
 
+    -- Giả lập bấm E
     keypress(Enum.KeyCode.E)
     task.wait(0.05)
     keyrelease(Enum.KeyCode.E)
 
+    -- Chờ 1.5 giây
     task.wait(1.5)
+
+    -- Trả về vị trí cũ
     myHRP.CFrame = oldCFrame
+
+    -- Cho phép cử động lại
     myHum:ChangeState(Enum.HumanoidStateType.Running)
 end
 
