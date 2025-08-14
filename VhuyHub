@@ -1100,6 +1100,95 @@ local function getClosestSelected()
     return closest
 end
 
+-- ======= CONFIG MẶC ĐỊNH =======
+Config.ResolverEnabled = Config.ResolverEnabled or false
+Config.ResolverPrediction = Config.ResolverPrediction or 0.15
+
+-- ======= NÚT RESOLVER =======
+local resolverButton = CreateButton(ButtonFrame1, "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF"), function(btn)
+    Config.ResolverEnabled = not Config.ResolverEnabled
+    btn.Text = "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF")
+    sendNotification("Resolver", Config.ResolverEnabled and "Enabled" or "Disabled")
+    SaveSettings()
+end)
+
+-- ======= Ô TEXTBOX CHỈNH PREDICTION =======
+local resolverBox = Instance.new("Frame")
+resolverBox.Size = UDim2.new(1, 0, 0, 40)
+resolverBox.BackgroundTransparency = 1
+resolverBox.Parent = ButtonFrame1
+
+local label = Instance.new("TextLabel")
+label.Size = UDim2.new(1, 0, 0, 10)
+label.BackgroundTransparency = 1
+label.Text = "Prediction"
+label.TextSize = 10
+label.TextColor3 = Color3.fromRGB(180, 180, 180)
+label.Font = Enum.Font.Gotham
+label.Parent = resolverBox
+
+local tb = Instance.new("TextBox")
+tb.Size = UDim2.new(1, 0, 0, 20)
+tb.Position = UDim2.new(0, 0, 0, 12)
+tb.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+tb.TextColor3 = Color3.new(1, 1, 1)
+tb.Text = tostring(Config.ResolverPrediction)
+tb.PlaceholderText = "Prediction factor"
+tb.ClearTextOnFocus = false
+tb.Font = Enum.Font.GothamBold
+tb.TextSize = 12
+tb.Parent = resolverBox
+Instance.new("UICorner", tb).CornerRadius = UDim.new(0, 4)
+
+tb.FocusLost:Connect(function()
+    local num = tonumber(tb.Text)
+    if num then
+        Config.ResolverPrediction = num
+        sendNotification("Resolver", "Prediction set to " .. num)
+        SaveSettings()
+    else
+        tb.Text = tostring(Config.ResolverPrediction)
+    end
+end)
+
+-- ======= HÀM LẤY TARGET GẦN NHẤT =======
+local function getClosestSelected()
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return nil end
+    local closest, minDist
+    for name, selected in pairs(Config.SelectedPlayers or {}) do
+        if selected then
+            local plr = Players:FindFirstChild(name)
+            local hrp = plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dist = (myHRP.Position - hrp.Position).Magnitude
+                if not minDist or dist < minDist then
+                    closest, minDist = plr, dist
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- ======= LOGIC RESOLVER =======
+if _G.__vhuyhub_resolver_conn then
+    _G.__vhuyhub_resolver_conn:Disconnect()
+end
+
+_G.__vhuyhub_resolver_conn = RunService.Heartbeat:Connect(function()
+    if not Config.ResolverEnabled then return end
+
+    local target = getClosestSelected()
+    if not target or not target.Character then return end
+    local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local predictedPos = hrp.Position + (hrp.Velocity * Config.ResolverPrediction)
+    _G.ResolverPosition = predictedPos
+end)
+
 -- ==== NÚT LOOK AT (dùng CreateButton) ====
 local lookAtBtnRef
 local lastTargetName, lastNotify = nil, 0
