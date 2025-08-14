@@ -1010,30 +1010,33 @@ local function getKOSelected()
     return nil
 end
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-
-local function stompTarget(target)
-    local myChar = LocalPlayer.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myHRP then return end
-
-    local lowerTorso = target.Character and target.Character:FindFirstChild("LowerTorso")
-    if not lowerTorso then return end
-
-    local oldCFrame = myHRP.CFrame
-    local mainEvent = ReplicatedStorage:FindFirstChild("MainEvent")
-    if not mainEvent then return end
-
-    -- Teleport 1 frame ngay trên target
-    myHRP.CFrame = lowerTorso.CFrame + Vector3.new(0, 2, 0)
-    RunService.Heartbeat:Wait()
-
-    -- Instant stomp (bỏ animation)
-    mainEvent:FireServer("Stomp")
-
-    -- Trả về vị trí cũ ngay lập tức
-    myHRP.CFrame = oldCFrame
+local function stompTarget(target)  
+    local myChar = LocalPlayer.Character  
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")  
+    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")  
+    if not myHRP or not myHum then return end  
+  
+    local lowerTorso = target.Character and target.Character:FindFirstChild("LowerTorso")  
+    if not lowerTorso then return end  
+  
+    local oldCFrame = myHRP.CFrame  
+  
+    -- Dừng mọi hành động  
+     
+  
+    -- TP tới target  
+    myHRP.CFrame = lowerTorso.CFrame + Vector3.new(0, 2, 0)  
+  
+    -- Giả lập bấm E  
+    keypress(Enum.KeyCode.E)  
+    task.wait(0.05)  
+    keyrelease(Enum.KeyCode.E)  
+  
+    -- Chờ 1.5 giây  
+    task.wait(1.5)  
+  
+    -- Trả về vị trí cũ  
+    myHRP.CFrame = oldCFrame 
 end
 
 -- AutoStomp + Auto disable/enable AntiLock
@@ -1288,6 +1291,28 @@ LocalPlayer.CharacterAdded:Connect(function()
     end)
 end)
 
+do
+    local mt = getrawmetatable(game)
+    setreadonly(mt, false)
+    local oldNamecall = mt.__namecall
+
+    mt.__namecall = newcclosure(function(self, ...)
+        local args = {...}
+        local method = getnamecallmethod()
+
+        if Config.LookAtEnabled and method == "FireServer" and tostring(self) == "MainEvent" and args[1] == "Shoot" then
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dir = hrp.CFrame.LookVector * 1000
+                args[2] = hrp.Position + dir
+            end
+            return oldNamecall(self, unpack(args))
+        end
+
+        return oldNamecall(self, ...)
+    end)
+end
+
 -- ======= CONFIG MẶC ĐỊNH =======
 Config.AutoReloadEnabled = Config.AutoReloadEnabled or false
 
@@ -1299,9 +1324,7 @@ local autoReloadButton = CreateButton(ButtonFrame1, "Auto Reload: " .. (Config.A
     SaveSettings()
 end)
 
--- ======= LOGIC AUTO RELOAD (Bỏ animation) =======
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
+-- ======= LOGIC AUTO RELOAD =======
 if _G.__vhuyhub_autoreload_conn then
     _G.__vhuyhub_autoreload_conn:Disconnect()
 end
@@ -1313,15 +1336,12 @@ _G.__vhuyhub_autoreload_conn = RunService.Heartbeat:Connect(function()
     local tool = char and char:FindFirstChildOfClass("Tool")
     if not tool then return end
 
-    -- Kiểm tra thuộc tính Ammo
+    -- Kiểm tra thuộc tính Ammo trong tool
     local ammoVal = tool:FindFirstChild("Ammo") or tool:FindFirstChild("AmmoCount")
     if ammoVal and ammoVal.Value <= 0 then
-        -- Gọi remote reload trực tiếp (không animation)
-        local mainEvent = ReplicatedStorage:FindFirstChild("MainEvent")
-        if mainEvent then
-            mainEvent:FireServer("Reload", tool)
-        end
-        task.wait(1) -- tránh spam
+        keypress(Enum.KeyCode.R)
+        task.wait(0.05)
+        keyrelease(Enum.KeyCode.R)
     end
 end)
 
