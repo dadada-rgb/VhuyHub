@@ -1145,34 +1145,66 @@ local typeMenuVisible = false
 local typeButtons = {}
 
 -- Nút AntiLock ON/OFF
-CreateButton(ButtonFrame1, "AntiLock", function()
+local AntiLockBtn = Instance.new("TextButton")
+AntiLockBtn.Size = UDim2.new(0, 200, 0, 30)
+AntiLockBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+AntiLockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+AntiLockBtn.Font = Enum.Font.SourceSans
+AntiLockBtn.TextSize = 20
+AntiLockBtn.Text = "AntiLock"
+AntiLockBtn.Parent = ButtonFrame1
+
+AntiLockBtn.MouseButton1Click:Connect(function()
     getgenv().Desync = not getgenv().Desync
     Config.AntiLockEnabled = getgenv().Desync
     SaveSettings()
 end)
 
--- Nút AntiLock Type (xổ menu)
-CreateButton(ButtonFrame1, "AntiLock Type", function()
+-- Nút AntiLock Type (nút con)
+local AntiLockTypeBtn = Instance.new("TextButton")
+AntiLockTypeBtn.Size = UDim2.new(0, 200, 0, 25)
+AntiLockTypeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+AntiLockTypeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+AntiLockTypeBtn.Font = Enum.Font.SourceSans
+AntiLockTypeBtn.TextSize = 18
+AntiLockTypeBtn.Text = "AntiLock Type: " .. (Config.AntiLockType or "Behind")
+AntiLockTypeBtn.Position = UDim2.new(0, 0, 0, AntiLockBtn.Position.Y.Offset + 35)
+AntiLockTypeBtn.Parent = ButtonFrame1
+
+local typeMenuVisible = false
+local typeButtons = {}
+local AntiLockTypes = {"Behind", "Down", "ForWard", "Left", "One", "Right", "Up", "Zero"}
+
+AntiLockTypeBtn.MouseButton1Click:Connect(function()
     typeMenuVisible = not typeMenuVisible
     if typeMenuVisible then
-        local baseIndex = #Page1Frame:GetChildren() -- số nút hiện tại
-        local yOffset = 0
+        local yOffset = AntiLockTypeBtn.Position.Y.Offset + 35
         for _, t in ipairs(AntiLockTypes) do
-            local btn = CreateButton(Page1Frame, "Type: "..t, function()
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(0, 200, 0, 25)
+            btn.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+            btn.TextColor3 = Color3.fromRGB(180, 180, 180)
+            btn.Font = Enum.Font.SourceSans
+            btn.TextSize = 16
+            btn.Text = t
+            btn.Position = UDim2.new(0, 0, 0, yOffset)
+            btn.Parent = ButtonFrame1
+
+            btn.MouseButton1Click:Connect(function()
                 getgenv().AntiLockType = t
                 Config.AntiLockType = t
+                AntiLockTypeBtn.Text = "AntiLock Type: " .. t
                 SaveSettings()
-                typeMenuVisible = false
-                -- Ẩn menu sau khi chọn
+                -- Đóng menu
                 for _, b in ipairs(typeButtons) do b:Destroy() end
                 typeButtons = {}
+                typeMenuVisible = false
             end)
-            btn.Position = UDim2.new(0, 0, 0, (baseIndex * 35) + yOffset)
-            yOffset = yOffset + 35
+
             table.insert(typeButtons, btn)
+            yOffset = yOffset + 30
         end
     else
-        -- Ẩn menu khi tắt
         for _, b in ipairs(typeButtons) do b:Destroy() end
         typeButtons = {}
     end
