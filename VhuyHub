@@ -733,43 +733,6 @@ checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O Aimlock: OFF", funct
     SaveSettings()
 end)
 
--- Config mặc định
-if Config.AntiStompEnabled == nil then Config.AntiStompEnabled = false end
-
--- Hàm phá BasePart
-local function doAntiStomp()
-    local char = game.Players.LocalPlayer.Character
-    if not char then return end
-    for _, obj in pairs(char:GetDescendants()) do
-        if obj:IsA("BasePart") then
-            if obj.Name ~= "HumanoidRootPart" then
-                obj.CanCollide = false
-                obj.Transparency = 1
-            end
-        end
-    end
-end
-
--- Nút bật/tắt Anti Stomp
-antiStompButton = CreateButton(ButtonFrame1, "Anti Stomp: " .. (Config.AntiStompEnabled and "ON" or "OFF"), function()
-    Config.AntiStompEnabled = not Config.AntiStompEnabled
-    antiStompButton.Text = "Anti Stomp: " .. (Config.AntiStompEnabled and "ON" or "OFF")
-    sendNotification("Anti Stomp", Config.AntiStompEnabled and "Enabled" or "Disabled")
-    SaveSettings()
-end)
-
--- Vòng lặp kiểm tra
-RunService.Heartbeat:Connect(function()
-    if Config.AntiStompEnabled then
-        local char = game.Players.LocalPlayer.Character
-        local be = char and char:FindFirstChild("BodyEffects")
-        local ko = be and be:FindFirstChild("K.O")
-        if ko and ko.Value == true then
-            doAntiStomp()
-        end
-    end
-end)
-
 -- ======= CONFIG MẶC ĐỊNH =======
 Config.AntiLockEnabled = Config.AntiLockEnabled or false
 Config.AntiLockType = Config.AntiLockType or "Behind"
@@ -900,9 +863,9 @@ local function stompTarget(target)
     myHRP.CFrame = CFrame.new(pos + Vector3.new(0, 2, 0))
 
     -- Stomp (giả lập phím E)
-    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    keypress(Enum.KeyCode.E)
     task.wait(0.05)
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+    keyrelease(Enum.KeyCode.E)
 
     -- Chờ hoàn tất animation stomp
     task.wait(1.5)
@@ -949,20 +912,20 @@ local function getMyHumanoid()
     return char, hum, hrp
 end
 
--- ======= HÀM LẤY TARGET GẦN NHẤT =======
 local function getClosestSelected()
-    local myChar = LocalPlayer.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myHRP then return nil end
-    local closest, minDist
+    local _, _, myHRP = getMyHumanoid()
+    if not myHRP then return end
+    
+    local myPos, closest, minDist = myHRP.Position, nil, math.huge
     for name, selected in pairs(Config.SelectedPlayers or {}) do
         if selected then
-            local plr = Players:FindFirstChild(name)
-            local hrp = plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+            local hrp = Players:FindFirstChild(name)
+                and Players[name].Character
+                and Players[name].Character:FindFirstChild("HumanoidRootPart")
             if hrp then
-                local dist = (myHRP.Position - hrp.Position).Magnitude
-                if not minDist or dist < minDist then
-                    closest, minDist = plr, dist
+                local dist = (myPos - hrp.Position).Magnitude
+                if dist < minDist then
+                    closest, minDist = Players[name], dist
                 end
             end
         end
@@ -972,69 +935,36 @@ end
 
 local lastTargetName, lastNotify = nil, 0
 
--- === NÚT LOOK AT ===
-lookAtBtnRef = CreateButton(ButtonFrame1, "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF"), function()
-    Config.LookAtEnabled = not Config.LookAtEnabled
-    lookAtBtnRef.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF")
-    local _, hum = getMyHumanoid()
-    if hum then hum.AutoRotate = not Config.LookAtEnabled end
-    if not Config.LookAtEnabled then
-        lastTargetName = nil
-        lastNotify = 0
-    end
-    SaveSettings()
-end)
-
--- === LOOP XOAY ===
+-- LOOK AT chỉ hoạt động khi Csync bật
 RunService.RenderStepped:Connect(function()
-    if not Config.LookAtEnabled then return end  -- <== Chặn ngay từ đầu
-
+    if not (Config.CsyncOrbitEnabled or Config.CsyncRandomEnabled) then
+        Config.LookAtEnabled = false
+        return
+    end
+    
+    Config.LookAtEnabled = true
     local char, hum, hrp = getMyHumanoid()
     if not (hum and hrp) then return end
     hum.AutoRotate = false
 
     local targetPlr = getClosestSelected()
-    if not targetPlr then
-        Config.LookAtEnabled = false
-        lookAtBtnRef.Text = "Look At: OFF"
-        hum.AutoRotate = true
-        sendNotification("Look At", "Không có mục tiêu — tự tắt")
-        SaveSettings()
-        return
-    end
+    if not targetPlr then return end
 
     local thrp = targetPlr.Character and targetPlr.Character:FindFirstChild("HumanoidRootPart")
     if not thrp then return end
 
     local myPos = hrp.Position
     local tPos = thrp.Position
-    hrp.CFrame = hrp.CFrame:Lerp(CFrame.lookAt(myPos, Vector3.new(tPos.X, myPos.Y, tPos.Z)), 0.35)
-
-    -- Chỉ xoay yaw (không ngẩng cúi)
-    local myPos = hrp.Position
-    local tPos = thrp.Position
     local facePos = Vector3.new(tPos.X, myPos.Y, tPos.Z)
 
-    -- Lerp nhẹ để mượt
-    local desired = CFrame.lookAt(myPos, facePos)
-    hrp.CFrame = hrp.CFrame:Lerp(desired, 0.35)
-
-    -- Thông báo khi đổi target (anti-spam)
-    if targetPlr.Name ~= lastTargetName then
-        lastTargetName = targetPlr.Name
-        local now = tick()
-        if now - lastNotify > 0.25 then
-            sendNotification("Look At", "Đang hướng vào: " .. lastTargetName)
-            lastNotify = now
-        end
-    end
+    hrp.CFrame = hrp.CFrame:Lerp(CFrame.lookAt(myPos, facePos), 0.35)
 end)
 
--- (tuỳ chọn) khi nhân vật respawn, khôi phục AutoRotate đúng trạng thái
+-- Khi chết → tự reset AutoRotate
 LocalPlayer.CharacterAdded:Connect(function()
     task.defer(function()
         local _, hum = getMyHumanoid()
-        if hum then hum.AutoRotate = not Config.LookAtEnabled end
+        if hum then hum.AutoRotate = true end
     end)
 end)
 
@@ -1241,22 +1171,6 @@ if _G.VHUB_CSYNC_LOOP then _G.VHUB_CSYNC_LOOP:Disconnect() end
 _G.VHUB_CSYNC_LOOP = RunService.Heartbeat:Connect(function()
     if not currentTarget or not currentTarget.Parent then
         currentTarget = getClosestSelected()
-    end
-
-    -- Auto bật/tắt Look At
-    if currentTarget then
-        if not Config.LookAtEnabled then
-            Config.LookAtEnabled = true
-            lookAtBtnRef.Text = "Look At: ON"
-            sendNotification("Look At", "Tự bật khi Csync hoạt động")
-        end
-    else
-        if Config.LookAtEnabled then
-            Config.LookAtEnabled = false
-            lookAtBtnRef.Text = "Look At: OFF"
-            sendNotification("Look At", "Tự tắt vì không có target")
-        end
-        return
     end
 
     -- Nếu target bị KO → đổi target
