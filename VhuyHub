@@ -100,16 +100,80 @@ local function LoadSettings()
             return HttpService:JSONDecode(readfile(ConfigFile))
         end)
         if success and type(data) == "table" then
-            -- Gộp dữ liệu load vào Config hiện tại
             for k, v in pairs(data) do
                 Config[k] = v
             end
+            print("Loaded Config:", HttpService:JSONEncode(Config)) -- Debug
+            UpdateButtonStates() -- Cập nhật trạng thái giao diện sau khi load
         else
             warn("[LoadSettings] Lỗi đọc config:", data)
         end
     else
-        -- Nếu chưa có file thì tạo mới
         SaveSettings()
+    end
+end
+
+-- Hàm cập nhật trạng thái nút
+local function UpdateButtonStates()
+    if flyButton then
+        flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
+    end
+    if aimbotButton then
+        aimbotButton.Text = "Aimlock: " .. (Config.AimbotEnabled and "ON" or "OFF")
+    end
+    if espButton then
+        espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
+    end
+    if speedButton then
+        speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
+    end
+    if checkKOAimbotButton then
+        checkKOAimbotButton.Text = "Check K.O Aimlock: " .. (Config.checkKOAimbot and "ON" or "OFF")
+    end
+    if antiLockButton then
+        antiLockButton.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
+    end
+    if autoStompButton then
+        autoStompButton.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
+    end
+    if autoReloadButton then
+        autoReloadButton.Text = "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF")
+    end
+    if triggerBotButton then
+        triggerBotButton.Text = "TriggerBot: " .. (tbEnabled and "ON" or "OFF")
+    end
+    if csyncRandomButton then
+        csyncRandomButton.Text = "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF")
+    end
+    if csyncOrbitButton then
+        csyncOrbitButton.Text = "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF")
+    end
+    if customFovButton then
+        customFovButton.Text = "Custom FOV: " .. (customFovEnabled and "ON" or "OFF")
+    end
+    if fullbrightButton then
+        fullbrightButton.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
+    end
+    if autoWallhopButton then
+        autoWallhopButton.Text = "Auto Wallhop: " .. (Config.AutoWallhopEnabled and "ON" or "OFF")
+    end
+    if infiniteJumpButton then
+        infiniteJumpButton.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
+    end
+    if antiAfkButton then
+        antiAfkButton.Text = "Anti AFK: " .. (antiAfkEnabled and "ON" or "OFF")
+    end
+    if noclipButton then
+        noclipButton.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
+    end
+    if clickTpButton then
+        clickTpButton.Text = "Click TP: " .. (Config.clickTpEnabled and "ON" or "OFF")
+    end
+    if spinbotButton then
+        spinbotButton.Text = "Spinbot: " .. (Config.SpinbotEnabled and "ON" or "OFF")
+    end
+    if flintTouchButton then
+        flintTouchButton.Text = "FlintTouch: " .. (hiddenFling and "ON" or "OFF")
     end
 end
 
