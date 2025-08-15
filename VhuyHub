@@ -930,31 +930,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Nút Resolver mới
-resolverButton = CreateButton(ButtonFrame1, "Resolver: OFF", function()
-    Config.ResolverEnabled = not Config.ResolverEnabled
-    resolverButton.Text = "Resolver: " .. (Config.ResolverEnabled and "ON" or "OFF")
-    sendNotification("Resolver", Config.ResolverEnabled and "Enabled" or "Disabled")
-    SaveSettings()
-end)
-
--- Logic Resolver mới
-if _G.__custom_resolver_conn then
-    _G.__custom_resolver_conn:Disconnect()
-end
-
-_G.__custom_resolver_conn = RunService.Heartbeat:Connect(function()
-    if not Config.ResolverEnabled then return end
-
-    local target = getClosestSelected()
-    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-        local hrp = target.Character.HumanoidRootPart
-        -- Xử lý velocity: khử trục Y
-        hrp.Velocity = Vector3.new(hrp.Velocity.X, 0, hrp.Velocity.Z)
-        hrp.AssemblyLinearVelocity = Vector3.new(hrp.Velocity.X, 0, hrp.Velocity.Z)
-    end
-end)
-
 -- ==== CONFIG ====
 if Config.LookAtEnabled == nil then Config.LookAtEnabled = false end
 
@@ -1010,14 +985,12 @@ end
 
 local lastTargetName, lastNotify = nil, 0
 
+-- === NÚT LOOK AT ===
 lookAtBtnRef = CreateButton(ButtonFrame1, "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF"), function()
     Config.LookAtEnabled = not Config.LookAtEnabled
     lookAtBtnRef.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF")
-
-    -- đồng bộ AutoRotate như catus (khi enable thì tắt autorotate để mình điều khiển hướng)
     local _, hum = getMyHumanoid()
     if hum then hum.AutoRotate = not Config.LookAtEnabled end
-
     if not Config.LookAtEnabled then
         lastTargetName = nil
         lastNotify = 0
@@ -1025,32 +998,30 @@ lookAtBtnRef = CreateButton(ButtonFrame1, "Look At: " .. (Config.LookAtEnabled a
     SaveSettings()
 end)
 
--- ==== LOOP XOAY NHÂN VẬT NHÌN TARGET (theo logic catus: xoay HRP) ====
+-- === LOOP XOAY ===
 RunService.RenderStepped:Connect(function()
-    if not Config.LookAtEnabled then return end
+    if not Config.LookAtEnabled then return end  -- <== Chặn ngay từ đầu
 
     local char, hum, hrp = getMyHumanoid()
     if not (hum and hrp) then return end
-
-    -- đảm bảo autorotate tắt khi đang bật look-at
-    if hum.AutoRotate ~= false then hum.AutoRotate = false end
+    hum.AutoRotate = false
 
     local targetPlr = getClosestSelected()
-
-    -- Nếu không có target → tự tắt Look At
     if not targetPlr then
         Config.LookAtEnabled = false
         lookAtBtnRef.Text = "Look At: OFF"
         hum.AutoRotate = true
-        sendNotification("Look At", "Không có mục tiêu — tự động tắt")
+        sendNotification("Look At", "Không có mục tiêu — tự tắt")
         SaveSettings()
-        lastTargetName = nil
-        lastNotify = 0
         return
     end
 
     local thrp = targetPlr.Character and targetPlr.Character:FindFirstChild("HumanoidRootPart")
     if not thrp then return end
+
+    local myPos = hrp.Position
+    local tPos = thrp.Position
+    hrp.CFrame = hrp.CFrame:Lerp(CFrame.lookAt(myPos, Vector3.new(tPos.X, myPos.Y, tPos.Z)), 0.35)
 
     -- Chỉ xoay yaw (không ngẩng cúi)
     local myPos = hrp.Position
@@ -1078,29 +1049,6 @@ LocalPlayer.CharacterAdded:Connect(function()
         local _, hum = getMyHumanoid()
         if hum then hum.AutoRotate = not Config.LookAtEnabled end
     end)
-end)
-
--- Config mặc định
-if Config.LegitMacroEnabled == nil then Config.LegitMacroEnabled = false end
-
--- Nút bật/tắt Legit Macro
-legitMacroBtn = CreateButton(ButtonFrame1, "Legit Macro: " .. (Config.LegitMacroEnabled and "ON" or "OFF"), function()
-    Config.LegitMacroEnabled = not Config.LegitMacroEnabled
-    legitMacroBtn.Text = "Legit Macro: " .. (Config.LegitMacroEnabled and "ON" or "OFF")
-    sendNotification("Legit Macro", Config.LegitMacroEnabled and "Enabled" or "Disabled")
-    SaveSettings()
-end)
-
--- Loop macro
-RunService.Heartbeat:Connect(function()
-    if Config.LegitMacroEnabled then
-        -- Scroll Up
-        game:GetService("VirtualInputManager"):SendMouseWheelEvent(0, 0, true, game)
-        RunService.Heartbeat:Wait()
-        -- Scroll Down
-        game:GetService("VirtualInputManager"):SendMouseWheelEvent(0, 0, false, game)
-        RunService.Heartbeat:Wait()
-    end
 end)
 
 -- ======= CONFIG MẶC ĐỊNH =======
@@ -1508,53 +1456,68 @@ fullbrightButton = CreateButton(ButtonFrame2Left, "Fullbright: OFF", function()
     SaveSettings()
 end)
 
--- Auto Wallhop Button
-autoWallhopEnabled = false
-autoWallhopButton = CreateButton(ButtonFrame2Left, "Auto Wallhop: OFF", function()
-    autoWallhopEnabled = not autoWallhopEnabled
-    autoWallhopButton.Text = "Auto Wallhop: " .. (autoWallhopEnabled and "ON" or "OFF")
-    sendNotification("Auto Wallhop", autoWallhopEnabled and "Enabled" or "Disabled")
+-- Auto Wallhop Config
+if Config.AutoWallhopEnabled == nil then Config.AutoWallhopEnabled = false end
+
+-- Nút bật/tắt
+autoWallhopButton = CreateButton(ButtonFrame2Left, "Auto Wallhop: " .. (Config.AutoWallhopEnabled and "ON" or "OFF"), function()
+    Config.AutoWallhopEnabled = not Config.AutoWallhopEnabled
+    autoWallhopButton.Text = "Auto Wallhop: " .. (Config.AutoWallhopEnabled and "ON" or "OFF")
+    sendNotification("Auto Wallhop", Config.AutoWallhopEnabled and "Enabled" or "Disabled")
     SaveSettings()
 end)
 
--- Wallhop Logic
+-- Services
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
 
-local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local rootPart = character:WaitForChild("HumanoidRootPart")
+-- Biến cập nhật khi respawn
+local character, humanoid, rootPart
 
-local isPerformingWallHop = false
+local function updateCharacterRefs()
+    character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+    humanoid = character:WaitForChild("Humanoid")
+    rootPart = character:WaitForChild("HumanoidRootPart")
+end
 
--- Detect wall in front
+updateCharacterRefs()
+LocalPlayer.CharacterAdded:Connect(updateCharacterRefs)
+
+-- Check tường trước mặt
 local function isWallInFront()
+    if not rootPart then return false end
     local raycastParams = RaycastParams.new()
     raycastParams.FilterDescendantsInstances = {character}
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    local raycastResult = Workspace:Raycast(rootPart.Position, rootPart.CFrame.LookVector * 2, raycastParams)
-    return raycastResult and raycastResult.Instance ~= nil
+
+    local origin = rootPart.Position + Vector3.new(0, 2, 0) -- raycast từ ngực
+    local direction = rootPart.CFrame.LookVector * 2 -- khoảng cách 2 studs
+    local result = Workspace:Raycast(origin, direction, raycastParams)
+
+    return result and result.Instance ~= nil
 end
 
--- Perform wallhop
+-- Thực hiện wallhop
+local isPerformingWallHop = false
 local function performWallHop()
-    if not autoWallhopEnabled or isPerformingWallHop then return end
+    if not Config.AutoWallhopEnabled or isPerformingWallHop or not humanoid or not rootPart then return end
     isPerformingWallHop = true
-    while autoWallhopEnabled and isWallInFront() do
-        humanoid.Jump = true
-        rootPart.Velocity = Vector3.new(0, 60, 0) -- lực nhảy
-        task.wait(0) -- chờ nhảy
-        rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, math.rad(-35), 0) -- xoay nhẹ
-        task.wait(0.4) -- delay
+
+    while Config.AutoWallhopEnabled and isWallInFront() do
+        humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        rootPart.AssemblyLinearVelocity = Vector3.new(0, 60, 0) -- lực nhảy
+        task.wait(0.05) -- tránh spam quá nhanh
+        rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, math.rad(-35), 0)
     end
+
     isPerformingWallHop = false
 end
 
--- Loop check
+-- Loop
 RunService.Heartbeat:Connect(function()
-    if autoWallhopEnabled then
+    if Config.AutoWallhopEnabled then
         performWallHop()
     end
 end)
