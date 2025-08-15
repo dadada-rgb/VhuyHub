@@ -1066,67 +1066,7 @@ end)
 -- ==== CONFIG ====
 Config.AutoShiftLockEnabled = Config.AutoShiftLockEnabled or false
 
--- ==== NÚT AUTO SHIFTLOCK ====
-autoShiftLockButton = CreateButton(ButtonFrame1, "AutoShiftLock: " .. (Config.AutoShiftLockEnabled and "ON" or "OFF"), function()
-    Config.AutoShiftLockEnabled = not Config.AutoShiftLockEnabled
-    autoShiftLockButton.Text = "AutoShiftLock: " .. (Config.AutoShiftLockEnabled and "ON" or "OFF")
-    sendNotification("AutoShiftLock", Config.AutoShiftLockEnabled and "Enabled" or "Disabled")
-    SaveSettings()
-end)
 
--- ==== LOGIC AUTO SHIFTLOCK ====
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-
-local function enableShiftLock()
-    -- Ép bật chế độ ShiftLock
-    LocalPlayer.DevEnableMouseLock = true
-    LocalPlayer.DevComputerCameraMode = Enum.DevComputerCameraMovementMode.LockFirstPerson
-
-    -- Ép hiện crosshair
-    local gui = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if gui then
-        local crosshair = gui:FindFirstChild("Crosshair", true)
-        if crosshair and crosshair:IsA("GuiObject") then
-            crosshair.Visible = true
-        else
-            -- Tạo crosshair custom nếu game không có
-            if not gui:FindFirstChild("VHUB_Crosshair") then
-                local frame = Instance.new("Frame")
-                frame.Name = "VHUB_Crosshair"
-                frame.Size = UDim2.new(0, 4, 0, 4)
-                frame.Position = UDim2.new(0.5, -2, 0.5, -2)
-                frame.BackgroundColor3 = Color3.new(1, 1, 1)
-                frame.BorderSizePixel = 0
-                frame.Parent = gui
-            end
-        end
-    end
-end
-
--- Loop giữ trạng thái AutoShiftLock
-if _G.__vhuyhub_shiftlock then
-    _G.__vhuyhub_shiftlock:Disconnect()
-end
-
-_G.__vhuyhub_shiftlock = RunService.Heartbeat:Connect(function()
-    if Config.AutoShiftLockEnabled then
-        pcall(enableShiftLock)
-    end
-end)
-
--- Trả camera về mặc định khi tắt
-local function disableShiftLock()
-    LocalPlayer.DevComputerCameraMode = Enum.DevComputerCameraMovementMode.Follow
-end
-
--- Theo dõi khi tắt AutoShiftLock
-RunService.Heartbeat:Connect(function()
-    if not Config.AutoShiftLockEnabled then
-        disableShiftLock()
-    end
-end)
 
 -- ==== CONFIG ====
 if Config.LookAtEnabled == nil then Config.LookAtEnabled = false end
@@ -1249,14 +1189,11 @@ _G.__vhuyhub_resolver_conn = RunService.Heartbeat:Connect(function()
     _G.ResolverPosition = predictedPos
 end)
 
--- ==== NÚT LOOK AT (dùng CreateButton) ====
-local lookAtBtnRef
 local lastTargetName, lastNotify = nil, 0
 
-lookAtBtnRef = CreateButton(ButtonFrame1, "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF"), function(btn)
-    local b = btn or lookAtBtnRef
+lookAtBtnRef = CreateButton(ButtonFrame1, "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF"), function()
     Config.LookAtEnabled = not Config.LookAtEnabled
-    b.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF")
+    lookAtBtnRef.Text = "Look At: " .. (Config.LookAtEnabled and "ON" or "OFF")
 
     -- đồng bộ AutoRotate như catus (khi enable thì tắt autorotate để mình điều khiển hướng)
     local _, hum = getMyHumanoid()
