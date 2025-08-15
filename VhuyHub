@@ -1162,45 +1162,67 @@ createLabeledBox(boxFrame, "Radius", Config.CsyncRadius, function(v) Config.Csyn
 createLabeledBox(boxFrame, "Height", Config.CsyncHeight, function(v) Config.CsyncHeight = v end, UDim2.new(1/3, 0, 0, 0))
 createLabeledBox(boxFrame, "Speed",  Config.CsyncSpeed,  function(v) Config.CsyncSpeed  = v end, UDim2.new(2/3, 0, 0, 0))
 
--- ========================
--- Logic Csync + Look At auto
--- ========================
 local currentTarget = nil
+local csyncPaused = false
 
 if _G.VHUB_CSYNC_LOOP then _G.VHUB_CSYNC_LOOP:Disconnect() end
 _G.VHUB_CSYNC_LOOP = RunService.Heartbeat:Connect(function()
+    -- Nếu chưa có target hoặc target không tồn tại → tìm mới
     if not currentTarget or not currentTarget.Parent then
         currentTarget = getClosestSelected()
     end
 
-    -- Nếu target bị KO → đổi target
+    -- Nếu đang pause thì thử tìm lại target để resume
+    if csyncPaused then
+        if currentTarget then
+            csyncPaused = false
+            sendNotification("Csync", "Tiếp tục tấn công target: " .. currentTarget.Name)
+        else
+            return
+        end
+    end
+
+    -- Nếu vẫn không có target thì dừng (pause)
+    if not currentTarget then
+        csyncPaused = true
+        return
+    end
+
+    -- Nếu target bị KO → đổi target hoặc pause
     if isKO(currentTarget) then
         local nextTarget = getNextTarget(currentTarget)
         if nextTarget then
             currentTarget = nextTarget
             sendNotification("Csync", "Chuyển sang target: " .. nextTarget.Name)
         else
-            Config.CsyncRandomEnabled = false
-            Config.CsyncOrbitEnabled = false
-            csyncRandomButton.Text = "Csync Random: OFF"
-            csyncOrbitButton.Text = "Csync Orbit: OFF"
+            csyncPaused = true
             sendNotification("Csync", "Không còn target khả dụng. Tạm dừng.")
             return
         end
     end
 
-    -- Thực hiện Csync
-    local hrp = currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart")
-    local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not hrp or not myHRP then return end
+    -- Thực hiện Csync nếu không pause
+    if not csyncPaused then
+        local hrp = currentTarget.Character and currentTarget.Character:FindFirstChild("HumanoidRootPart")
+        local myHRP = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp or not myHRP then return end
 
-    if Config.CsyncOrbitEnabled then
-        local t = tick() * Config.CsyncSpeed
-        local pos = hrp.Position + Vector3.new(math.cos(t) * Config.CsyncRadius, Config.CsyncHeight, math.sin(t) * Config.CsyncRadius)
-        myHRP.CFrame = CFrame.new(pos, hrp.Position)
-    elseif Config.CsyncRandomEnabled then
-        local offset = Vector3.new(math.random(-Config.CsyncRadius, Config.CsyncRadius), Config.CsyncHeight, math.random(-Config.CsyncRadius, Config.CsyncRadius))
-        myHRP.CFrame = CFrame.new(hrp.Position + offset, hrp.Position)
+        if Config.CsyncOrbitEnabled then
+            local t = tick() * Config.CsyncSpeed
+            local pos = hrp.Position + Vector3.new(
+                math.cos(t) * Config.CsyncRadius,
+                Config.CsyncHeight,
+                math.sin(t) * Config.CsyncRadius
+            )
+            myHRP.CFrame = CFrame.new(pos, hrp.Position)
+        elseif Config.CsyncRandomEnabled then
+            local offset = Vector3.new(
+                math.random(-Config.CsyncRadius, Config.CsyncRadius),
+                Config.CsyncHeight,
+                math.random(-Config.CsyncRadius, Config.CsyncRadius)
+            )
+            myHRP.CFrame = CFrame.new(hrp.Position + offset, hrp.Position)
+        end
     end
 end)
 
@@ -1215,11 +1237,6 @@ LocalPlayer.CharacterAdded:Connect(function()
         csyncOrbitButton.Text = "Csync Orbit: OFF"
         csyncRandomButton.Text = "Csync Random: OFF"
         sendNotification("Csync", "Đã tắt vì bạn chết")
-    end
-    if Config.LookAtEnabled then
-        Config.LookAtEnabled = false
-        lookAtBtnRef.Text = "Look At: OFF"
-        sendNotification("Look At", "Tự tắt khi chết")
     end
 end)
 
