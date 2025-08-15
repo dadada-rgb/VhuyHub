@@ -1250,6 +1250,65 @@ LocalPlayer.CharacterAdded:Connect(function()
     end)
 end)
 
+Config.TPBulletEnabled = Config.TPBulletEnabled or false
+
+tpBulletButton = CreateButton(ButtonFrame1, "TP Bullet: " .. (Config.TPBulletEnabled and "ON" or "OFF"), function()
+    Config.TPBulletEnabled = not Config.TPBulletEnabled
+    tpBulletButton.Text = "TP Bullet: " .. (Config.TPBulletEnabled and "ON" or "OFF")
+    sendNotification("TP Bullet", Config.TPBulletEnabled and "Enabled" or "Disabled")
+    SaveSettings()
+end)
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Hàm tìm target gần nhất trong danh sách
+local function getClosestSelected()
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return nil end
+    local closest, minDist
+    for name, selected in pairs(Config.SelectedPlayers or {}) do
+        if selected then
+            local plr = Players:FindFirstChild(name)
+            local hrp = plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dist = (myHRP.Position - hrp.Position).Magnitude
+                if not minDist or dist < minDist then
+                    closest, minDist = plr, dist
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- Hàm TP Bullet an toàn
+local function tpBulletsToTarget()
+    local target = getClosestSelected()
+    if not target or not target.Character then return end
+
+    local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v:IsA("Part") and v.Name == "Bullet" then
+            v.CFrame = hrp.CFrame
+        end
+    end
+end
+
+-- Loop để TP Bullet khi bật
+if _G.__vhuyhub_tpb then
+    _G.__vhuyhub_tpb:Disconnect()
+end
+_G.__vhuyhub_tpb = RunService.Heartbeat:Connect(function()
+    if Config.TPBulletEnabled then
+        pcall(tpBulletsToTarget)
+    end
+end)
+
 -- ======= CONFIG MẶC ĐỊNH =======
 Config.AutoReloadEnabled = Config.AutoReloadEnabled or false
 
