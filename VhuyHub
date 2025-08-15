@@ -742,7 +742,10 @@ local function doAntiStomp()
     if not char then return end
     for _, obj in pairs(char:GetDescendants()) do
         if obj:IsA("BasePart") then
-            obj:Destroy()
+            if obj.Name ~= "HumanoidRootPart" then
+                obj.CanCollide = false
+                obj.Transparency = 1
+            end
         end
     end
 end
@@ -875,33 +878,37 @@ local function getKOSelected()
     return nil
 end
 
-local function stompTarget(target)  
-    local myChar = LocalPlayer.Character  
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")  
-    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")  
-    if not myHRP or not myHum then return end  
-  
-    local lowerTorso = target.Character and target.Character:FindFirstChild("LowerTorso")  
-    if not lowerTorso then return end  
-  
-    local oldCFrame = myHRP.CFrame  
-  
-    -- Dừng mọi hành động  
-     
-  
-    -- TP tới target  
-    myHRP.CFrame = lowerTorso.CFrame + Vector3.new(0, 2, 0)  
-  
-    -- Giả lập bấm E  
-    keypress(Enum.KeyCode.E)  
-    task.wait(0.05)  
-    keyrelease(Enum.KeyCode.E)  
-  
-    -- Chờ 1.5 giây  
-    task.wait(1.5)  
-  
-    -- Trả về vị trí cũ  
-    myHRP.CFrame = oldCFrame 
+local function stompTarget(target)
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+    if not myHRP or not myHum then return end
+
+    local targetHRP = target.Character and target.Character:FindFirstChild("LowerTorso")
+    if not targetHRP then return end
+
+    local oldCFrame = myHRP.CFrame
+
+    -- Lưu trạng thái humanoid ban đầu
+    local oldState = myHum:GetState()
+
+    -- Dừng animation & hành động
+    myHum:ChangeState(Enum.HumanoidStateType.Physics)
+
+    -- TP đến vị trí phía trên target
+    local pos = targetHRP.Position
+    myHRP.CFrame = CFrame.new(pos + Vector3.new(0, 2, 0))
+
+    -- Stomp (giả lập phím E)
+    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(0.05)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+
+    -- Chờ hoàn tất animation stomp
+    task.wait(1.5)
+
+    myHRP.CFrame = oldCFrame
+    myHum:ChangeState(oldState)
 end
 
 -- AutoStomp + Auto disable/enable AntiLock
@@ -940,26 +947,6 @@ local function getMyHumanoid()
     local hum = char:FindFirstChildOfClass("Humanoid")
     local hrp = char:FindFirstChild("HumanoidRootPart")
     return char, hum, hrp
-end
-
-local function getClosestSelected()
-    local _, _, myHRP = getMyHumanoid()
-    if not myHRP then return nil end
-    local myPos = myHRP.Position
-    local closest, dmin = nil, math.huge
-
-    for name, selected in pairs(Config.SelectedPlayers or {}) do
-        if selected then
-            local plr = Players:FindFirstChild(name)
-            local chr = plr and plr.Character
-            local thrp = chr and chr:FindFirstChild("HumanoidRootPart")
-            if thrp then
-                local d = (myPos - thrp.Position).Magnitude
-                if d < dmin then closest, dmin = plr, d end
-            end
-        end
-    end
-    return closest
 end
 
 -- ======= HÀM LẤY TARGET GẦN NHẤT =======
