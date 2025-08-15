@@ -972,7 +972,7 @@ end)
 Config.AutoReloadEnabled = Config.AutoReloadEnabled or false
 
 -- ======= NÚT AUTO RELOAD =======
-local autoReloadButton = CreateButton(ButtonFrame1, "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF"), function()
+autoReloadButton = CreateButton(ButtonFrame1, "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF"), function()
     Config.AutoReloadEnabled = not Config.AutoReloadEnabled
     autoReloadButton.Text = "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF")
     sendNotification("Auto Reload", Config.AutoReloadEnabled and "Enabled" or "Disabled")
@@ -1409,8 +1409,8 @@ local function performWallHop()
     while Config.AutoWallhopEnabled and isWallInFront() do
         humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
         rootPart.AssemblyLinearVelocity = Vector3.new(0, 60, 0) -- lực nhảy
-        task.wait(0.05) -- tránh spam quá nhanh
         rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, math.rad(-35), 0)
+        task.wait(0.05) -- tránh spam quá nhanh
     end
 
     isPerformingWallHop = false
@@ -1661,7 +1661,7 @@ spinbotSpeedBox.PlaceholderText = "Speed"
 spinbotSpeedBox.ClearTextOnFocus = false
 spinbotSpeedBox.Font = Enum.Font.GothamBold
 spinbotSpeedBox.TextSize = 12
-spinbotSpeedBox.Parent = ButtonFrame2
+spinbotSpeedBox.Parent = ButtonFrame2Right
 Instance.new("UICorner", spinbotSpeedBox).CornerRadius = UDim.new(0, 4)
 
 spinbotSpeedBox.FocusLost:Connect(function()
