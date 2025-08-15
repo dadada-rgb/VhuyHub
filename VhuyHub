@@ -1036,17 +1036,28 @@ RunService.RenderStepped:Connect(function()
     if hum.AutoRotate ~= false then hum.AutoRotate = false end
 
     local targetPlr = getClosestSelected()
-    if not targetPlr then return end
+
+    -- Nếu không có target → tự tắt Look At
+    if not targetPlr then
+        Config.LookAtEnabled = false
+        lookAtBtnRef.Text = "Look At: OFF"
+        hum.AutoRotate = true
+        sendNotification("Look At", "Không có mục tiêu — tự động tắt")
+        SaveSettings()
+        lastTargetName = nil
+        lastNotify = 0
+        return
+    end
 
     local thrp = targetPlr.Character and targetPlr.Character:FindFirstChild("HumanoidRootPart")
     if not thrp then return end
 
-    -- CHỈ xoay yaw như catus (không ngẩng cúi), giữ nguyên cao độ
+    -- Chỉ xoay yaw (không ngẩng cúi)
     local myPos = hrp.Position
     local tPos = thrp.Position
     local facePos = Vector3.new(tPos.X, myPos.Y, tPos.Z)
 
-    -- set hướng: dùng lookAt + lerp nhẹ để mượt (giống feel của catus)
+    -- Lerp nhẹ để mượt
     local desired = CFrame.lookAt(myPos, facePos)
     hrp.CFrame = hrp.CFrame:Lerp(desired, 0.35)
 
@@ -1072,42 +1083,24 @@ end)
 -- Config mặc định
 if Config.LegitMacroEnabled == nil then Config.LegitMacroEnabled = false end
 
-local legitMacroConn
-
--- Hàm bật macro
-local function enableLegitMacro()
-    legitMacroConn = task.spawn(function()
-        while Config.LegitMacroEnabled do
-            game:GetService("RunService").Heartbeat:Wait()
-            game:GetService("VirtualInputManager"):SendMouseWheelEvent(0.1, 0.1, true, game)  -- delay scroll up
-            game:GetService("RunService").Heartbeat:Wait()
-            game:GetService("VirtualInputManager"):SendMouseWheelEvent(0.1, 0.1, false, game) -- delay scroll down
-            game:GetService("RunService").Heartbeat:Wait()
-        end
-    end)
-end
-
--- Hàm tắt macro
-local function disableLegitMacro()
-    if legitMacroConn then
-        task.cancel(legitMacroConn)
-        legitMacroConn = nil
-    end
-end
-
 -- Nút bật/tắt Legit Macro
-legitMacroButton = CreateButton(ButtonFrame1, "Legit Macro: " .. (Config.LegitMacroEnabled and "ON" or "OFF"), function()
+legitMacroBtn = CreateButton(ButtonFrame1, "Legit Macro: " .. (Config.LegitMacroEnabled and "ON" or "OFF"), function()
     Config.LegitMacroEnabled = not Config.LegitMacroEnabled
-    legitMacroButton.Text = "Legit Macro: " .. (Config.LegitMacroEnabled and "ON" or "OFF")
+    legitMacroBtn.Text = "Legit Macro: " .. (Config.LegitMacroEnabled and "ON" or "OFF")
     sendNotification("Legit Macro", Config.LegitMacroEnabled and "Enabled" or "Disabled")
-
-    if Config.LegitMacroEnabled then
-        enableLegitMacro()
-    else
-        disableLegitMacro()
-    end
-
     SaveSettings()
+end)
+
+-- Loop macro
+RunService.Heartbeat:Connect(function()
+    if Config.LegitMacroEnabled then
+        -- Scroll Up
+        game:GetService("VirtualInputManager"):SendMouseWheelEvent(0, 0, true, game)
+        RunService.Heartbeat:Wait()
+        -- Scroll Down
+        game:GetService("VirtualInputManager"):SendMouseWheelEvent(0, 0, false, game)
+        RunService.Heartbeat:Wait()
+    end
 end)
 
 -- ======= CONFIG MẶC ĐỊNH =======
@@ -1427,84 +1420,69 @@ fovBox:GetPropertyChangedSignal("Text"):Connect(function()
     end
 end)
 
--- ======= NÚT KOR ANIM =======
-local korAnimEnabled = false
-local korAnimConn
+-- Config
+getgenv().KorAnimEnabled = true
+getgenv().RightUpperLegAccessories = {
+    {id = 18457575895}, -- accessory ID
+}
+getgenv().KorAnimDelay = 1 -- thời gian chờ sau khi spawn trước khi chỉnh
 
-local function enableKorAnim()
-    local player = game.Players.LocalPlayer
-    local character = player.Character or player.CharacterAdded:Wait()
+local function hideRightLegAndAddAccessories(character)
+    local rightUpperLeg = character:FindFirstChild("RightUpperLeg")
+    if rightUpperLeg then
+        -- Ẩn Upper Leg
+        rightUpperLeg.Transparency = 1
 
-    getgenv().Time = 1
-    getgenv().RightUpperLegAccessories = {
-        {id = 18457575895}, 
-    }
+        -- Xóa Lower Leg & Foot
+        local rightLowerLeg = character:FindFirstChild("RightLowerLeg")
+        local rightFoot = character:FindFirstChild("RightFoot")
+        if rightLowerLeg then rightLowerLeg:Destroy() end
+        if rightFoot then rightFoot:Destroy() end
 
-    local function hideRightLegAndAddAccessories(character)
-        local rightUpperLeg = character:FindFirstChild("RightUpperLeg")
-        if rightUpperLeg then
-            rightUpperLeg.Transparency = 1
-            local rightLowerLeg = character:FindFirstChild("RightLowerLeg")
-            local rightFoot = character:FindFirstChild("RightFoot")
-            if rightLowerLeg then rightLowerLeg:Destroy() end
-            if rightFoot then rightFoot:Destroy() end
-
-            for _, accessory in ipairs(getgenv().RightUpperLegAccessories) do
-                local acc = game:GetObjects("rbxassetid://" .. tostring(accessory.id))[1]
-                if acc then
-                    acc.Parent = workspace
-                    local handle = acc:FindFirstChild("Handle")
-                    if handle then
-                        handle.CFrame = rightUpperLeg.CFrame
-                        local weld = Instance.new("Weld")
-                        weld.Part0 = handle
-                        weld.Part1 = rightUpperLeg
-                        weld.C0 = CFrame.new(0, -0.12, 0)
-                        weld.Parent = handle
-                        acc.Parent = character
-                    end
+        -- Gắn accessories
+        for _, accessoryData in ipairs(getgenv().RightUpperLegAccessories) do
+            local accessory = game:GetObjects("rbxassetid://" .. tostring(accessoryData.id))[1]
+            if accessory then
+                accessory.Parent = game.Workspace
+                local handle = accessory:FindFirstChild("Handle")
+                if handle then
+                    handle.CFrame = rightUpperLeg.CFrame
+                    local weld = Instance.new("Weld")
+                    weld.Part0 = handle
+                    weld.Part1 = rightUpperLeg
+                    weld.C0 = CFrame.new(0, -0.12, 0)
+                    weld.Parent = handle
+                    accessory.Parent = character
                 end
             end
         end
     end
-
-    local function onCharacterAdded(char)
-        task.wait(getgenv().Time)
-        hideRightLegAndAddAccessories(char)
-    end
-
-    player.CharacterAdded:Connect(onCharacterAdded)
-    if player.Character then
-        onCharacterAdded(player.Character)
-    end
-
-    korAnimConn = game:GetService("RunService").Stepped:Connect(function()
-        local char = player.Character
-        if char and char:FindFirstChild("Animate") then
-            char.Animate.run.RunAnim.AnimationId = "http://www.roblox.com/asset/?id=616163682"
-            char.Animate.jump.JumpAnim.AnimationId = "http://www.roblox.com/asset/?id=10921242013"
-            char.Animate.fall.FallAnim.AnimationId = "http://www.roblox.com/asset/?id=707829716"
-        end
-    end)
 end
 
-local function disableKorAnim()
-    if korAnimConn then
-        korAnimConn:Disconnect()
-        korAnimConn = nil
-    end
-    -- Nếu muốn reset lại anim mặc định thì có thể thêm đoạn code khôi phục ở đây
+local function applyKorAnim(character)
+    task.wait(getgenv().KorAnimDelay)
+    hideRightLegAndAddAccessories(character)
 end
 
-korAnimButton = CreateButton(ButtonFrame2Left, "Kor Anim: OFF", function()
-    korAnimEnabled = not korAnimEnabled
-    korAnimButton.Text = "Kor Anim: " .. (korAnimEnabled and "ON" or "OFF")
-    sendNotification("Kor Anim", korAnimEnabled and "Enabled" or "Disabled")
+-- Theo dõi khi spawn nhân vật mới
+game.Players.LocalPlayer.CharacterAdded:Connect(function(char)
+    applyKorAnim(char)
+end)
 
-    if korAnimEnabled then
-        enableKorAnim()
-    else
-        disableKorAnim()
+-- Nếu đang sống thì áp dụng luôn
+if game.Players.LocalPlayer.Character then
+    applyKorAnim(game.Players.LocalPlayer.Character)
+end
+
+-- Đổi animation liên tục
+game:GetService("RunService").Stepped:Connect(function()
+    if not getgenv().KorAnimEnabled then return end
+    local char = game.Players.LocalPlayer.Character
+    if char and char:FindFirstChild("Animate") then
+        local anim = char.Animate
+        anim.run.RunAnim.AnimationId = "http://www.roblox.com/asset/?id=616163682"
+        anim.jump.JumpAnim.AnimationId = "http://www.roblox.com/asset/?id=10921242013"
+        anim.fall.FallAnim.AnimationId = "http://www.roblox.com/asset/?id=707829716"
     end
 end)
 
