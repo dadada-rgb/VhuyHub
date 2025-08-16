@@ -9,13 +9,22 @@ local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local HttpService = game:GetService("HttpService")
-local LocalPlayer = game:GetService("Players").LocalPlayer
+local StarterGui = game:GetService("StarterGui")
+
+function sendNotification(title, text, duration)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title or "DhuyxDtuyen",
+            Text = text or "",
+            Duration = duration or 3
+        })
+    end)
+end
 
 -- Cấu trúc config mặc định
 local Config = {
     Buttons = {}, -- Lưu keybind + trạng thái của từng chức năng
-    ESPEnabled = false,
+    ESPEnabled = true,
     SpeedEnabled = false,
     FlyEnabled = false,
     AimbotEnabled = false,
@@ -32,7 +41,7 @@ local Config = {
 }
 
 local autoSelect = false
-local tbEnabled = false
+local tbEnabled = true
 local fovRadius = 20
 local Player = nil
 local camera = Workspace.CurrentCamera
@@ -566,8 +575,8 @@ end
 -- Nút cho trang 1
 espButton = CreateButton(ButtonFrame1, "ESP: OFF", function()
     Config.ESPEnabled = not Config.ESPEnabled
-    sendNotification("ESP", Config.ESPEnabled and "ON" or "OFF")
     espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
+    sendNotification("ESP", Config.ESPEnabled and "ON" or "OFF")
 end)
 
 speedButton = CreateButton(ButtonFrame1, "Speed: OFF", function()
@@ -603,16 +612,15 @@ macroLegitButton = CreateButton(ButtonFrame1, "Macro Legit: " .. (Config.MacroLe
     macroLegitButton.Text = "Macro Legit: " .. (Config.MacroLegitEnabled and "ON" or "OFF")
     sendNotification("Macro Legit", Config.MacroLegitEnabled and "Enabled" or "Disabled")
 
-    -- Nếu bật thì chạy loop
     if Config.MacroLegitEnabled then
         task.spawn(function()
-            while Config.MacroLegitEnabled do
-                RunService.Heartbeat:Wait()
+            repeat
+                game:GetService("RunService").Heartbeat:Wait()
                 game:GetService("VirtualInputManager"):SendMouseWheelEvent(0.1, 0.1, true, game)
-                RunService.Heartbeat:Wait()
+                game:GetService("RunService").Heartbeat:Wait()
                 game:GetService("VirtualInputManager"):SendMouseWheelEvent(0.1, 0.1, false, game)
-                RunService.Heartbeat:Wait()
-            end
+                game:GetService("RunService").Heartbeat:Wait()
+            until not Config.MacroLegitEnabled
         end)
     end
 end)
