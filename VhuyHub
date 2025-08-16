@@ -1028,7 +1028,6 @@ _G.VHUB_CSYNC_LOOP = RunService.Heartbeat:Connect(function()
     if csyncPaused then
         if currentTarget then
             csyncPaused = false
-            sendNotification("Csync", "Tiếp tục tấn công target: " .. currentTarget.Name)
         else
             return
         end
@@ -1045,7 +1044,6 @@ _G.VHUB_CSYNC_LOOP = RunService.Heartbeat:Connect(function()
         local nextTarget = getNextTarget(currentTarget)
         if nextTarget then
             currentTarget = nextTarget
-            sendNotification("Csync", "Chuyển sang target: " .. nextTarget.Name)
         else
             csyncPaused = true
             return
