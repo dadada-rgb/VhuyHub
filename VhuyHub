@@ -909,18 +909,18 @@ local function isKO(plr)
 end
 
 local function getClosestSelected()
-    local myChar = LocalPlayer.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myHRP then return nil end
-    local closest, minDist
+    local closest, dist = nil, math.huge
     for name, selected in pairs(Config.SelectedPlayers or {}) do
         if selected then
             local plr = Players:FindFirstChild(name)
-            local hrp = plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                local dist = (myHRP.Position - hrp.Position).Magnitude
-                if not minDist or dist < minDist then
-                    closest, minDist = plr, dist
+            if plr and isValidTarget(plr) then
+                local root = plr.Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local mag = (root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                    if mag < dist then
+                        dist = mag
+                        closest = plr
+                    end
                 end
             end
         end
@@ -1048,7 +1048,6 @@ _G.VHUB_CSYNC_LOOP = RunService.Heartbeat:Connect(function()
             sendNotification("Csync", "Chuyển sang target: " .. nextTarget.Name)
         else
             csyncPaused = true
-            sendNotification("Csync", "Không còn target khả dụng. Tạm dừng.")
             return
         end
     end
@@ -1712,7 +1711,7 @@ local function IsValidTarget(player)
         or player.Character.Humanoid.Health <= 0 then
         return false
     end
-    
+
     -- Kiểm tra trạng thái K.O nếu checkKOAimbot được bật
     if Config.checkKOAimbot then
         local bodyEffects = player.Character:FindFirstChild("BodyEffects")
@@ -1721,7 +1720,12 @@ local function IsValidTarget(player)
             return false -- Bỏ qua người chơi nếu họ bị K.O
         end
     end
-    
+
+    -- Kiểm tra trạng thái Grab
+    if player.Character:FindFirstChild("GRABBING_CONSTRAINT") then
+        return false -- Bỏ qua nếu đang bị grab
+    end
+
     return true
 end
 
