@@ -79,7 +79,7 @@ local Config = {
     SpeedAmount = 20,
     infiniteJumpEnabled = false,
     clickTpEnabled = false,
-    checkKOAimbot = false,
+    checkKOAimbot = true,
     CustomPing = nil
 }
 
@@ -100,80 +100,16 @@ local function LoadSettings()
             return HttpService:JSONDecode(readfile(ConfigFile))
         end)
         if success and type(data) == "table" then
+            -- Gộp dữ liệu load vào Config hiện tại
             for k, v in pairs(data) do
                 Config[k] = v
             end
-            print("Loaded Config:", HttpService:JSONEncode(Config)) -- Debug
-            UpdateButtonStates() -- Cập nhật trạng thái giao diện sau khi load
         else
             warn("[LoadSettings] Lỗi đọc config:", data)
         end
     else
+        -- Nếu chưa có file thì tạo mới
         SaveSettings()
-    end
-end
-
--- Hàm cập nhật trạng thái nút
-local function UpdateButtonStates()
-    if flyButton then
-        flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
-    end
-    if aimbotButton then
-        aimbotButton.Text = "Aimlock: " .. (Config.AimbotEnabled and "ON" or "OFF")
-    end
-    if espButton then
-        espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
-    end
-    if speedButton then
-        speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
-    end
-    if checkKOAimbotButton then
-        checkKOAimbotButton.Text = "Check K.O Aimlock: " .. (Config.checkKOAimbot and "ON" or "OFF")
-    end
-    if antiLockButton then
-        antiLockButton.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
-    end
-    if autoStompButton then
-        autoStompButton.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
-    end
-    if autoReloadButton then
-        autoReloadButton.Text = "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF")
-    end
-    if triggerBotButton then
-        triggerBotButton.Text = "TriggerBot: " .. (tbEnabled and "ON" or "OFF")
-    end
-    if csyncRandomButton then
-        csyncRandomButton.Text = "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF")
-    end
-    if csyncOrbitButton then
-        csyncOrbitButton.Text = "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF")
-    end
-    if customFovButton then
-        customFovButton.Text = "Custom FOV: " .. (customFovEnabled and "ON" or "OFF")
-    end
-    if fullbrightButton then
-        fullbrightButton.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
-    end
-    if autoWallhopButton then
-        autoWallhopButton.Text = "Auto Wallhop: " .. (Config.AutoWallhopEnabled and "ON" or "OFF")
-    end
-    if infiniteJumpButton then
-        infiniteJumpButton.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
-    end
-    if antiAfkButton then
-        antiAfkButton.Text = "Anti AFK: " .. (antiAfkEnabled and "ON" or "OFF")
-    end
-    if noclipButton then
-        noclipButton.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
-    end
-    if clickTpButton then
-        clickTpButton.Text = "Click TP: " .. (Config.clickTpEnabled and "ON" or "OFF")
-    end
-    if spinbotButton then
-        spinbotButton.Text = "Spinbot: " .. (Config.SpinbotEnabled and "ON" or "OFF")
-    end
-    if flintTouchButton then
-        flintTouchButton.Text = "FlintTouch: " .. (hiddenFling and "ON" or "OFF")
     end
 end
 
@@ -185,13 +121,9 @@ local tbEnabled = true
 local fovRadius = 20
 local Player = nil
 local camera = Workspace.CurrentCamera
-local camConnection
 local clickTpTool = nil
 local savedWaypoint = nil
 local noclipConnection = nil
-local autoKillEnabled = false
-local autoKillLoop = nil
-
 
 -- Biến lưu trạng thái Lighting cũ cho Fullbright
 local oldLighting = {
@@ -766,35 +698,30 @@ espButton = CreateButton(ButtonFrame1, "ESP: OFF", function()
     Config.ESPEnabled = not Config.ESPEnabled
     sendNotification("ESP", Config.ESPEnabled and "ON" or "OFF")
     espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
-    SaveSettings()
 end)
 
 speedButton = CreateButton(ButtonFrame1, "Speed: OFF", function()
     Config.SpeedEnabled = not Config.SpeedEnabled
     sendNotification("SPEED", Config.SpeedEnabled and "ON" or "OFF")
     speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
-    SaveSettings()
 end)
 
 flyButton = CreateButton(ButtonFrame1, "Fly: OFF", function()
     Config.FlyEnabled = not Config.FlyEnabled
     sendNotification("FLY", Config.FlyEnabled and "ON" or "OFF")
     flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
-    SaveSettings()
 end)
 
 aimbotButton = CreateButton(ButtonFrame1, "Aimlock: OFF", function()
     Config.AimbotEnabled = not Config.AimbotEnabled
     sendNotification("AIMLOCK", Config.AimbotEnabled and "ON" or "OFF")
     aimbotButton.Text = "Aimlock: " .. (Config.AimbotEnabled and "ON" or "OFF")
-    SaveSettings()
 end)
 
 checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O Aimlock: OFF", function()
     Config.checkKOAimbot = not Config.checkKOAimbot
     sendNotification("CHECK K.O AIMLOCK", Config.checkKOAimbot and "ON" or "OFF")
     checkKOAimbotButton.Text = "Check K.O Aimlock: " .. (Config.checkKOAimbot and "ON" or "OFF")
-    SaveSettings()
 end)
 
 -- ======= CONFIG MẶC ĐỊNH =======
@@ -816,7 +743,6 @@ antiLockButton = CreateButton(ButtonFrame1, "AntiLock: " .. (Config.AntiLockEnab
     Config.AntiLockEnabled = not Config.AntiLockEnabled
     antiLockButton.Text = "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF")
     sendNotification("AntiLock", Config.AntiLockEnabled and "Enabled" or "Disabled")
-    SaveSettings()
 end)
 
 -- Ô nhập mode cho AntiLock
@@ -883,7 +809,6 @@ autoStompButton = CreateButton(ButtonFrame1, "AutoStomp: " .. (Config.AutoStompE
     Config.AutoStompEnabled = not Config.AutoStompEnabled
     autoStompButton.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
     sendNotification("AutoStomp", Config.AutoStompEnabled and "Enabled" or "Disabled")
-    SaveSettings()
 end)
 
 -- ======= LOGIC AUTOSTOMP (Check K.O) =======
@@ -937,32 +862,6 @@ local function stompTarget(target)
     myHRP.CFrame = oldCFrame
     myHum:ChangeState(oldState)
 end
-
--- AutoStomp + Auto disable/enable AntiLock
-local pausedAntiLock = false
-RunService.Heartbeat:Connect(function()
-    if not Config.AutoStompEnabled then return end
-
-    local target = getKOSelected()
-    if target then
-        -- Tắt AntiLock nếu đang bật
-        if Config.AntiLockEnabled then
-            pausedAntiLock = true
-            Config.AntiLockEnabled = false
-            antiLockButton.Text = "AntiLock: OFF"
-            sendNotification("AntiLock", "Disabled for AutoStomp")
-        end
-        stompTarget(target)
-    else
-        -- Bật lại AntiLock nếu trước đó tắt tạm
-        if pausedAntiLock then
-            Config.AntiLockEnabled = true
-            antiLockButton.Text = "AntiLock: ON"
-            sendNotification("AntiLock", "Re-enabled after AutoStomp")
-            pausedAntiLock = false
-        end
-    end
-end)
 
 -- ==== CONFIG ====
 if Config.LookAtEnabled == nil then Config.LookAtEnabled = false end
@@ -1030,6 +929,80 @@ LocalPlayer.CharacterAdded:Connect(function()
         local _, hum = getMyHumanoid()
         if hum then hum.AutoRotate = true end
     end)
+end)
+
+zeroDelayButton = CreateButton(ButtonFrame1, "0 Delay: OFF", function()
+    if not Config.ZeroDelayEnabled then
+        local DelayObj = game.ReplicatedStorage:FindFirstChild("BulletHole") and game.ReplicatedStorage.BulletHole:FindFirstChild("Delay")
+        if DelayObj then
+            if DelayObj:FindFirstChild("Position") then
+                DelayObj.Position:Destroy()
+            end
+            DelayObj.Position = 0
+        end
+        Config.ZeroDelayEnabled = true
+        sendNotification("0 Delay", "Enabled")
+        zeroDelayButton.Text = "0 Delay: ON"
+    else
+        -- nếu muốn reset thì sửa ở đây
+        Config.ZeroDelayEnabled = false
+        sendNotification("0 Delay", "Disabled")
+        zeroDelayButton.Text = "0 Delay: OFF"
+    end
+    SaveSettings()
+end)
+
+-- Auto Armor Button
+autoArmorEnabled = false
+
+autoArmorButton = CreateButton(ButtonFrame1, "Auto Armor: OFF", function()
+    autoArmorEnabled = not autoArmorEnabled
+    autoArmorButton.Text = "Auto Armor: " .. (autoArmorEnabled and "ON" or "OFF")
+    sendNotification("Auto Armor", autoArmorEnabled and "Enabled" or "Disabled")
+end)
+
+-- Auto Armor Logic
+local cloneref = getgenv().cloneref or function(...) return ... end
+local fireclickdetector = getgenv().fireclickdetector or function(...) return nil end
+local GameReference = cloneref(Game)
+
+if not GameReference:IsLoaded() then Game.Loaded:Wait() end
+
+local Workspace = cloneref(GameReference:GetService("Workspace"))
+local RunService = cloneref(GameReference:GetService("RunService"))
+local Players = cloneref(GameReference:GetService("Players"))
+
+local LocalPlayer = Players.LocalPlayer
+local LocalCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+local LocalHumanoid = LocalCharacter:FindFirstChildOfClass("Humanoid") or LocalCharacter:WaitForChild("Humanoid", 1e9)
+local LocalRootPart = LocalHumanoid and LocalHumanoid.RootPart or LocalCharacter:WaitForChild("HumanoidRootPart", 1e9)
+
+local BuyMaxDistance = 100 --// Studs \\--
+
+LocalPlayer.CharacterAdded:Connect(function(Character)
+    LocalCharacter = Character
+    LocalHumanoid = LocalCharacter:FindFirstChildOfClass("Humanoid") or LocalCharacter:WaitForChild("Humanoid", 1e9)
+    LocalRootPart = LocalHumanoid and LocalHumanoid.RootPart or LocalCharacter:WaitForChild("HumanoidRootPart", 1e9)
+end)
+
+RunService.PostSimulation:Connect(function()
+    if not autoArmorEnabled then return end
+    if not LocalCharacter or not LocalHumanoid or not LocalRootPart then return end
+
+    local Ignored = Workspace:FindFirstChild("Ignored") or Workspace:FindFirstChild("MAP") or Workspace:FindFirstChild("Blacklisted")
+    if Ignored then
+        local Shop = Ignored:FindFirstChild("Shop") or Ignored:FindFirstChild("Shops") or Ignored:FindFirstChild("Pads") or Ignored:FindFirstChild("BuyPads") or Ignored:FindFirstChild("Bought")
+        if Shop then
+            for _, Child in ipairs(Shop:GetChildren()) do
+                if Child.Name:lower():find("armor") and Child:IsA("Model") and Child:FindFirstChildOfClass("ClickDetector") then
+                    local Head = Child:FindFirstChild("Head") or Child:FindFirstChild("Part")
+                    if Head and Head:IsA("BasePart") and (Head.Position - LocalRootPart.Position).Magnitude <= BuyMaxDistance then
+                        fireclickdetector(Child:FindFirstChildOfClass("ClickDetector"))
+                    end
+                end
+            end
+        end
+    end
 end)
 
 -- ======= CONFIG MẶC ĐỊNH =======
@@ -2212,7 +2185,7 @@ local UserInputService = game:GetService("UserInputService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 
-local FOV_RADIUS = 1000
+local FOV_RADIUS = 200
 
 -- Hàm lấy player gần chuột nhất trong FOV
 local function GetClosestValidPlayer()
