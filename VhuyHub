@@ -572,32 +572,54 @@ end)
 
 speedButton = CreateButton(ButtonFrame1, "Speed: OFF", function()
     Config.SpeedEnabled = not Config.SpeedEnabled
-    sendNotification("SPEED", Config.SpeedEnabled and "ON" or "OFF")
     speedButton.Text = "Speed: " .. (Config.SpeedEnabled and "ON" or "OFF")
+    sendNotification("SPEED", Config.SpeedEnabled and "ON" or "OFF")
 end)
 
 flyButton = CreateButton(ButtonFrame1, "Fly: OFF", function()
     Config.FlyEnabled = not Config.FlyEnabled
-    sendNotification("FLY", Config.FlyEnabled and "ON" or "OFF")
     flyButton.Text = "Fly: " .. (Config.FlyEnabled and "ON" or "OFF")
+    sendNotification("FLY", Config.FlyEnabled and "ON" or "OFF")
 end)
 
 aimbotButton = CreateButton(ButtonFrame1, "Aimlock: OFF", function()
     Config.AimbotEnabled = not Config.AimbotEnabled
-    sendNotification("AIMLOCK", Config.AimbotEnabled and "ON" or "OFF")
     aimbotButton.Text = "Aimlock: " .. (Config.AimbotEnabled and "ON" or "OFF")
+    sendNotification("AIMLOCK", Config.AimbotEnabled and "ON" or "OFF")
 end)
 
 checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O: OFF", function()
     Config.checkKOAimbot = not Config.checkKOAimbot
-    sendNotification("CHECK K.O", Config.checkKOAimbot and "ON" or "OFF")
     checkKOAimbotButton.Text = "Check K.O: " .. (Config.checkKOAimbot and "ON" or "OFF")
+    sendNotification("CHECK K.O", Config.checkKOAimbot and "ON" or "OFF")
+end)
+
+-- Config mặc định
+if Config.MacroLegitEnabled == nil then Config.MacroLegitEnabled = false end
+
+-- Nút Macro Legit
+macroLegitButton = CreateButton(ButtonFrame1, "Macro Legit: " .. (Config.MacroLegitEnabled and "ON" or "OFF"), function()
+    Config.MacroLegitEnabled = not Config.MacroLegitEnabled
+    macroLegitButton.Text = "Macro Legit: " .. (Config.MacroLegitEnabled and "ON" or "OFF")
+    sendNotification("Macro Legit", Config.MacroLegitEnabled and "Enabled" or "Disabled")
+
+    -- Nếu bật thì chạy loop
+    if Config.MacroLegitEnabled then
+        task.spawn(function()
+            while Config.MacroLegitEnabled do
+                RunService.Heartbeat:Wait()
+                game:GetService("VirtualInputManager"):SendMouseWheelEvent(0.1, 0.1, true, game)
+                RunService.Heartbeat:Wait()
+                game:GetService("VirtualInputManager"):SendMouseWheelEvent(0.1, 0.1, false, game)
+                RunService.Heartbeat:Wait()
+            end
+        end)
+    end
 end)
 
 -- ======= CONFIG MẶC ĐỊNH =======
 Config.AntiLockEnabled = Config.AntiLockEnabled or false
 Config.AntiLockType = Config.AntiLockType or "Behind"
-Config.AutoStompEnabled = Config.AutoStompEnabled or false
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -673,73 +695,6 @@ _G.__vhuyhub_antilock_conn = RunService.Heartbeat:Connect(function()
         hrp.Velocity = oldVel
     end
 end)
-
-autoStompButton = CreateButton(ButtonFrame1, "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF"), function()
-    Config.AutoStompEnabled = not Config.AutoStompEnabled
-    autoStompButton.Text = "AutoStomp: " .. (Config.AutoStompEnabled and "ON" or "OFF")
-    sendNotification("AutoStomp", Config.AutoStompEnabled and "Enabled" or "Disabled")
-end)
-
--- ======= LOGIC AUTOSTOMP (Check K.O) =======
-local function isKO(plr)
-    local char = plr and plr.Character
-    local be = char and char:FindFirstChild("BodyEffects")
-    return be and be:FindFirstChild("K.O") and be["K.O"].Value == true
-end
-
-local function getKOSelected()
-    for name, selected in pairs(Config.SelectedPlayers or {}) do
-        if selected then
-            local plr = Players:FindFirstChild(name)
-            if plr and isKO(plr) then
-                return plr
-            end
-        end
-    end
-    return nil
-end
-
--- Hàm stomp người bị K.O gần nhất trong danh sách chọn (trong phạm vi 200 studs)
-local function StompTarget()
-    local closestKO = nil
-    local minDistKO = math.huge
-    local myPos = LocalPlayer.Character 
-        and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") 
-        and LocalPlayer.Character.HumanoidRootPart.Position
-
-    if not myPos then return end
-
-    for name, selected in pairs(Config.SelectedPlayers) do
-        if selected then
-            local plr = Players:FindFirstChild(name)
-            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                -- Check K.O (có thể thay bằng hàm isKO(plr))
-                local humanoid = plr.Character:FindFirstChildOfClass("Humanoid")
-                if humanoid and humanoid.Health <= 0 then
-                    local pos = plr.Character.HumanoidRootPart.Position
-                    local dist = (myPos - pos).Magnitude
-                    if dist < minDistKO and dist <= 200 then
-                        closestKO = plr
-                        minDistKO = dist
-                    end
-                end
-            end
-        end
-    end
-
-    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not root or not closestKO then return end
-
-    local torso = closestKO.Character:FindFirstChild("Torso") or closestKO.Character:FindFirstChild("HumanoidRootPart")
-    if torso then
-        root.CFrame = torso.CFrame
-        task.wait(0.2)
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-        task.wait(0.1)
-        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-        task.wait(1.5)
-    end
-end
 
 -- ==== CONFIG ====
 if Config.LookAtEnabled == nil then Config.LookAtEnabled = false end
@@ -893,8 +848,8 @@ end)
 
 triggerBotButton = CreateButton(ButtonFrame1, "TriggerBot: " .. (tbEnabled and "ON" or "OFF"), function()
     tbEnabled = not tbEnabled
-    sendNotification("TRIGGERBOT", tbEnabled and "ON" or "OFF")
     triggerBotButton.Text = "TriggerBot: " .. (tbEnabled and "ON" or "OFF")
+    sendNotification("TRIGGERBOT", tbEnabled and "ON" or "OFF")
 end)
 
 tpAndStompButton = CreateButton(ButtonFrame1, "TP Player", function()
@@ -921,7 +876,7 @@ tpAndStompButton = CreateButton(ButtonFrame1, "TP Player", function()
         local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         if root then
             local pos = closestPlayer.Character.HumanoidRootPart.Position
-            root.CFrame = CFrame.new(pos + Vector3.new(3, 0, 0))
+            root.CFrame = CFrame.new(pos + Vector3.new(0, 0, 0))
         end
     end
 end)
@@ -1256,8 +1211,8 @@ fullbrightButton = CreateButton(ButtonFrame2Left, "Fullbright: OFF", function()
         Lighting.OutdoorAmbient = oldLighting.OutdoorAmbient
         Lighting.ClockTime = oldLighting.ClockTime
     end
-    sendNotification("FULLBRIGHT", Config.FullbrightEnabled and "ON" or "OFF")
     fullbrightButton.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
+    sendNotification("FULLBRIGHT", Config.FullbrightEnabled and "ON" or "OFF")
 end)
 
 -- Auto Wallhop Config
@@ -1312,7 +1267,7 @@ local function performWallHop()
         humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
         rootPart.AssemblyLinearVelocity = Vector3.new(0, 60, 0) -- lực nhảy
         rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, math.rad(-35), 0)
-        task.wait(0.05) -- tránh spam quá nhanh
+        task.wait(0.5)
     end
 
     isPerformingWallHop = false
@@ -1322,6 +1277,60 @@ end
 RunService.Heartbeat:Connect(function()
     if Config.AutoWallhopEnabled then
         performWallHop()
+    end
+end)
+
+-- Config mặc định
+if Config.RainbowHitEffectEnabled == nil then Config.RainbowHitEffectEnabled = true end
+
+-- Nút bật/tắt Rainbow Hit Effect
+rainbowHitButton = CreateButton(ButtonFrame2Left, "Rainbow Hit Effect: " .. (Config.RainbowHitEffectEnabled and "ON" or "OFF"), function()
+    Config.RainbowHitEffectEnabled = not Config.RainbowHitEffectEnabled
+    rainbowHitButton.Text = "Rainbow Hit Effect: " .. (Config.RainbowHitEffectEnabled and "ON" or "OFF")
+    sendNotification("Rainbow Hit Effect", Config.RainbowHitEffectEnabled and "Enabled" or "Disabled")
+end)
+
+-- Hàm tạo rainbow color theo thời gian
+local function rainbowColor()
+    local t = tick() % 5 / 5
+    return Color3.fromHSV(t, 1, 1)
+end
+
+-- Theo dõi máu player
+local lastHealth = {}
+
+RunService.Heartbeat:Connect(function()
+    if not Config.RainbowHitEffectEnabled then return end
+
+    for name, selected in pairs(Config.SelectedPlayers or {}) do
+        if selected then
+            local plr = Players:FindFirstChild(name)
+            local hum = plr and plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                local current = hum.Health
+                local last = lastHealth[name] or current
+                if current < last then
+                    -- Bị mất máu → tạo hiệu ứng highlight rainbow
+                    local highlight = Instance.new("Highlight")
+                    highlight.Parent = plr.Character
+                    highlight.Adornee = plr.Character
+                    highlight.FillTransparency = 1
+                    highlight.OutlineTransparency = 0
+                    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+
+                    -- Rainbow loop trong 1 giây
+                    task.spawn(function()
+                        local start = tick()
+                        while tick() - start < 1 do
+                            highlight.OutlineColor = rainbowColor()
+                            task.wait(0.05)
+                        end
+                        highlight:Destroy()
+                    end)
+                end
+                lastHealth[name] = current
+            end
+        end
     end
 end)
 
