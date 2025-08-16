@@ -39,6 +39,7 @@ local camera = Workspace.CurrentCamera
 local clickTpTool = nil
 local savedWaypoint = nil
 local noclipConnection = nil
+local Keybinds = {} 
 
 -- Biến lưu trạng thái Lighting cũ cho Fullbright
 local oldLighting = {
@@ -176,7 +177,7 @@ end
 animateButton(ToggleButton)
 
 ToggleButton.MouseButton1Click:Connect(function()
-    local targetSize = MenuFrame.Visible and UDim2.new(0, 0, 0, 0) or UDim2.new(0, 300, 0, 250)
+    local targetSize = MenuFrame.Visible and UDim2.new(0, 0, 0, 0) or UDim2.new(0, 400, 0, 300)
     local tween = TweenService:Create(MenuFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize})
     if not MenuFrame.Visible then
         MenuFrame.Visible = true
@@ -457,6 +458,16 @@ Btn3.MouseButton1Click:Connect(function()
     ShowPage(3)
 end)
 
+-- Lắng nghe phím duy nhất 1 lần
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    local key = input.KeyCode.Name:upper()
+    if Keybinds[key] then
+        Keybinds[key]() -- chạy đúng callback
+    end
+end)
+
+-- Hàm tạo button
 local function CreateButton(parent, name, callback)
     local buttonFrame = Instance.new("Frame")
     buttonFrame.Size = UDim2.new(1, -10, 0, 30)
@@ -476,6 +487,7 @@ local function CreateButton(parent, name, callback)
     animateButton(button)
     button.MouseButton1Click:Connect(callback)
 
+    -- Ô nhập keybind
     local keyBox = Instance.new("TextBox")
     keyBox.Size = UDim2.new(0.3, 0, 1, 0)
     keyBox.Position = UDim2.new(0.7, 5, 0, 0)
@@ -489,16 +501,16 @@ local function CreateButton(parent, name, callback)
     keyBox.Parent = buttonFrame
     Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 6)
 
+    -- Khi người dùng nhập key mới
     keyBox:GetPropertyChangedSignal("Text"):Connect(function()
-        local text = keyBox.Text:lower()
+        local text = keyBox.Text:upper()
 
-        if text == "button" then
-            -- Tạo ScreenGui riêng ngoài menu
+        -- Nếu gõ "button" thì tạo nút rời ngoài màn hình
+        if text == "BUTTON" then
             local screenGui = Instance.new("ScreenGui")
             screenGui.IgnoreGuiInset = true
             screenGui.Parent = game:GetService("CoreGui")
 
-            -- Tạo nút giống Show/Hide
             local screenBtn = Instance.new("TextButton")
             screenBtn.Size = UDim2.new(0, 70, 0, 30)
             screenBtn.Position = UDim2.new(0, 100, 0, 300)
@@ -511,8 +523,7 @@ local function CreateButton(parent, name, callback)
             Instance.new("UICorner", screenBtn).CornerRadius = UDim.new(0, 6)
 
             -- Kéo di chuyển
-            local dragging = false
-            local dragStart, startPos
+            local dragging, dragStart, startPos = false
             screenBtn.InputBegan:Connect(function(input)
                 if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
                     dragging = true
@@ -535,27 +546,22 @@ local function CreateButton(parent, name, callback)
                 end
             end)
 
-            -- Bấm => chạy đúng callback
-            screenBtn.MouseButton1Click:Connect(function()
-                callback()
-            end)
+            -- Khi bấm thì chạy callback
+            screenBtn.MouseButton1Click:Connect(callback)
 
-            -- Chết thì mất
+            -- Khi nhân vật respawn thì xóa nút
             LocalPlayer.CharacterAdded:Connect(function()
                 if screenGui then
                     screenGui:Destroy()
                 end
             end)
-
         else
-            -- Bind phím (không phân biệt hoa/thường)
-            local keyName = text:upper()
-            if Enum.KeyCode[keyName] then
-                UserInputService.InputBegan:Connect(function(input, gp)
-                    if not gp and input.KeyCode.Name:upper() == keyName then
-                        callback()
-                    end
-                end)
+            -- Nếu là phím hợp lệ
+            if Enum.KeyCode[text] then
+                -- Xóa bind cũ nếu có
+                Keybinds[text] = nil
+                -- Gán bind mới
+                Keybinds[text] = callback
             end
         end
     end)
