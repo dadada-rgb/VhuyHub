@@ -909,18 +909,18 @@ local function isKO(plr)
 end
 
 local function getClosestSelected()
-    local closest, dist = nil, math.huge
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return nil end
+    local closest, minDist
     for name, selected in pairs(Config.SelectedPlayers or {}) do
         if selected then
             local plr = Players:FindFirstChild(name)
-            if plr and isValidTarget(plr) then
-                local root = plr.Character:FindFirstChild("HumanoidRootPart")
-                if root then
-                    local mag = (root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
-                    if mag < dist then
-                        dist = mag
-                        closest = plr
-                    end
+            local hrp = plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dist = (myHRP.Position - hrp.Position).Magnitude
+                if not minDist or dist < minDist then
+                    closest, minDist = plr, dist
                 end
             end
         end
