@@ -549,12 +549,6 @@ local function CreateButton(parent, name, callback)
             -- Khi bấm thì chạy callback
             screenBtn.MouseButton1Click:Connect(callback)
 
-            -- Khi nhân vật respawn thì xóa nút
-            LocalPlayer.CharacterAdded:Connect(function()
-                if screenGui then
-                    screenGui:Destroy()
-                end
-            end)
         else
             -- Nếu là phím hợp lệ
             if Enum.KeyCode[text] then
