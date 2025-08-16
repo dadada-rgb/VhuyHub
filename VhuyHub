@@ -1586,6 +1586,32 @@ RunService.RenderStepped:Connect(function(delta)
     end
 end)
 
+-- Anti Fling Button (Page 2, Right Side)
+antiFlingEnabled = false
+
+antiFlingButton = CreateButton(ButtonFrame2Right, "Anti Fling: OFF", function()
+    antiFlingEnabled = not antiFlingEnabled
+    antiFlingButton.Text = "Anti Fling: " .. (antiFlingEnabled and "ON" or "OFF")
+    sendNotification("Anti Fling", antiFlingEnabled and "Enabled" or "Disabled")
+end)
+
+-- Anti Fling Logic
+if _G.__antifling_conn then
+    _G.__antifling_conn:Disconnect()
+end
+
+_G.__antifling_conn = RunService.Heartbeat:Connect(function()
+    if not antiFlingEnabled then return end
+    pcall(function()
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local hrp = plr.Character.HumanoidRootPart
+                hrp.Velocity = Vector3.new(0, 0, 0)
+                hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+            end
+        end
+    end)
+end)
 
 local hiddenFling = false
 local flingPower = 55000
