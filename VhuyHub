@@ -1,50 +1,3 @@
-pcall(function()
-    -- Xóa ScreenGui chính và GUI phụ
-    local pg = game.Players.LocalPlayer:FindFirstChild("PlayerGui")
-    if pg then
-        for _, gui in ipairs(pg:GetChildren()) do
-            if gui.Name == "DhuyxMenu" or gui.Name == "VhuyIntroGui" or gui.Name == "CButtonGui" or gui.Name == "SafeESP" then
-                gui:Destroy()
-            end
-        end
-    end
-
-    -- Xóa tool click TP nếu có
-    local bp = game.Players.LocalPlayer:FindFirstChild("Backpack")
-    if bp then
-        local tool = bp:FindFirstChild("ClickTP")
-        if tool then tool:Destroy() end
-    end
-
-    -- Tắt noclip nếu đang bật
-    if getgenv().noclipConnection and typeof(getgenv().noclipConnection) == "RBXScriptConnection" then
-        getgenv().noclipConnection:Disconnect()
-        getgenv().noclipConnection = nil
-    end
-
-    -- Tắt fling
-    getgenv().hiddenFling = false
-
-    -- Xóa ESP nếu còn tồn tại
-    if getgenv().ESPs then
-        for _, esp in pairs(getgenv().ESPs) do
-            pcall(function()
-                if esp.label then esp.label:Destroy() end
-                if esp.highlight then esp.highlight:Destroy() end
-            end)
-        end
-        getgenv().ESPs = {}
-    end
-
-    -- Ngắt tất cả kết nối đã lưu
-    if getgenv().Connections then
-        for _, conn in pairs(getgenv().Connections) do
-            pcall(function() conn:Disconnect() end)
-        end
-        getgenv().Connections = {}
-    end
-end)
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -59,14 +12,9 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local HttpService = game:GetService("HttpService")
 local LocalPlayer = game:GetService("Players").LocalPlayer
 
--- Tạo file config riêng cho mỗi người chơi
-local ConfigFile = "mygui_config_" .. LocalPlayer.UserId .. ".json"
-
 -- Cấu trúc config mặc định
 local Config = {
     Buttons = {}, -- Lưu keybind + trạng thái của từng chức năng
-    GuiPosition = {X = 0, Y = 0}, -- Vị trí GUI
-    GuiVisible = true, -- Trạng thái hiện/ẩn menu
     ESPEnabled = false,
     SpeedEnabled = false,
     FlyEnabled = false,
@@ -83,41 +31,8 @@ local Config = {
     CustomPing = nil
 }
 
--- Hàm lưu config
-local function SaveSettings()
-    local success, err = pcall(function()
-        writefile(ConfigFile, HttpService:JSONEncode(Config))
-    end)
-    if not success then
-        warn("[SaveSettings] Lỗi lưu config:", err)
-    end
-end
-
--- Hàm load config
-local function LoadSettings()
-    if isfile(ConfigFile) then
-        local success, data = pcall(function()
-            return HttpService:JSONDecode(readfile(ConfigFile))
-        end)
-        if success and type(data) == "table" then
-            -- Gộp dữ liệu load vào Config hiện tại
-            for k, v in pairs(data) do
-                Config[k] = v
-            end
-        else
-            warn("[LoadSettings] Lỗi đọc config:", data)
-        end
-    else
-        -- Nếu chưa có file thì tạo mới
-        SaveSettings()
-    end
-end
-
--- Load config ngay khi script chạy
-LoadSettings()
-
 local autoSelect = false
-local tbEnabled = true
+local tbEnabled = false
 local fovRadius = 20
 local Player = nil
 local camera = Workspace.CurrentCamera
@@ -191,50 +106,6 @@ task.delay(4, function()
         blur:Destroy()
     end)
 end)
-
--- Hàm dịch chuyển đến người gần nhất
-local function TeleportToClosest()
-    local closestKO, closestAlive = nil, nil
-    local minDistKO, minDistAlive = math.huge, math.huge
-    local myPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.Position
-
-    if not myPos then return end
-
-    for name, selected in pairs(Config.SelectedPlayers) do
-        if selected then
-            local plr = Players:FindFirstChild(name)
-            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local pos = plr.Character.HumanoidRootPart.Position
-                local dist = (myPos - pos).Magnitude
-                if dist < minDistAlive then
-                    closestAlive = plr
-                    minDistAlive = dist
-                end
-            end
-        end
-    end
-
-    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    local oldPos = root.CFrame
-
-    if closestKO then
-        local torso = closestKO.Character:FindFirstChild("Torso") or closestKO.Character:FindFirstChild("HumanoidRootPart")
-        if torso then
-            root.CFrame = torso.CFrame
-            task.wait(0.2)
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-            task.wait(0.1)
-            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-            task.wait(1.5)
-        end
-    elseif closestAlive then
-        local torso = closestAlive.Character:FindFirstChild("HumanoidRootPart") or closestAlive.Character:FindFirstChild("HumanoidRootPart")
-        if torso then
-            root.CFrame = torso.CFrame + Vector3.new(0, 30, 0)
-        end
-    end
-end
 
 -- GUI chính
 local ScreenGui = Instance.new("ScreenGui")
@@ -367,7 +238,6 @@ PingBox:GetPropertyChangedSignal("Text"):Connect(function()
     else
         Config.CustomPing = nil
     end
-    SaveSettings()
 end)
 
 -- Tạo 3 trang
@@ -718,10 +588,10 @@ aimbotButton = CreateButton(ButtonFrame1, "Aimlock: OFF", function()
     aimbotButton.Text = "Aimlock: " .. (Config.AimbotEnabled and "ON" or "OFF")
 end)
 
-checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O Aimlock: OFF", function()
+checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O: OFF", function()
     Config.checkKOAimbot = not Config.checkKOAimbot
-    sendNotification("CHECK K.O AIMLOCK", Config.checkKOAimbot and "ON" or "OFF")
-    checkKOAimbotButton.Text = "Check K.O Aimlock: " .. (Config.checkKOAimbot and "ON" or "OFF")
+    sendNotification("CHECK K.O", Config.checkKOAimbot and "ON" or "OFF")
+    checkKOAimbotButton.Text = "Check K.O: " .. (Config.checkKOAimbot and "ON" or "OFF")
 end)
 
 -- ======= CONFIG MẶC ĐỊNH =======
@@ -770,7 +640,6 @@ modeBox.FocusLost:Connect(function()
         return
     end
     sendNotification("AntiLock", "Type set to: " .. Config.AntiLockType)
-    SaveSettings()
 end)
 
 -- ======= LOGIC ANTILOCK =======
@@ -830,37 +699,46 @@ local function getKOSelected()
     return nil
 end
 
-local function stompTarget(target)
-    local myChar = LocalPlayer.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
-    if not myHRP or not myHum then return end
+-- Hàm stomp người bị K.O gần nhất trong danh sách chọn (trong phạm vi 200 studs)
+local function StompTarget()
+    local closestKO = nil
+    local minDistKO = math.huge
+    local myPos = LocalPlayer.Character 
+        and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") 
+        and LocalPlayer.Character.HumanoidRootPart.Position
 
-    local targetHRP = target.Character and target.Character:FindFirstChild("LowerTorso")
-    if not targetHRP then return end
+    if not myPos then return end
 
-    local oldCFrame = myHRP.CFrame
+    for name, selected in pairs(Config.SelectedPlayers) do
+        if selected then
+            local plr = Players:FindFirstChild(name)
+            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                -- Check K.O (có thể thay bằng hàm isKO(plr))
+                local humanoid = plr.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid and humanoid.Health <= 0 then
+                    local pos = plr.Character.HumanoidRootPart.Position
+                    local dist = (myPos - pos).Magnitude
+                    if dist < minDistKO and dist <= 200 then
+                        closestKO = plr
+                        minDistKO = dist
+                    end
+                end
+            end
+        end
+    end
 
-    -- Lưu trạng thái humanoid ban đầu
-    local oldState = myHum:GetState()
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not root or not closestKO then return end
 
-    -- Dừng animation & hành động
-    myHum:ChangeState(Enum.HumanoidStateType.Physics)
-
-    -- TP đến vị trí phía trên target
-    local pos = targetHRP.Position
-    myHRP.CFrame = CFrame.new(pos + Vector3.new(0, 2, 0))
-
-    -- Stomp (giả lập phím E)
-    keypress(Enum.KeyCode.E)
-    task.wait(0.05)
-    keyrelease(Enum.KeyCode.E)
-
-    -- Chờ hoàn tất animation stomp
-    task.wait(1.5)
-
-    myHRP.CFrame = oldCFrame
-    myHum:ChangeState(oldState)
+    local torso = closestKO.Character:FindFirstChild("Torso") or closestKO.Character:FindFirstChild("HumanoidRootPart")
+    if torso then
+        root.CFrame = torso.CFrame
+        task.wait(0.2)
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        task.wait(0.1)
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        task.wait(1.5)
+    end
 end
 
 -- ==== CONFIG ====
@@ -931,27 +809,6 @@ LocalPlayer.CharacterAdded:Connect(function()
     end)
 end)
 
-zeroDelayButton = CreateButton(ButtonFrame1, "0 Delay: OFF", function()
-    if not Config.ZeroDelayEnabled then
-        local DelayObj = game.ReplicatedStorage:FindFirstChild("BulletHole") and game.ReplicatedStorage.BulletHole:FindFirstChild("Delay")
-        if DelayObj then
-            if DelayObj:FindFirstChild("Position") then
-                DelayObj.Position:Destroy()
-            end
-            DelayObj.Position = 0
-        end
-        Config.ZeroDelayEnabled = true
-        sendNotification("0 Delay", "Enabled")
-        zeroDelayButton.Text = "0 Delay: ON"
-    else
-        -- nếu muốn reset thì sửa ở đây
-        Config.ZeroDelayEnabled = false
-        sendNotification("0 Delay", "Disabled")
-        zeroDelayButton.Text = "0 Delay: OFF"
-    end
-    SaveSettings()
-end)
-
 -- Auto Armor Button
 autoArmorEnabled = false
 
@@ -977,7 +834,7 @@ local LocalCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(
 local LocalHumanoid = LocalCharacter:FindFirstChildOfClass("Humanoid") or LocalCharacter:WaitForChild("Humanoid", 1e9)
 local LocalRootPart = LocalHumanoid and LocalHumanoid.RootPart or LocalCharacter:WaitForChild("HumanoidRootPart", 1e9)
 
-local BuyMaxDistance = 100 --// Studs \\--
+local BuyMaxDistance = 1000 --// Studs \\--
 
 LocalPlayer.CharacterAdded:Connect(function(Character)
     LocalCharacter = Character
@@ -1013,7 +870,6 @@ autoReloadButton = CreateButton(ButtonFrame1, "Auto Reload: " .. (Config.AutoRel
     Config.AutoReloadEnabled = not Config.AutoReloadEnabled
     autoReloadButton.Text = "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF")
     sendNotification("Auto Reload", Config.AutoReloadEnabled and "Enabled" or "Disabled")
-    SaveSettings()
 end)
 
 -- ======= LOGIC AUTO RELOAD (theo kiểu _G.AutoReload ban đầu) =======
@@ -1039,7 +895,6 @@ triggerBotButton = CreateButton(ButtonFrame1, "TriggerBot: " .. (tbEnabled and "
     tbEnabled = not tbEnabled
     sendNotification("TRIGGERBOT", tbEnabled and "ON" or "OFF")
     triggerBotButton.Text = "TriggerBot: " .. (tbEnabled and "ON" or "OFF")
-    SaveSettings()
 end)
 
 tpAndStompButton = CreateButton(ButtonFrame1, "TP Player", function()
@@ -1139,14 +994,12 @@ csyncRandomButton = CreateButton(ButtonFrame1, "Csync Random: " .. (Config.Csync
     Config.CsyncRandomEnabled = not Config.CsyncRandomEnabled
     csyncRandomButton.Text = "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF")
     sendNotification("Csync Random", Config.CsyncRandomEnabled and "Enabled" or "Disabled")
-    SaveSettings()
 end)
 
 csyncOrbitButton = CreateButton(ButtonFrame1, "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF"), function()
     Config.CsyncOrbitEnabled = not Config.CsyncOrbitEnabled
     csyncOrbitButton.Text = "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF")
     sendNotification("Csync Orbit", Config.CsyncOrbitEnabled and "Enabled" or "Disabled")
-    SaveSettings()
 end)
 
 -- Frame nhập Radius, Height, Speed
@@ -1188,7 +1041,6 @@ local function createLabeledBox(parent, labelText, default, onChange, pos)
         local num = tonumber(tb.Text)
         if num then
             onChange(num)
-            SaveSettings()
         else
             tb.Text = tostring(default)
         end
@@ -1296,7 +1148,6 @@ customFovButton = CreateButton(ButtonFrame2Left, "Custom FOV: OFF", function()
     else
         Workspace.CurrentCamera.FieldOfView = defaultFov
     end
-    SaveSettings()
 end)
 
 -- Ô nhập giá trị FOV
@@ -1318,7 +1169,6 @@ fovBox:GetPropertyChangedSignal("Text"):Connect(function()
         if num and num >= 40 and num <= 120 then
             Workspace.CurrentCamera.FieldOfView = num
             sendNotification("Custom FOV", "Đã đặt FOV thành " .. num)
-            SaveSettings()
         end
     end
 end)
@@ -1408,7 +1258,6 @@ fullbrightButton = CreateButton(ButtonFrame2Left, "Fullbright: OFF", function()
     end
     sendNotification("FULLBRIGHT", Config.FullbrightEnabled and "ON" or "OFF")
     fullbrightButton.Text = "Fullbright: " .. (Config.FullbrightEnabled and "ON" or "OFF")
-    SaveSettings()
 end)
 
 -- Auto Wallhop Config
@@ -1419,7 +1268,6 @@ autoWallhopButton = CreateButton(ButtonFrame2Left, "Auto Wallhop: " .. (Config.A
     Config.AutoWallhopEnabled = not Config.AutoWallhopEnabled
     autoWallhopButton.Text = "Auto Wallhop: " .. (Config.AutoWallhopEnabled and "ON" or "OFF")
     sendNotification("Auto Wallhop", Config.AutoWallhopEnabled and "Enabled" or "Disabled")
-    SaveSettings()
 end)
 
 -- Services
@@ -1481,7 +1329,6 @@ infiniteJumpButton = CreateButton(ButtonFrame2Left, "Infinite Jump: OFF", functi
     Config.infiniteJumpEnabled = not Config.infiniteJumpEnabled
     sendNotification("INFINITIEJUMP", Config.infiniteJumpEnabled and "ON" or "OFF")
     infiniteJumpButton.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
-    SaveSettings()
 end)
 
 -- JumpRequest chạy khi bấm Space (PC) hoặc nút nhảy mặc định (Mobile)
@@ -1544,7 +1391,6 @@ noclipButton = CreateButton(ButtonFrame2Left, "Noclip: OFF", function()
 
     sendNotification("NOCLIP", Config.NoclipEnabled and "ON" or "OFF")
     noclipButton.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
-    SaveSettings()
 end)
 
 -- Đảm bảo noclip vẫn bật khi respawn
@@ -1654,8 +1500,6 @@ clickTpButton = CreateButton(ButtonFrame2Right, "Click TP: OFF", function()
     Config.clickTpEnabled = not Config.clickTpEnabled
     sendNotification("GIVECLICKTOOL", Config.clickTpEnabled and "ON" or "OFF")
     clickTpButton.Text = "Click TP: " .. (Config.clickTpEnabled and "ON" or "OFF")
-    SaveSettings()
-
     if Config.clickTpEnabled then
         giveClickTpTool()
         sendNotification("Click TP", "Đã cấp tool Click TP vào Backpack!")
@@ -1702,7 +1546,6 @@ spinbotButton = CreateButton(ButtonFrame2Right, "Spinbot: " .. (Config.SpinbotEn
     Config.SpinbotEnabled = not Config.SpinbotEnabled
     spinbotButton.Text = "Spinbot: " .. (Config.SpinbotEnabled and "ON" or "OFF")
     sendNotification("Spinbot", Config.SpinbotEnabled and "Enabled" or "Disabled")
-    SaveSettings()
 end)
 
 -- Ô nhập Speed
@@ -1722,7 +1565,6 @@ spinbotSpeedBox.FocusLost:Connect(function()
     local num = tonumber(spinbotSpeedBox.Text)
     if num then
         Config.SpinbotSpeed = num
-        SaveSettings()
     else
         spinbotSpeedBox.Text = tostring(Config.SpinbotSpeed)
     end
@@ -1787,7 +1629,6 @@ flintTouchButton = CreateButton(ButtonFrame2Right, "FlintTouch: OFF", function()
     hiddenFling = not hiddenFling
     sendNotification("FLINGTOUCH", hiddenFling and "ON" or "OFF")
     flintTouchButton.Text = "FlintTouch: " .. (hiddenFling and "ON" or "OFF")
-    SaveSettings()
 end)
 
 local function FlingAll()
@@ -1962,7 +1803,6 @@ local function UpdatePlayerList()
             button.MouseButton1Click:Connect(function()
                 Config.SelectedPlayers[player.Name] = not Config.SelectedPlayers[player.Name]
                 UpdateButtonText()
-                SaveSettings()
             end)
             animateButton(button)
             UpdateButtonText()
@@ -1984,7 +1824,6 @@ UserInputService.InputBegan:Connect(function(input, processed)
             Config.SelectedPlayers = {}
         end
         UpdatePlayerList()
-        SaveSettings()
     end
 end)
 
@@ -2273,7 +2112,6 @@ selectBtn.MouseButton1Click:Connect(function()
             })
         end
 
-        SaveSettings()
         if UpdateSelectedPlayersUI then
             UpdateSelectedPlayersUI() -- cập nhật danh sách GUI ngay
         end
@@ -2311,7 +2149,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
                 })
             end
 
-            SaveSettings()
             if UpdateSelectedPlayersUI then
                 UpdateSelectedPlayersUI()
             end
