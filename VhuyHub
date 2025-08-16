@@ -34,7 +34,6 @@ local Config = {
     SelectedPlayers = {},
     FlySpeed = 35,
     SpeedAmount = 20,
-    infiniteJumpEnabled = false,
     clickTpEnabled = false,
     checkKOAimbot = true,
     CustomPing = nil
@@ -1339,16 +1338,113 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
-infiniteJumpButton = CreateButton(ButtonFrame2Left, "Infinite Jump: OFF", function()
-    Config.infiniteJumpEnabled = not Config.infiniteJumpEnabled
-    sendNotification("INFINITIEJUMP", Config.infiniteJumpEnabled and "ON" or "OFF")
-    infiniteJumpButton.Text = "Infinite Jump: " .. (Config.infiniteJumpEnabled and "ON" or "OFF")
+-- Nút Animation ON/OFF (R6 = 4283774086, R15 = 10714068222)
+local animEnabled = false
+local animTrack = nil
+
+local function stopAnim()
+    if animTrack then
+        animTrack:Stop()
+        animTrack = nil
+    end
+    animEnabled = false
+end
+
+local animButton = CreateButton(ButtonFrame2Left, "BangPlayer: OFF", function()
+    animEnabled = not animEnabled
+    if not animEnabled then
+        stopAnim()
+        animButton.Text = "BangPlayer: OFF"
+        sendNotification("BangPlayer", "Đã tắt")
+    else
+        local target = getClosestSelected()
+        if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
+            animEnabled = false
+            animButton.Text = "BangPlayer: OFF"
+            sendNotification("BangPlayer", "Không tìm thấy target!")
+            return
+        end
+
+        local myChar = LocalPlayer.Character
+        local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+        local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if not (myHum and myHRP) then return end
+
+        -- Xoá quần áo
+        pcall(function() myChar:FindFirstChildOfClass("Pants"):Destroy() end)
+        pcall(function() myChar:FindFirstChildOfClass("Shirt"):Destroy() end)
+
+        -- Chọn animation theo rig type
+        local anim = Instance.new("Animation")
+        if myHum.RigType == Enum.HumanoidRigType.R6 then
+            anim.AnimationId = "http://www.roblox.com/asset/?id=4283774086"
+        else -- R15
+            anim.AnimationId = "http://www.roblox.com/asset/?id=10714068222"
+        end
+
+        animTrack = myHum:LoadAnimation(anim)
+        animTrack:Play()
+        animTrack:AdjustSpeed(10)
+
+        animButton.Text = target.Name .. " (ON)"
+        sendNotification("BangPlayer", "Đang chạy trên " .. target.Name)
+
+        -- Teleport loop
+        task.spawn(function()
+            while animEnabled and myChar and myChar.Parent and target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") do
+                task.wait()
+                myHRP.CFrame = target.Character.HumanoidRootPart.CFrame
+            end
+            stopAnim()
+            animButton.Text = "Anim: OFF"
+        end)
+    end
 end)
 
--- JumpRequest chạy khi bấm Space (PC) hoặc nút nhảy mặc định (Mobile)
-UserInputService.JumpRequest:Connect(function()
-    if Config.infiniteJumpEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState(Enum.HumanoidStateType.Jumping)
+-- Cập nhật text theo target khi ON
+RunService.RenderStepped:Connect(function()
+    if animEnabled then
+        local target = getClosestSelected()
+        if target then
+            animButton.Text = target.Name .. " (ON)"
+        else
+            animButton.Text = "BangPlayer: ON (No Target)"
+        end
+    end
+end)
+
+-- Invisible (client-side only, safe & universal)
+local invisibleEnabled = false
+
+local invisibleButton = CreateButton(ButtonFrame2Left, "Invisible: OFF", function()
+    invisibleEnabled = not invisibleEnabled
+    invisibleButton.Text = "Invisible: " .. (invisibleEnabled and "ON" or "OFF")
+    sendNotification("Invisible", invisibleEnabled and "Enabled" or "Disabled")
+
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if invisibleEnabled then
+                -- Dùng LocalTransparencyModifier để chỉ bạn thấy mờ
+                part.LocalTransparencyModifier = 0.5
+            else
+                part.LocalTransparencyModifier = 0
+            end
+        end
+    end
+end)
+
+-- Khi respawn thì giữ trạng thái invisible nếu đang bật
+LocalPlayer.CharacterAdded:Connect(function(char)
+    if invisibleEnabled then
+        task.wait(0.5) -- chờ nhân vật load
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.LocalTransparencyModifier = 0.5
+            end
+        end
     end
 end)
 
@@ -1432,6 +1528,7 @@ local RunService = game:GetService("RunService")
 local animations = {
     happier = "http://www.roblox.com/asset/?id=15609995579",
     happy   = "http://www.roblox.com/asset/?id=14352343065",
+    fakedead = "rbxassetid://107771044135542",
 }
 
 local currentTrack = nil
@@ -1489,6 +1586,10 @@ end)
 
 CreateButton(ButtonFrame2Right, "Happy", function()
     playAnimation(animations.happy)
+end)
+
+CreateButton(ButtonFrame2Right, "Fake Dead", function()
+    playAnimation(animations.fakedead)
 end)
 
 local function giveClickTpTool()
