@@ -1005,7 +1005,10 @@ end)
 
 tpLobbyBtn.MouseButton1Click:Connect(function()
     local character = localPlayer.Character or localPlayer.CharacterAdded:Wait()
-    character:MoveTo(Vector3.new(-107, 152, 41))
+    local hrp = character:FindFirstChild("HumanoidRootPart") or character:WaitForChild("HumanoidRootPart")
+
+    -- Thay tọa độ này bằng địa chỉ bạn muốn TP tới
+    hrp.CFrame = CFrame.new(-107, 152, 41)
 end)
 
 -- Input bindings
