@@ -1473,22 +1473,69 @@ local function getClosestSelected()
     return closest
 end
 
--- Nút BangPlayer
+-- Xóa nút BangPlayer cũ nếu tồn tại
+if bangButton then
+    bangButton:Destroy()
+end
+
+-- Biến toàn cục
 local animEnabled = false
 local animTrack = nil
+local bangConnection = nil
 
-local function stopAnim()
+-- Hàm dừng animation và teleport
+local function stopAnimAndTp()
     if animTrack then
         animTrack:Stop()
         animTrack = nil
     end
+    if bangConnection then
+        bangConnection:Disconnect()
+        bangConnection = nil
+    end
     animEnabled = false
 end
 
-local bangButton = CreateButton(ButtonFrame2Left, "BangPlayer: OFF", function()
+-- Hàm tìm player gần nhất trong danh sách SelectedPlayers
+local function getClosestSelected()
+    local closest, dist = nil, math.huge
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return nil end
+
+    for name, selected in pairs(Config.SelectedPlayers or {}) do
+        if selected then
+            local plr = Players:FindFirstChild(name)
+            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local d = (myHRP.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+                if d < dist then
+                    dist = d
+                    closest = plr
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- Tạo nút BangPlayer
+bangButton = Instance.new("TextButton")
+bangButton.Size = UDim2.new(0, 180, 0, 30)
+bangButton.Position = UDim2.new(0, 5, 0, 10)
+bangButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+bangButton.Text = "BangPlayer: OFF"
+bangButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+bangButton.Font = Enum.Font.GothamBold
+bangButton.TextSize = 14
+bangButton.Parent = ButtonFrame2Left
+Instance.new("UICorner", bangButton).CornerRadius = UDim.new(0, 6)
+animateButton(bangButton)
+
+bangButton.MouseButton1Click:Connect(function()
     animEnabled = not animEnabled
+    
     if not animEnabled then
-        stopAnim()
+        stopAnimAndTp()
         bangButton.Text = "BangPlayer: OFF"
         sendNotification("BangPlayer", "Đã tắt")
     else
@@ -1496,23 +1543,31 @@ local bangButton = CreateButton(ButtonFrame2Left, "BangPlayer: OFF", function()
         if not target then
             animEnabled = false
             bangButton.Text = "BangPlayer: OFF"
-            sendNotification("BangPlayer", "Không tìm thấy target trong danh sách!")
+            sendNotification("BangPlayer", "Không tìm thấy mục tiêu trong danh sách!")
             return
         end
 
         local myChar = LocalPlayer.Character
         local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
         local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-        if not (myHum and myHRP) then return end
-
-        -- Chọn animation theo rig
-        local anim = Instance.new("Animation")
-        if myHum.RigType == Enum.HumanoidRigType.R6 then
-            anim.AnimationId = "rbxassetid://148840371"
-        else
-            anim.AnimationId = "http://www.roblox.com/asset?id=569145055"
+        if not (myHum and myHRP) then
+            animEnabled = false
+            bangButton.Text = "BangPlayer: OFF"
+            sendNotification("BangPlayer", "Không tìm thấy nhân vật!")
+            return
         end
 
+        -- Chọn animation theo rig type
+        local anim = Instance.new("Animation")
+        anim.AnimationId = myHum.RigType == Enum.HumanoidRigType.R6 and "rbxassetid://148840371" or "rbxassetid://5918726674"
+        
+        -- Xóa quần áo nếu có
+        pcall(function()
+            myChar.Pants:Destroy()
+            myChar.Shirt:Destroy()
+        end)
+
+        -- Phát animation
         animTrack = myHum:LoadAnimation(anim)
         animTrack:Play()
         animTrack:AdjustSpeed(10)
@@ -1520,18 +1575,60 @@ local bangButton = CreateButton(ButtonFrame2Left, "BangPlayer: OFF", function()
         bangButton.Text = "BangPlayer: ON (" .. target.Name .. ")"
         sendNotification("BangPlayer", "Đang dính theo " .. target.Name)
 
-        -- Teleport loop
-        task.spawn(function()
-            while animEnabled 
-            and myChar and myChar.Parent 
-            and target and target.Character 
-            and target.Character:FindFirstChild("HumanoidRootPart") do
-                task.wait()
+        -- Teleport liên tục
+        bangConnection = RunService.Heartbeat:Connect(function()
+            if animEnabled and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
                 myHRP.CFrame = target.Character.HumanoidRootPart.CFrame
+            else
+                stopAnimAndTp()
+                bangButton.Text = "BangPlayer: OFF"
+                sendNotification("BangPlayer", "Mục tiêu không hợp lệ, đã tắt!")
             end
-            stopAnim()
-            bangButton.Text = "BangPlayer: OFF"
         end)
+    end
+end)
+
+-- Xử lý khi respawn
+LocalPlayer.CharacterAdded:Connect(function()
+    if animEnabled then
+        task.wait(0.5) -- Đợi nhân vật load
+        local target = getClosestSelected()
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+            local myChar = LocalPlayer.Character
+            local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+            local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+            if myHum and myHRP then
+                -- Chọn lại animation theo rig type
+                local anim = Instance.new("Animation")
+                anim.AnimationId = myHum.RigType == Enum.HumanoidRigType.R6 and "rbxassetid://148840371" or "rbxassetid://5918726674"
+                
+                -- Xóa quần áo nếu có
+                pcall(function()
+                    myChar.Pants:Destroy()
+                    myChar.Shirt:Destroy()
+                end)
+
+                -- Phát lại animation
+                animTrack = myHum:LoadAnimation(anim)
+                animTrack:Play()
+                animTrack:AdjustSpeed(10)
+
+                -- Teleport liên tục
+                bangConnection = RunService.Heartbeat:Connect(function()
+                    if animEnabled and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                        myHRP.CFrame = target.Character.HumanoidRootPart.CFrame
+                    else
+                        stopAnimAndTp()
+                        bangButton.Text = "BangPlayer: OFF"
+                        sendNotification("BangPlayer", "Mục tiêu không hợp lệ, đã tắt!")
+                    end
+                end)
+            end
+        else
+            stopAnimAndTp()
+            bangButton.Text = "BangPlayer: OFF"
+            sendNotification("BangPlayer", "Mục tiêu không hợp lệ, đã tắt!")
+        end
     end
 end)
 
