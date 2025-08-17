@@ -116,367 +116,70 @@ task.delay(4, function()
     end)
 end)
 
--- GUI chính
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "DhuyxMenu"
-ScreenGui.ResetOnSpawn = false
-ScreenGui.IgnoreGuiInset = true
-ScreenGui.Parent = PlayerGui
+--// Services
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local LocalizationService = game:GetService("LocalizationService")
+local LocalPlayer = Players.LocalPlayer
 
-local MenuFrame = Instance.new("Frame")
-MenuFrame.Size = UDim2.new(0, 400, 0, 300)
-MenuFrame.Position = UDim2.new(0.05, 0, 0.2, 0)
-MenuFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
-MenuFrame.BackgroundTransparency = 0.1
-MenuFrame.Active = true
-MenuFrame.Draggable = true
-MenuFrame.Parent = ScreenGui
-Instance.new("UICorner", MenuFrame).CornerRadius = UDim.new(0, 12)
+--// GUI Setup
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+local gui = Instance.new("ScreenGui")
+gui.Name = "DhuyxMenu"
+gui.ResetOnSpawn = false
+gui.IgnoreGuiInset = true
+gui.Parent = playerGui
 
-local gradient = Instance.new("UIGradient")
-gradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 179, 186)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(100, 100, 255))
-}
-gradient.Rotation = 45
-gradient.Parent = MenuFrame
+--// Config
+local Config = { CustomPing = nil }
+local Keybinds = {}
 
-local stroke = Instance.new("UIStroke")
-stroke.Thickness = 2
-stroke.Color = Color3.fromRGB(255, 255, 255)
-stroke.Transparency = 0.3
-stroke.Parent = MenuFrame
-
--- Nút Toggle Show/Hide
-local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 70, 0, 30)
-ToggleButton.Position = UDim2.new(0, 20, 0, 240)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-ToggleButton.Text = "SHOW"
-ToggleButton.TextColor3 = Color3.new(0, 0, 0)
-ToggleButton.Font = Enum.Font.GothamBold
-ToggleButton.TextSize = 16
-ToggleButton.Active = true
-ToggleButton.Draggable = true
-ToggleButton.Parent = ScreenGui
-Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 10)
-
-local toggleGradient = Instance.new("UIGradient")
-toggleGradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 179, 186)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 100, 100))
-}
-toggleGradient.Parent = ToggleButton
-
--- Hiệu ứng hover/click
-local function animateButton(btn)
+--// Helpers
+local function attachButtonEffects(btn, shrinkPx)
+    local orig = btn.Size
     btn.MouseEnter:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 200, 200)}):Play()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(200, 200, 200)}):Play()
     end)
     btn.MouseLeave:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.2), {BackgroundColor3 = Color3.fromRGB(255, 179, 186)}):Play()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(180, 180, 180)}):Play()
     end)
     btn.MouseButton1Click:Connect(function()
-        TweenService:Create(btn, TweenInfo.new(0.1), {Size = btn.Size + UDim2.new(0, 5, 0, 5)}):Play()
-        task.wait(0.1)
-        TweenService:Create(btn, TweenInfo.new(0.1), {Size = btn.Size - UDim2.new(0, 5, 0, 5)}):Play()
+        local s = shrinkPx or 3
+        local toSmall = UDim2.new(orig.X.Scale, math.max(0, orig.X.Offset - s), orig.Y.Scale, math.max(0, orig.Y.Offset - s))
+        local t1 = TweenService:Create(btn, TweenInfo.new(0.08), {Size = toSmall})
+        local t2 = TweenService:Create(btn, TweenInfo.new(0.08), {Size = orig})
+        t1:Play(); t1.Completed:Wait(); t2:Play()
     end)
 end
-animateButton(ToggleButton)
 
-ToggleButton.MouseButton1Click:Connect(function()
-    local targetSize = MenuFrame.Visible and UDim2.new(0, 0, 0, 0) or UDim2.new(0, 400, 0, 300)
-    local tween = TweenService:Create(MenuFrame, TweenInfo.new(0.4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = targetSize})
-    if not MenuFrame.Visible then
-        MenuFrame.Visible = true
-        tween:Play()
-    else
-        tween:Play()
-        tween.Completed:Wait()
-        MenuFrame.Visible = false
+local function makeSmoothDraggable(frame, speed)
+    speed = speed or 0.2
+    local dragging, dragInput, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        local goal = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        TweenService:Create(frame, TweenInfo.new(speed, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = goal}):Play()
     end
-    ToggleButton.Text = MenuFrame.Visible and "HIDE" or "SHOW"
-end)
-
--- Tiêu đề & Ping/FPS/Clock
-local MenuTitle = Instance.new("TextLabel")
-MenuTitle.Size = UDim2.new(1, 0, 0, 30)
-MenuTitle.BackgroundTransparency = 1
-MenuTitle.Text = "DhuyxDtuyen"
-MenuTitle.TextColor3 = Color3.fromRGB(255, 179, 186)
-MenuTitle.Font = Enum.Font.GothamBlack
-MenuTitle.TextSize = 18
-MenuTitle.Parent = MenuFrame
-
-local PingClock = Instance.new("TextLabel")
-PingClock.Size = UDim2.new(0, 200, 0, 25)
-PingClock.Position = UDim2.new(0, 5, 0, -30)
-PingClock.BackgroundTransparency = 1
-PingClock.TextColor3 = Color3.fromRGB(255, 255, 255)
-PingClock.Font = Enum.Font.Gotham
-PingClock.TextSize = 14
-PingClock.Parent = MenuTitle
-
-task.spawn(function()
-    while task.wait(1) do
-        local ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
-        local fps = math.floor(1 / RunService.RenderStepped:Wait())
-        local timeStr = os.date("%H:%M")
-        PingClock.Text = string.format("Ping: %d ms | FPS: %d | %s", ping, fps, timeStr)
-    end
-end)
-
-local PingBox = Instance.new("TextBox")
-PingBox.Size = UDim2.new(0, 80, 0, 25)
-PingBox.Position = UDim2.new(1, -85, 0, 2)
-PingBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-PingBox.BackgroundTransparency = 0.2
-PingBox.TextColor3 = Color3.fromRGB(0, 0, 0)
-PingBox.TextSize = 14
-PingBox.Font = Enum.Font.Gotham
-PingBox.PlaceholderText = "Ping (ms)"
-PingBox.Text = ""
-PingBox.ClearTextOnFocus = false
-PingBox.Parent = MenuTitle
-Instance.new("UICorner", PingBox).CornerRadius = UDim.new(0, 6)
-
-PingBox:GetPropertyChangedSignal("Text"):Connect(function()
-    local input = tonumber(PingBox.Text)
-    if input and input >= 0 then
-        Config.CustomPing = math.clamp(input, 10, 1000)
-    else
-        Config.CustomPing = nil
-    end
-end)
-
--- Tạo 3 trang
-local currentPage = 1
-
-local Page1 = Instance.new("Frame")
-Page1.Size = UDim2.new(1, 0, 1, -70)
-Page1.Position = UDim2.new(0, 0, 0, 30)
-Page1.BackgroundTransparency = 1
-Page1.Parent = MenuFrame
-
--- Frame danh sách người chơi cho trang 1
-local PlayerListFrame = Instance.new("Frame")
-PlayerListFrame.Size = UDim2.new(0.5, -5, 1, -20)
-PlayerListFrame.Position = UDim2.new(0, 5, 0, 10)
-PlayerListFrame.BackgroundTransparency = 1
-PlayerListFrame.Parent = Page1
-
-local PlayerList = Instance.new("ScrollingFrame")
-PlayerList.Size = UDim2.new(1, 0, 1, 0)
-PlayerList.CanvasSize = UDim2.new(0, 0, 0, 0)
-PlayerList.ScrollBarThickness = 4
-PlayerList.BackgroundTransparency = 1
-PlayerList.Parent = PlayerListFrame
-
-local UIListLayout = Instance.new("UIListLayout")
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 4)
-UIListLayout.Parent = PlayerList
-UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    PlayerList.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
-end)
-
--- Frame nút chức năng cho trang 1
-local ButtonFrame1 = Instance.new("ScrollingFrame")
-ButtonFrame1.Size = UDim2.new(0.5, -5, 1, -20)
-ButtonFrame1.Position = UDim2.new(0.5, 0, 0, 10)
-ButtonFrame1.BackgroundTransparency = 1
-ButtonFrame1.ScrollBarThickness = 4
-ButtonFrame1.CanvasSize = UDim2.new(0, 0, 0, 0)
-ButtonFrame1.Parent = Page1
-
-local ButtonLayout1 = Instance.new("UIListLayout")
-ButtonLayout1.SortOrder = Enum.SortOrder.LayoutOrder
-ButtonLayout1.Padding = UDim.new(0, 6)
-ButtonLayout1.Parent = ButtonFrame1
-ButtonLayout1:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    ButtonFrame1.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout1.AbsoluteContentSize.Y)
-end)
-
-local Page2 = Instance.new("Frame")
-Page2.Size = UDim2.new(1, 0, 1, -70)
-Page2.Position = UDim2.new(0, 0, 0, 30)
-Page2.BackgroundTransparency = 1
-Page2.Visible = false
-Page2.Parent = MenuFrame
-
--- Frame nút chức năng trái cho trang 2
-local ButtonFrame2Left = Instance.new("ScrollingFrame")
-ButtonFrame2Left.Size = UDim2.new(0.5, -5, 1, -20)
-ButtonFrame2Left.Position = UDim2.new(0, 5, 0, 10)
-ButtonFrame2Left.BackgroundTransparency = 1
-ButtonFrame2Left.ScrollBarThickness = 4
-ButtonFrame2Left.CanvasSize = UDim2.new(0, 0, 0, 0)
-ButtonFrame2Left.Parent = Page2
-
-local ButtonLayout2Left = Instance.new("UIListLayout")
-ButtonLayout2Left.SortOrder = Enum.SortOrder.LayoutOrder
-ButtonLayout2Left.Padding = UDim.new(0, 6)
-ButtonLayout2Left.Parent = ButtonFrame2Left
-ButtonLayout2Left:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    ButtonFrame2Left.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout2Left.AbsoluteContentSize.Y)
-end)
-
--- Frame nút chức năng phải cho trang 2
-local ButtonFrame2Right = Instance.new("ScrollingFrame")
-ButtonFrame2Right.Size = UDim2.new(0.5, -5, 1, -20)
-ButtonFrame2Right.Position = UDim2.new(0.5, 0, 0, 10)
-ButtonFrame2Right.BackgroundTransparency = 1
-ButtonFrame2Right.ScrollBarThickness = 4
-ButtonFrame2Right.CanvasSize = UDim2.new(0, 0, 0, 0)
-ButtonFrame2Right.Parent = Page2
-
-local ButtonLayout2Right = Instance.new("UIListLayout")
-ButtonLayout2Right.SortOrder = Enum.SortOrder.LayoutOrder
-ButtonLayout2Right.Padding = UDim.new(0, 6)
-ButtonLayout2Right.Parent = ButtonFrame2Right
-ButtonLayout2Right:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    ButtonFrame2Right.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout2Right.AbsoluteContentSize.Y)
-end)
-
-local Page3 = Instance.new("Frame")
-Page3.Size = UDim2.new(1, 0, 1, -70)
-Page3.Position = UDim2.new(0, 0, 0, 30)
-Page3.BackgroundTransparency = 1
-Page3.Visible = false
-Page3.Parent = MenuFrame
-
-local ScriptHubScroll = Instance.new("ScrollingFrame")
-ScriptHubScroll.Size = UDim2.new(1, -10, 1, -50)
-ScriptHubScroll.Position = UDim2.new(0, 5, 0, 5)
-ScriptHubScroll.BackgroundTransparency = 1
-ScriptHubScroll.ScrollBarThickness = 6
-ScriptHubScroll.ScrollingDirection = Enum.ScrollingDirection.Y
-ScriptHubScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-ScriptHubScroll.Parent = Page3
-
-local ScriptListLayout = Instance.new("UIListLayout")
-ScriptListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-ScriptListLayout.Padding = UDim.new(0, 6)
-ScriptListLayout.FillDirection = Enum.FillDirection.Vertical
-ScriptListLayout.Parent = ScriptHubScroll
-
-ScriptListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    ScriptHubScroll.CanvasSize = UDim2.new(0, 0, 0, ScriptListLayout.AbsoluteContentSize.Y)
-end)
-
-local function CreateScriptItem(name, url)
-    local itemFrame = Instance.new("Frame")
-    itemFrame.Size = UDim2.new(1, 0, 0, 35)
-    itemFrame.BackgroundTransparency = 0.2
-    itemFrame.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    itemFrame.Parent = ScriptHubScroll
-    Instance.new("UICorner", itemFrame).CornerRadius = UDim.new(0, 6)
-
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.new(0.7, 0, 1, 0)
-    nameLabel.Position = UDim2.new(0, 5, 0, 0)
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Text = name
-    nameLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
-    nameLabel.TextSize = 16
-    nameLabel.Font = Enum.Font.GothamBold
-    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-    nameLabel.Parent = itemFrame
-
-    local runBtn = Instance.new("TextButton")
-    runBtn.Size = UDim2.new(0.3, -10, 1, -4)
-    runBtn.Position = UDim2.new(0.7, 5, 0, 2)
-    runBtn.BackgroundColor3 = Color3.fromRGB(100, 200, 100)
-    runBtn.Text = "Run"
-    runBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
-    runBtn.TextSize = 16
-    runBtn.Font = Enum.Font.GothamBold
-    runBtn.Parent = itemFrame
-    Instance.new("UICorner", runBtn).CornerRadius = UDim.new(0, 6)
-    animateButton(runBtn)
-
-    runBtn.MouseButton1Click:Connect(function()
-        loadstring(game:HttpGet(url))()
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
     end)
-
-    return itemFrame
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then update(input) end
+    end)
 end
 
-CreateScriptItem("Evade", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade")
-CreateScriptItem("Murder Mystery 2", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2")
-CreateScriptItem("Blade Ball", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball")
-CreateScriptItem("Doors", "https://raw.githubusercontent.com/DarkDoorsKing/Project/main/Doors.lua")
-CreateScriptItem("Emote", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote")
-CreateScriptItem("Infinite Yield", "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source")
-
-local PageButtons = Instance.new("Frame")
-PageButtons.Size = UDim2.new(1, 0, 0, 35)
-PageButtons.Position = UDim2.new(0, 0, 1, -35)
-PageButtons.BackgroundTransparency = 1
-PageButtons.Parent = MenuFrame
-
-local Btn1 = Instance.new("TextButton")
-Btn1.Size = UDim2.new(1/3, -2, 1, 0)
-Btn1.Position = UDim2.new(0, 0, 0, 0)
-Btn1.Text = "Da Hood"
-Btn1.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-Btn1.TextColor3 = Color3.fromRGB(0, 0, 0)
-Btn1.Font = Enum.Font.GothamBold
-Btn1.TextSize = 16
-Instance.new("UICorner", Btn1).CornerRadius = UDim.new(0, 6)
-Btn1.Parent = PageButtons
-animateButton(Btn1)
-
-local Btn2 = Instance.new("TextButton")
-Btn2.Size = UDim2.new(1/3, -2, 1, 0)
-Btn2.Position = UDim2.new(1/3, 2, 0, 0)
-Btn2.Text = "Universal"
-Btn2.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-Btn2.TextColor3 = Color3.fromRGB(0, 0, 0)
-Btn2.Font = Enum.Font.GothamBold
-Btn2.TextSize = 16
-Instance.new("UICorner", Btn2).CornerRadius = UDim.new(0, 6)
-Btn2.Parent = PageButtons
-animateButton(Btn2)
-
-local Btn3 = Instance.new("TextButton")
-Btn3.Size = UDim2.new(1/3, -2, 1, 0)
-Btn3.Position = UDim2.new(2/3, 2, 0, 0)
-Btn3.Text = "Script Other"
-Btn3.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-Btn3.TextColor3 = Color3.fromRGB(0, 0, 0)
-Btn3.Font = Enum.Font.GothamBold
-Btn3.TextSize = 16
-Instance.new("UICorner", Btn3).CornerRadius = UDim.new(0, 6)
-Btn3.Parent = PageButtons
-animateButton(Btn3)
-
-local function ShowPage(page)
-    Page1.Visible = (page == 1)
-    Page2.Visible = (page == 2)
-    Page3.Visible = (page == 3)
-end
-
-Btn1.MouseButton1Click:Connect(function()
-    ShowPage(1)
-end)
-Btn2.MouseButton1Click:Connect(function()
-    ShowPage(2)
-end)
-Btn3.MouseButton1Click:Connect(function()
-    ShowPage(3)
-end)
-
--- Lắng nghe phím duy nhất 1 lần
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    local key = input.KeyCode.Name:upper()
-    if Keybinds[key] then
-        Keybinds[key]() -- chạy đúng callback
-    end
-end)
-
--- Hàm tạo button
 local function CreateButton(parent, name, callback)
     local buttonFrame = Instance.new("Frame")
     buttonFrame.Size = UDim2.new(1, -10, 0, 30)
@@ -485,7 +188,7 @@ local function CreateButton(parent, name, callback)
 
     local button = Instance.new("TextButton")
     button.Size = UDim2.new(0.7, -5, 1, 0)
-    button.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
+    button.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
     button.BackgroundTransparency = 0.2
     button.TextColor3 = Color3.fromRGB(0, 0, 0)
     button.TextSize = 14
@@ -493,10 +196,9 @@ local function CreateButton(parent, name, callback)
     button.Text = name
     button.Parent = buttonFrame
     Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
-    animateButton(button)
+    attachButtonEffects(button, 3)
     button.MouseButton1Click:Connect(callback)
 
-    -- Ô nhập keybind
     local keyBox = Instance.new("TextBox")
     keyBox.Size = UDim2.new(0.3, 0, 1, 0)
     keyBox.Position = UDim2.new(0.7, 5, 0, 0)
@@ -510,11 +212,8 @@ local function CreateButton(parent, name, callback)
     keyBox.Parent = buttonFrame
     Instance.new("UICorner", keyBox).CornerRadius = UDim.new(0, 6)
 
-    -- Khi người dùng nhập key mới
     keyBox:GetPropertyChangedSignal("Text"):Connect(function()
         local text = keyBox.Text:upper()
-
-        -- Nếu gõ "button" thì tạo nút rời ngoài màn hình
         if text == "BUTTON" then
             local screenGui = Instance.new("ScreenGui")
             screenGui.IgnoreGuiInset = true
@@ -523,47 +222,19 @@ local function CreateButton(parent, name, callback)
             local screenBtn = Instance.new("TextButton")
             screenBtn.Size = UDim2.new(0, 70, 0, 30)
             screenBtn.Position = UDim2.new(0, 100, 0, 300)
-            screenBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 255)
+            screenBtn.BackgroundColor3 = Color3.fromRGB(200, 200, 200)
             screenBtn.Text = name
-            screenBtn.TextColor3 = Color3.new(0, 0, 0)
+            screenBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
             screenBtn.TextSize = 10
             screenBtn.Font = Enum.Font.GothamBold
             screenBtn.Parent = screenGui
             Instance.new("UICorner", screenBtn).CornerRadius = UDim.new(0, 6)
-
-            -- Kéo di chuyển
-            local dragging, dragStart, startPos = false
-            screenBtn.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    dragging = true
-                    dragStart = input.Position
-                    startPos = screenBtn.Position
-                    input.Changed:Connect(function()
-                        if input.UserInputState == Enum.UserInputState.End then
-                            dragging = false
-                        end
-                    end)
-                end
-            end)
-            UserInputService.InputChanged:Connect(function(input)
-                if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-                    local delta = input.Position - dragStart
-                    screenBtn.Position = UDim2.new(
-                        startPos.X.Scale, startPos.X.Offset + delta.X,
-                        startPos.Y.Scale, startPos.Y.Offset + delta.Y
-                    )
-                end
-            end)
-
-            -- Khi bấm thì chạy callback
+            makeSmoothDraggable(screenBtn, 0.18)
+            attachButtonEffects(screenBtn, 3)
             screenBtn.MouseButton1Click:Connect(callback)
-
         else
-            -- Nếu là phím hợp lệ
             if Enum.KeyCode[text] then
-                -- Xóa bind cũ nếu có
                 Keybinds[text] = nil
-                -- Gán bind mới
                 Keybinds[text] = callback
             end
         end
@@ -571,6 +242,398 @@ local function CreateButton(parent, name, callback)
 
     return button
 end
+
+--// Toggle Button
+local ToggleButton = Instance.new("TextButton")
+ToggleButton.Size = UDim2.new(0, 45, 0, 45)
+ToggleButton.Position = UDim2.new(0, 15, 0, 250)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+ToggleButton.Text = "≡"
+ToggleButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+ToggleButton.TextSize = 20
+ToggleButton.Font = Enum.Font.GothamBold
+ToggleButton.Parent = gui
+Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 10)
+attachButtonEffects(ToggleButton, 5)
+makeSmoothDraggable(ToggleButton, 0.18)
+
+--// MainFrame
+local MainFrame = Instance.new("Frame")
+MainFrame.Size = UDim2.new(0, 320, 0, 240)
+MainFrame.Position = UDim2.new(0.08, 0, 0.2, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50) -- Softer black (dark gray)
+MainFrame.Visible = false
+MainFrame.Parent = gui
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+makeSmoothDraggable(MainFrame, 0.2)
+
+-- Shadow
+local shadow = Instance.new("ImageLabel", MainFrame)
+shadow.Size = UDim2.new(1, 30, 1, 30)
+shadow.Position = UDim2.new(0, -15, 0, -15)
+shadow.Image = "rbxassetid://1316045217"
+shadow.ImageColor3 = Color3.fromRGB(0, 0, 0)
+shadow.ImageTransparency = 0.4
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(10, 10, 118, 118)
+shadow.ZIndex = -1
+shadow.BackgroundTransparency = 1
+
+-- Title
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, -10, 0, 35)
+Title.Position = UDim2.new(0, 5, 0, 5)
+Title.Text = "DhuyxDtuyen"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundTransparency = 1
+
+-- Ping/FPS/Clock
+local PingClock = Instance.new("TextLabel")
+PingClock.Size = UDim2.new(0, 200, 0, 25)
+PingClock.Position = UDim2.new(0, 5, 0, 35)
+PingClock.BackgroundTransparency = 1
+PingClock.TextColor3 = Color3.fromRGB(200, 200, 200)
+PingClock.Font = Enum.Font.Gotham
+PingClock.TextSize = 12
+PingClock.Parent = MainFrame
+
+task.spawn(function()
+    local lastDt = 1/60
+    RunService.RenderStepped:Connect(function(dt) lastDt = dt end)
+    while task.wait(0.5) do
+        local ping = Config.CustomPing or math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+        local fps = math.clamp(math.floor(1 / (lastDt > 0 and lastDt or 1/240)), 1, 999)
+        local timeStr = os.date("%H:%M")
+        PingClock.Text = string.format("Ping: %d ms | FPS: %d | %s", ping, fps, timeStr)
+    end
+end)
+
+local PingBox = Instance.new("TextBox")
+PingBox.Size = UDim2.new(0, 80, 0, 25)
+PingBox.Position = UDim2.new(1, -85, 0, 5)
+PingBox.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+PingBox.BackgroundTransparency = 0.2
+PingBox.TextColor3 = Color3.fromRGB(0, 0, 0)
+PingBox.TextSize = 14
+PingBox.Font = Enum.Font.Gotham
+PingBox.PlaceholderText = "Ping (ms)"
+PingBox.Text = ""
+PingBox.ClearTextOnFocus = false
+PingBox.Parent = Title
+Instance.new("UICorner", PingBox).CornerRadius = UDim.new(0, 6)
+
+PingBox:GetPropertyChangedSignal("Text"):Connect(function()
+    local input = tonumber(PingBox.Text)
+    if input and input >= 0 then
+        Config.CustomPing = math.clamp(input, 10, 1000)
+    else
+        Config.CustomPing = nil
+    end
+end)
+
+--// Tabs
+local TabHolder = Instance.new("Frame", MainFrame)
+TabHolder.Size = UDim2.new(1, -10, 0, 30)
+TabHolder.Position = UDim2.new(0, 5, 0, 65)
+TabHolder.BackgroundTransparency = 1
+local TabLayout = Instance.new("UIListLayout", TabHolder)
+TabLayout.FillDirection = Enum.FillDirection.Horizontal
+TabLayout.Padding = UDim.new(0, 5)
+
+local function createTab(name)
+    local btn = Instance.new("TextButton", TabHolder)
+    btn.Size = UDim2.new(0, 60, 1, 0)
+    btn.Text = name
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+    btn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    attachButtonEffects(btn, 3)
+    return btn
+end
+
+local Tab1Btn = createTab("Da Hood")
+local Tab2Btn = createTab("Universal")
+local Tab3Btn = createTab("Scripts")
+local Tab4Btn = createTab("Functions")
+local Tab5Btn = createTab("Info")
+
+--// Pages
+local Pages = Instance.new("Frame", MainFrame)
+Pages.Size = UDim2.new(1, -10, 1, -105)
+Pages.Position = UDim2.new(0, 5, 0, 100)
+Pages.BackgroundTransparency = 1
+Pages.ClipsDescendants = true
+
+local Page1 = Instance.new("Frame", Pages) -- Da Hood
+Page1.Size = UDim2.new(1, 0, 1, 0)
+Page1.BackgroundTransparency = 1
+
+local Page2 = Instance.new("Frame", Pages) -- Universal
+Page2.Size = UDim2.new(1, 0, 1, 0)
+Page2.BackgroundTransparency = 1
+Page2.Visible = false
+
+local Page3 = Instance.new("Frame", Pages) -- Scripts
+Page3.Size = UDim2.new(1, 0, 1, 0)
+Page3.BackgroundTransparency = 1
+Page3.Visible = false
+
+local Page4 = Instance.new("Frame", Pages) -- Functions
+Page4.Size = UDim2.new(1, 0, 1, 0)
+Page4.BackgroundTransparency = 1
+Page4.Visible = false
+
+local Page5 = Instance.new("Frame", Pages) -- Info
+Page5.Size = UDim2.new(1, 0, 1, 0)
+Page5.BackgroundTransparency = 1
+Page5.Visible = false
+
+local function switchPage(page)
+    Page1.Visible = (page == Page1)
+    Page2.Visible = (page == Page2)
+    Page3.Visible = (page == Page3)
+    Page4.Visible = (page == Page4)
+    Page5.Visible = (page == Page5)
+end
+
+Tab1Btn.MouseButton1Click:Connect(function() switchPage(Page1) end)
+Tab2Btn.MouseButton1Click:Connect(function() switchPage(Page2) end)
+Tab3Btn.MouseButton1Click:Connect(function() switchPage(Page3) end)
+Tab4Btn.MouseButton1Click:Connect(function() switchPage(Page4) end)
+Tab5Btn.MouseButton1Click:Connect(function() switchPage(Page5) end)
+
+--// Page 1 (Da Hood)
+local PlayerListFrame = Instance.new("Frame", Page1)
+PlayerListFrame.Size = UDim2.new(0.5, -5, 1, -20)
+PlayerListFrame.Position = UDim2.new(0, 5, 0, 10)
+PlayerListFrame.BackgroundTransparency = 1
+
+local PlayerList = Instance.new("ScrollingFrame", PlayerListFrame)
+PlayerList.Size = UDim2.new(1, 0, 1, 0)
+PlayerList.CanvasSize = UDim2.new(0, 0, 0, 0)
+PlayerList.ScrollBarThickness = 4
+PlayerList.BackgroundTransparency = 1
+
+local UIListLayout = Instance.new("UIListLayout", PlayerList)
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 4)
+UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    PlayerList.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
+end)
+
+local ButtonFrame1 = Instance.new("ScrollingFrame", Page1)
+ButtonFrame1.Size = UDim2.new(0.5, -5, 1, -20)
+ButtonFrame1.Position = UDim2.new(0.5, 0, 0, 10)
+ButtonFrame1.BackgroundTransparency = 1
+ButtonFrame1.ScrollBarThickness = 4
+ButtonFrame1.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local ButtonLayout1 = Instance.new("UIListLayout", ButtonFrame1)
+ButtonLayout1.SortOrder = Enum.SortOrder.LayoutOrder
+ButtonLayout1.Padding = UDim.new(0, 6)
+ButtonLayout1:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ButtonFrame1.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout1.AbsoluteContentSize.Y)
+end)
+
+--// Page 2 (Universal)
+local ButtonFrame2Left = Instance.new("ScrollingFrame", Page2)
+ButtonFrame2Left.Size = UDim2.new(0.5, -5, 1, -20)
+ButtonFrame2Left.Position = UDim2.new(0, 5, 0, 10)
+ButtonFrame2Left.BackgroundTransparency = 1
+ButtonFrame2Left.ScrollBarThickness = 4
+ButtonFrame2Left.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local ButtonLayout2Left = Instance.new("UIListLayout", ButtonFrame2Left)
+ButtonLayout2Left.SortOrder = Enum.SortOrder.LayoutOrder
+ButtonLayout2Left.Padding = UDim.new(0, 6)
+ButtonLayout2Left:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ButtonFrame2Left.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout2Left.AbsoluteContentSize.Y)
+end)
+
+local ButtonFrame2Right = Instance.new("ScrollingFrame", Page2)
+ButtonFrame2Right.Size = UDim2.new(0.5, -5, 1, -20)
+ButtonFrame2Right.Position = UDim2.new(0.5, 0, 0, 10)
+ButtonFrame2Right.BackgroundTransparency = 1
+ButtonFrame2Right.ScrollBarThickness = 4
+ButtonFrame2Right.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local ButtonLayout2Right = Instance.new("UIListLayout", ButtonFrame2Right)
+ButtonLayout2Right.SortOrder = Enum.SortOrder.LayoutOrder
+ButtonLayout2Right.Padding = UDim.new(0, 6)
+ButtonLayout2Right:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ButtonFrame2Right.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout2Right.AbsoluteContentSize.Y)
+end)
+
+--// Page 3 (Scripts)
+local ScriptHubScroll = Instance.new("ScrollingFrame", Page3)
+ScriptHubScroll.Size = UDim2.new(1, -10, 1, -50)
+ScriptHubScroll.Position = UDim2.new(0, 5, 0, 5)
+ScriptHubScroll.BackgroundTransparency = 1
+ScriptHubScroll.ScrollBarThickness = 6
+ScriptHubScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+ScriptHubScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local ScriptListLayout = Instance.new("UIListLayout", ScriptHubScroll)
+ScriptListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+ScriptListLayout.Padding = UDim.new(0, 6)
+ScriptListLayout.FillDirection = Enum.FillDirection.Vertical
+ScriptListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ScriptHubScroll.CanvasSize = UDim2.new(0, 0, 0, ScriptListLayout.AbsoluteContentSize.Y)
+end)
+
+local function CreateScriptItem(name, url)
+    local itemFrame = Instance.new("Frame", ScriptHubScroll)
+    itemFrame.Size = UDim2.new(1, 0, 0, 35)
+    itemFrame.BackgroundTransparency = 0.2
+    itemFrame.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+
+    local nameLabel = Instance.new("TextLabel", itemFrame)
+    nameLabel.Size = UDim2.new(0.7, 0, 1, 0)
+    nameLabel.Position = UDim2.new(0, 5, 0, 0)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Text = name
+    nameLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
+    nameLabel.TextSize = 16
+    nameLabel.Font = Enum.Font.GothamBold
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+    local runBtn = Instance.new("TextButton", itemFrame)
+    runBtn.Size = UDim2.new(0.3, -10, 1, -4)
+    runBtn.Position = UDim2.new(0.7, 5, 0, 2)
+    runBtn.BackgroundColor3 = Color3.fromRGB(180, 180, 180)
+    runBtn.Text = "Run"
+    runBtn.TextColor3 = Color3.fromRGB(0, 0, 0)
+    runBtn.TextSize = 16
+    runBtn.Font = Enum.Font.GothamBold
+    Instance.new("UICorner", runBtn).CornerRadius = UDim.new(0, 6)
+    attachButtonEffects(runBtn, 3)
+    runBtn.MouseButton1Click:Connect(function()
+        loadstring(game:HttpGet(url))()
+    end)
+
+    Instance.new("UICorner", itemFrame).CornerRadius = UDim.new(0, 6)
+    return itemFrame
+end
+
+CreateScriptItem("Evade", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/evade")
+CreateScriptItem("Murder Mystery 2", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/mm2")
+CreateScriptItem("Blade Ball", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/Bladeball")
+CreateScriptItem("Doors", "https://raw.githubusercontent.com/DarkDoorsKing/Project/main/Doors.lua")
+CreateScriptItem("Emote", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote")
+CreateScriptItem("Infinite Yield", "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source")
+
+--// Page 4 (Functions)
+local ButtonFrame4Left = Instance.new("Frame", Page4)
+ButtonFrame4Left.Size = UDim2.new(0.5, -5, 1, 0)
+ButtonFrame4Left.Position = UDim2.new(0, 0, 0, 0)
+ButtonFrame4Left.BackgroundTransparency = 1
+local LeftLayout = Instance.new("UIListLayout", ButtonFrame4Left)
+LeftLayout.Padding = UDim.new(0, 8)
+LeftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+LeftLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+local ButtonFrame4Right = Instance.new("Frame", Page4)
+ButtonFrame4Right.Size = UDim2.new(0.5, -5, 1, 0)
+ButtonFrame4Right.Position = UDim2.new(0.5, 5, 0, 0)
+ButtonFrame4Right.BackgroundTransparency = 1
+local RightLayout = Instance.new("UIListLayout", ButtonFrame4Right)
+RightLayout.Padding = UDim.new(0, 8)
+RightLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+RightLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+-- Function buttons (placeholders for functionality)
+local autoFarmBtn = CreateButton(ButtonFrame4Left, "AutoFarm (Off)", function() end)
+local shootBtn = CreateButton(ButtonFrame4Left, "Shoot", function() end)
+local espBtn = CreateButton(ButtonFrame4Left, "ESP (Off)", function() end)
+local autoGunBtn = CreateButton(ButtonFrame4Left, "AutoGun", function() end)
+local flingMurdererBtn = CreateButton(ButtonFrame4Right, "Fling Murderer", function() end)
+local flingSheriffBtn = CreateButton(ButtonFrame4Right, "Fling Sheriff", function() end)
+local killAllBtn = CreateButton(ButtonFrame4Right, "Kill All", function() end)
+local tpLobbyBtn = CreateButton(ButtonFrame4Right, "TP Lobby", function() end)
+
+--// Page 5 (Info)
+local Avatar = Instance.new("ImageLabel", Page5)
+Avatar.Size = UDim2.new(0, 80, 0, 80)
+Avatar.Position = UDim2.new(0, 10, 0, 10)
+Avatar.BackgroundTransparency = 1
+Avatar.Image = "rbxthumb://type=AvatarHeadShot&id="..LocalPlayer.UserId.."&w=150&h=150"
+
+local InfoPanel = Instance.new("Frame", Page5)
+InfoPanel.Position = UDim2.new(0, 100, 0, 10)
+InfoPanel.Size = UDim2.new(1, -110, 1, -20)
+InfoPanel.BackgroundTransparency = 1
+InfoPanel.ClipsDescendants = true
+
+local InfoLayout = Instance.new("UIListLayout", InfoPanel)
+InfoLayout.Padding = UDim.new(0, 6)
+InfoLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+InfoLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+local function mkLine()
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1, -10, 0, 22)
+    l.BackgroundTransparency = 1
+    l.Font = Enum.Font.Gotham
+    l.TextSize = 14
+    l.TextColor3 = Color3.fromRGB(200, 200, 200)
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.TextWrapped = false
+    l.ClipsDescendants = true
+    l.Parent = InfoPanel
+    return l
+end
+
+local lineDisplay = mkLine()
+local lineUser = mkLine()
+local lineFPS = mkLine()
+local lineTime = mkLine()
+local lineCountry = mkLine()
+local lineFriends = mkLine()
+
+lineDisplay.Text = "Display Name : "..LocalPlayer.DisplayName
+lineUser.Text = "Username     : @"..LocalPlayer.Name
+
+task.spawn(function()
+    local c = "Unknown"
+    pcall(function()
+        c = LocalizationService:GetCountryRegionForPlayerAsync(LocalPlayer) or "Unknown"
+    end)
+    lineCountry.Text = "Country      : "..c
+end)
+
+task.spawn(function()
+    local ok, list = pcall(function() return Players:GetFriendsOnline() end)
+    local count = (ok and type(list)=="table") and #list or 0
+    lineFriends.Text = "Friends Online: "..count
+end)
+
+task.spawn(function()
+    local lastDt = 1/60
+    RunService.RenderStepped:Connect(function(dt) lastDt = dt end)
+    while task.wait(0.5) do
+        local fps = math.clamp(math.floor(1 / (lastDt > 0 and lastDt or 1/240)), 1, 999)
+        lineFPS.Text = "FPS          : "..fps
+        lineTime.Text = "Time         : "..os.date("%H:%M")
+    end
+end)
+
+--// Toggle open/close
+ToggleButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
+
+--// Keybinds
+UserInputService.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    local key = input.KeyCode.Name:upper()
+    if Keybinds[key] then
+        Keybinds[key]()
+    end
+end)
 
 -- Nút cho trang 1
 espButton = CreateButton(ButtonFrame1, "ESP: OFF", function()
