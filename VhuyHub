@@ -1451,6 +1451,90 @@ antiAfkButton = CreateButton(ButtonFrame2Left, "Anti AFK: OFF", function()
     end
 end)
 
+-- Hàm tìm player gần nhất trong danh sách SelectedPlayers
+local function getClosestSelected()
+    local closest, dist = nil, math.huge
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return nil end
+
+    for name, selected in pairs(Config.SelectedPlayers or {}) do
+        if selected then
+            local plr = Players:FindFirstChild(name)
+            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local d = (myHRP.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+                if d < dist then
+                    dist = d
+                    closest = plr
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- Nút BangPlayer
+local animEnabled = false
+local animTrack = nil
+
+local function stopAnim()
+    if animTrack then
+        animTrack:Stop()
+        animTrack = nil
+    end
+    animEnabled = false
+end
+
+local bangButton = CreateButton(ButtonFrame2Left, "BangPlayer: OFF", function()
+    animEnabled = not animEnabled
+    if not animEnabled then
+        stopAnim()
+        bangButton.Text = "BangPlayer: OFF"
+        sendNotification("BangPlayer", "Đã tắt")
+    else
+        local target = getClosestSelected()
+        if not target then
+            animEnabled = false
+            bangButton.Text = "BangPlayer: OFF"
+            sendNotification("BangPlayer", "Không tìm thấy target trong danh sách!")
+            return
+        end
+
+        local myChar = LocalPlayer.Character
+        local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+        local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if not (myHum and myHRP) then return end
+
+        -- Chọn animation theo rig
+        local anim = Instance.new("Animation")
+        if myHum.RigType == Enum.HumanoidRigType.R6 then
+            anim.AnimationId = "rbxassetid://148840371"
+        else
+            anim.AnimationId = "http://www.roblox.com/asset?id=569145055"
+        end
+
+        animTrack = myHum:LoadAnimation(anim)
+        animTrack:Play()
+        animTrack:AdjustSpeed(10)
+
+        bangButton.Text = "BangPlayer: ON (" .. target.Name .. ")"
+        sendNotification("BangPlayer", "Đang dính theo " .. target.Name)
+
+        -- Teleport loop
+        task.spawn(function()
+            while animEnabled 
+            and myChar and myChar.Parent 
+            and target and target.Character 
+            and target.Character:FindFirstChild("HumanoidRootPart") do
+                task.wait()
+                myHRP.CFrame = target.Character.HumanoidRootPart.CFrame
+            end
+            stopAnim()
+            bangButton.Text = "BangPlayer: OFF"
+        end)
+    end
+end)
+
 noclipButton = CreateButton(ButtonFrame2Left, "Noclip: OFF", function()
     Config.NoclipEnabled = not Config.NoclipEnabled
     
