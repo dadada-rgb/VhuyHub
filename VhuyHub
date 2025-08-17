@@ -1,121 +1,3 @@
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local Workspace = game:GetService("Workspace")
-local TweenService = game:GetService("TweenService")
-local Lighting = game:GetService("Lighting")
-local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
-
-local StarterGui = game:GetService("StarterGui")
-
-function sendNotification(title, text, duration)
-    pcall(function()
-        StarterGui:SetCore("SendNotification", {
-            Title = title or "DhuyxDtuyen",
-            Text = text or "",
-            Duration = duration or 3
-        })
-    end)
-end
-
--- Cấu trúc config mặc định
-local Config = {
-    Buttons = {}, -- Lưu keybind + trạng thái của từng chức năng
-    ESPEnabled = true,
-    SpeedEnabled = false,
-    FlyEnabled = false,
-    AimbotEnabled = false,
-    FullbrightEnabled = false,
-    NoclipEnabled = false,
-    ShiftAmount = 0.5,
-    SelectedPlayers = {},
-    FlySpeed = 35,
-    SpeedAmount = 20,
-    clickTpEnabled = false,
-    checkKOAimbot = true,
-    CustomPing = nil
-}
-
-local autoSelect = false
-local tbEnabled = true
-local fovRadius = 20
-local Player = nil
-local camera = Workspace.CurrentCamera
-local clickTpTool = nil
-local savedWaypoint = nil
-local noclipConnection = nil
-local Keybinds = {} 
-
--- Biến lưu trạng thái Lighting cũ cho Fullbright
-local oldLighting = {
-    Brightness = Lighting.Brightness,
-    GlobalShadows = Lighting.GlobalShadows,
-    FogEnd = Lighting.FogEnd,
-    Ambient = Lighting.Ambient,
-    OutdoorAmbient = Lighting.OutdoorAmbient,
-    ClockTime = Lighting.ClockTime
-}
-
--- Tạo hiệu ứng mờ nền
-local blur = Instance.new("BlurEffect")
-blur.Size = 20
-blur.Parent = Lighting
-
--- Tạo GUI intro
-local introGui = Instance.new("ScreenGui")
-introGui.Name = "VhuyIntroGui"
-introGui.IgnoreGuiInset = true
-introGui.ResetOnSpawn = false
-introGui.DisplayOrder = 99999
-introGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-
-local bg = Instance.new("Frame")
-bg.Size = UDim2.new(1, 0, 1, 0)
-bg.BackgroundColor3 = Color3.new(0, 0, 0)
-bg.BackgroundTransparency = 1
-bg.Parent = introGui
-
-local title = Instance.new("TextLabel")
-title.AnchorPoint = Vector2.new(0.5, 0.5)
-title.Position = UDim2.new(0.5, 0, 0.5, 0)
-title.Size = UDim2.new(0, 400, 0, 120)
-title.Text = "DhuyxDtuyen"
-title.Font = Enum.Font.GothamBlack
-title.TextColor3 = Color3.fromRGB(50, 50, 50)
-title.TextScaled = true
-title.TextTransparency = 1
-title.BackgroundTransparency = 1
-title.Parent = introGui
-
-local corner = Instance.new("UICorner")
-corner.CornerRadius = UDim.new(0, 12)
-corner.Parent = title
-
-local gradient = Instance.new("UIGradient")
-gradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 50, 50)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 230, 230))
-}
-gradient.Rotation = 45
-gradient.Parent = title
-
--- Hiệu ứng fade in
-TweenService:Create(title, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {TextTransparency = 0}):Play()
-TweenService:Create(bg, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {BackgroundTransparency = 0.4}):Play()
-
--- Hiệu ứng fade out
-task.delay(4, function()
-    TweenService:Create(title, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
-    TweenService:Create(bg, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
-    task.delay(1.5, function()
-        introGui:Destroy()
-        blur:Destroy()
-    end)
-end)
-
 --// Services
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -123,6 +5,12 @@ local TweenService = game:GetService("TweenService")
 local RunService = game:GetService("RunService")
 local LocalizationService = game:GetService("LocalizationService")
 local LocalPlayer = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local Lighting = game:GetService("Lighting")
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local StarterGui = game:GetService("StarterGui")
+local Camera = Workspace.CurrentCamera
 
 --// GUI Setup
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -163,7 +51,7 @@ local function makeSmoothDraggable(frame, speed)
         TweenService:Create(frame, TweenInfo.new(speed, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = goal}):Play()
     end
     frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = frame.Position
@@ -173,7 +61,7 @@ local function makeSmoothDraggable(frame, speed)
         end
     end)
     frame.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
     end)
     UserInputService.InputChanged:Connect(function(input)
         if input == dragInput and dragging then update(input) end
@@ -259,10 +147,10 @@ makeSmoothDraggable(ToggleButton, 0.18)
 
 --// MainFrame
 local MainFrame = Instance.new("Frame")
-MainFrame.Size = UDim2.new(0, 320, 0, 240)
+MainFrame.Size = UDim2.new(0, 400, 0, 300)
 MainFrame.Position = UDim2.new(0.08, 0, 0.2, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50) -- Softer black (dark gray)
-MainFrame.Visible = true
+MainFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+MainFrame.Visible = false
 MainFrame.Parent = gui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
 makeSmoothDraggable(MainFrame, 0.2)
@@ -344,7 +232,7 @@ TabLayout.Padding = UDim.new(0, 5)
 
 local function createTab(name)
     local btn = Instance.new("TextButton", TabHolder)
-    btn.Size = UDim2.new(0, 60, 1, 0)
+    btn.Size = UDim2.new(0, 78, 1, 0) -- Adjusted for 5 tabs to fit 400px width
     btn.Text = name
     btn.Font = Enum.Font.Gotham
     btn.TextSize = 14
@@ -407,27 +295,9 @@ Tab4Btn.MouseButton1Click:Connect(function() switchPage(Page4) end)
 Tab5Btn.MouseButton1Click:Connect(function() switchPage(Page5) end)
 
 --// Page 1 (Da Hood)
-local PlayerListFrame = Instance.new("Frame", Page1)
-PlayerListFrame.Size = UDim2.new(0.5, -5, 1, -20)
-PlayerListFrame.Position = UDim2.new(0, 5, 0, 10)
-PlayerListFrame.BackgroundTransparency = 1
-
-local PlayerList = Instance.new("ScrollingFrame", PlayerListFrame)
-PlayerList.Size = UDim2.new(1, 0, 1, 0)
-PlayerList.CanvasSize = UDim2.new(0, 0, 0, 0)
-PlayerList.ScrollBarThickness = 4
-PlayerList.BackgroundTransparency = 1
-
-local UIListLayout = Instance.new("UIListLayout", PlayerList)
-UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-UIListLayout.Padding = UDim.new(0, 4)
-UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    PlayerList.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
-end)
-
 local ButtonFrame1 = Instance.new("ScrollingFrame", Page1)
 ButtonFrame1.Size = UDim2.new(0.5, -5, 1, -20)
-ButtonFrame1.Position = UDim2.new(0.5, 0, 0, 10)
+ButtonFrame1.Position = UDim2.new(0, 5, 0, 10)
 ButtonFrame1.BackgroundTransparency = 1
 ButtonFrame1.ScrollBarThickness = 4
 ButtonFrame1.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -438,6 +308,51 @@ ButtonLayout1.Padding = UDim.new(0, 6)
 ButtonLayout1:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     ButtonFrame1.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout1.AbsoluteContentSize.Y)
 end)
+
+local PlayerListFrame = Instance.new("ScrollingFrame", Page1)
+PlayerListFrame.Size = UDim2.new(0.5, -5, 1, -20)
+PlayerListFrame.Position = UDim2.new(0.5, 0, 0, 10)
+PlayerListFrame.BackgroundTransparency = 1
+PlayerListFrame.ScrollBarThickness = 4
+PlayerListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+local UIListLayout = Instance.new("UIListLayout", PlayerListFrame)
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 4)
+UIListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    PlayerListFrame.CanvasSize = UDim2.new(0, 0, 0, UIListLayout.AbsoluteContentSize.Y)
+end)
+
+-- Populate PlayerList
+local function updatePlayerList()
+    for _, child in ipairs(PlayerListFrame:GetChildren()) do
+        if child:IsA("Frame") then
+            child:Destroy()
+        end
+    end
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        local playerFrame = Instance.new("Frame", PlayerListFrame)
+        playerFrame.Size = UDim2.new(1, -10, 0, 30)
+        playerFrame.BackgroundTransparency = 0.2
+        playerFrame.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
+
+        local playerLabel = Instance.new("TextLabel", playerFrame)
+        playerLabel.Size = UDim2.new(1, -5, 1, 0)
+        playerLabel.BackgroundTransparency = 1
+        playerLabel.Text = player.DisplayName .. " (@" .. player.Name .. ")"
+        playerLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
+        playerLabel.TextSize = 14
+        playerLabel.Font = Enum.Font.Gotham
+        playerLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+        Instance.new("UICorner", playerFrame).CornerRadius = UDim.new(0, 6)
+    end
+end
+
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)
+updatePlayerList()
 
 --// Page 2 (Universal)
 local ButtonFrame2Left = Instance.new("ScrollingFrame", Page2)
@@ -470,7 +385,7 @@ end)
 
 --// Page 3 (Scripts)
 local ScriptHubScroll = Instance.new("ScrollingFrame", Page3)
-ScriptHubScroll.Size = UDim2.new(1, -10, 1, -50)
+ScriptHubScroll.Size = UDim2.new(1, -10, 1, -30) -- Extended height for more space
 ScriptHubScroll.Position = UDim2.new(0, 5, 0, 5)
 ScriptHubScroll.BackgroundTransparency = 1
 ScriptHubScroll.ScrollBarThickness = 6
@@ -548,7 +463,7 @@ RightLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 -- Function buttons (placeholders for functionality)
 local autoFarmBtn = CreateButton(ButtonFrame4Left, "AutoFarm (Off)", function() end)
 local shootBtn = CreateButton(ButtonFrame4Left, "Shoot", function() end)
-local espBtn = CreateButton(ButtonFrame4Left, "ESP (On)", function() end)
+local espBtn = CreateButton(ButtonFrame4Left, "ESP (Off)", function() end)
 local autoGunBtn = CreateButton(ButtonFrame4Left, "AutoGun", function() end)
 local flingMurdererBtn = CreateButton(ButtonFrame4Right, "Fling Murderer", function() end)
 local flingSheriffBtn = CreateButton(ButtonFrame4Right, "Fling Sheriff", function() end)
@@ -635,6 +550,111 @@ UserInputService.InputBegan:Connect(function(input, gp)
     end
 end)
 
+function sendNotification(title, text, duration)
+    pcall(function()
+        StarterGui:SetCore("SendNotification", {
+            Title = title or "DhuyxDtuyen",
+            Text = text or "",
+            Duration = duration or 3
+        })
+    end)
+end
+
+-- Cấu trúc config mặc định
+local Config = {
+    Buttons = {}, -- Lưu keybind + trạng thái của từng chức năng
+    ESPEnabled = true,
+    SpeedEnabled = false,
+    FlyEnabled = false,
+    AimbotEnabled = false,
+    FullbrightEnabled = false,
+    NoclipEnabled = false,
+    ShiftAmount = 0.5,
+    SelectedPlayers = {},
+    FlySpeed = 35,
+    SpeedAmount = 20,
+    clickTpEnabled = false,
+    checkKOAimbot = true,
+    CustomPing = nil
+}
+
+local autoSelect = false
+local tbEnabled = true
+local fovRadius = 20
+local Player = nil
+local camera = Workspace.CurrentCamera
+local clickTpTool = nil
+local savedWaypoint = nil
+local noclipConnection = nil
+local Keybinds = {} 
+
+-- Biến lưu trạng thái Lighting cũ cho Fullbright
+local oldLighting = {
+    Brightness = Lighting.Brightness,
+    GlobalShadows = Lighting.GlobalShadows,
+    FogEnd = Lighting.FogEnd,
+    Ambient = Lighting.Ambient,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+    ClockTime = Lighting.ClockTime
+}
+
+-- Tạo hiệu ứng mờ nền
+local blur = Instance.new("BlurEffect")
+blur.Size = 20
+blur.Parent = Lighting
+
+-- Tạo GUI intro
+local introGui = Instance.new("ScreenGui")
+introGui.Name = "VhuyIntroGui"
+introGui.IgnoreGuiInset = true
+introGui.ResetOnSpawn = false
+introGui.DisplayOrder = 99999
+introGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local bg = Instance.new("Frame")
+bg.Size = UDim2.new(1, 0, 1, 0)
+bg.BackgroundColor3 = Color3.new(0, 0, 0)
+bg.BackgroundTransparency = 1
+bg.Parent = introGui
+
+local title = Instance.new("TextLabel")
+title.AnchorPoint = Vector2.new(0.5, 0.5)
+title.Position = UDim2.new(0.5, 0, 0.5, 0)
+title.Size = UDim2.new(0, 400, 0, 120)
+title.Text = "DhuyxDtuyen"
+title.Font = Enum.Font.GothamBlack
+title.TextColor3 = Color3.fromRGB(50, 50, 50))
+title.TextScaled = true
+title.TextTransparency = 1
+title.BackgroundTransparency = 1
+title.Parent = introGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 12)
+corner.Parent = title
+
+local gradient = Instance.new("UIGradient")
+gradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 50, 50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 230, 230))
+}
+gradient.Rotation = 45
+gradient.Parent = title
+
+-- Hiệu ứng fade in
+TweenService:Create(title, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {TextTransparency = 0}):Play()
+TweenService:Create(bg, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {BackgroundTransparency = 0.4}):Play()
+
+-- Hiệu ứng fade out
+task.delay(4, function()
+    TweenService:Create(title, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
+    TweenService:Create(bg, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+    task.delay(1.5, function()
+        introGui:Destroy()
+        blur:Destroy()
+    end)
+end)
+
 -- Nút cho trang 1
 espButton = CreateButton(ButtonFrame1, "ESP: OFF", function()
     Config.ESPEnabled = not Config.ESPEnabled
@@ -669,10 +689,6 @@ end)
 -- Config mặc định
 Config.RapidFireEnabled = Config.RapidFireEnabled or true -- mặc định bật
 Config.RapidFireDelay = 0.01
-
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
-local LocalPlayer = game:GetService("Players").LocalPlayer
 
 -- =============================
 -- Logic 1: Spam Activate
@@ -773,10 +789,6 @@ end)
 -- ======= CONFIG MẶC ĐỊNH =======
 Config.AntiLockEnabled = Config.AntiLockEnabled or false
 Config.AntiLockType = Config.AntiLockType or "Behind"
-
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local LocalPlayer = Players.LocalPlayer
 
 local antiLockModes = {
     Behind = true, Down = true, ForWard = true,
@@ -929,13 +941,13 @@ end)
 -- Auto Armor Logic
 local cloneref = getgenv().cloneref or function(...) return ... end
 local fireclickdetector = getgenv().fireclickdetector or function(...) return nil end
-local GameReference = cloneref(Game)
+local GameReference = cloneref(game)
 
-if not GameReference:IsLoaded() then Game.Loaded:Wait() end
+if not GameReference:IsLoaded() then game.Loaded:Wait() end
 
-local Workspace = cloneref(GameReference:GetService("Workspace"))
-local RunService = cloneref(GameReference:GetService("RunService"))
-local Players = cloneref(GameReference:GetService("Players"))
+local Workspace = cloneref(game:GetService("Workspace"))
+local RunService = cloneref(game:GetService("RunService"))
+local Players = cloneref(game:GetService("Players"))
 
 local LocalPlayer = Players.LocalPlayer
 local LocalCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
@@ -1234,7 +1246,6 @@ LocalPlayer.CharacterAdded:Connect(function()
     end
 end)
 
--- Nút cho trang 2 (chia trái phải)
 local customFovEnabled = false
 local defaultFov = Workspace.CurrentCamera.FieldOfView
 
@@ -1374,12 +1385,6 @@ autoWallhopButton = CreateButton(ButtonFrame2Left, "Auto Wallhop: " .. (Config.A
     autoWallhopButton.Text = "Auto Wallhop: " .. (Config.AutoWallhopEnabled and "ON" or "OFF")
     sendNotification("Auto Wallhop", Config.AutoWallhopEnabled and "Enabled" or "Disabled")
 end)
-
--- Services
-local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
 
 -- Biến cập nhật khi respawn
 local character, humanoid, rootPart
@@ -2267,7 +2272,7 @@ local function UpdateFly(deltaTime)
 end
 
 local function UpdatePlayerList()
-    for _, cd in pairs(PlayerList:GetChildren()) do
+    for _, cd in pairs(PlayerListFrame:GetChildren()) do
         if cd:IsA("TextButton") then cd:Destroy() end
     end
     for _, player in ipairs(Players:GetPlayers()) do
@@ -2280,7 +2285,7 @@ local function UpdatePlayerList()
             button.TextSize = 14
             button.Font = Enum.Font.Gotham
             button.AutoButtonColor = false
-            button.Parent = PlayerList
+            button.Parent = PlayerListFrame
             local function UpdateButtonText()
                 local isSelected = Config.SelectedPlayers[player.Name]
                 button.Text = (isSelected and "✓ " or "") .. player.DisplayName
@@ -2289,7 +2294,7 @@ local function UpdatePlayerList()
                 Config.SelectedPlayers[player.Name] = not Config.SelectedPlayers[player.Name]
                 UpdateButtonText()
             end)
-            animateButton(button)
+            attachButtonEffects(button, 3)
             UpdateButtonText()
         end
     end
