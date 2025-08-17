@@ -84,7 +84,7 @@ title.Position = UDim2.new(0.5, 0, 0.5, 0)
 title.Size = UDim2.new(0, 400, 0, 120)
 title.Text = "DhuyxDtuyen"
 title.Font = Enum.Font.GothamBlack
-title.TextColor3 = Color3.fromRGB(255, 179, 186)
+title.TextColor3 = Color3.fromRGB(50, 50, 50)
 title.TextScaled = true
 title.TextTransparency = 1
 title.BackgroundTransparency = 1
@@ -96,8 +96,8 @@ corner.Parent = title
 
 local gradient = Instance.new("UIGradient")
 gradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 179, 186)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 100, 100))
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 50, 50)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 230, 230))
 }
 gradient.Rotation = 45
 gradient.Parent = title
@@ -262,7 +262,7 @@ local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 320, 0, 240)
 MainFrame.Position = UDim2.new(0.08, 0, 0.2, 0)
 MainFrame.BackgroundColor3 = Color3.fromRGB(50, 50, 50) -- Softer black (dark gray)
-MainFrame.Visible = false
+MainFrame.Visible = true
 MainFrame.Parent = gui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
 makeSmoothDraggable(MainFrame, 0.2)
@@ -363,7 +363,7 @@ local Tab5Btn = createTab("Info")
 
 --// Pages
 local Pages = Instance.new("Frame", MainFrame)
-Pages.Size = UDim2.new(1, -10, 1, -105)
+Pages.Size = UDim2.new(1, -10, 1, -100)
 Pages.Position = UDim2.new(0, 5, 0, 100)
 Pages.BackgroundTransparency = 1
 Pages.ClipsDescendants = true
@@ -548,7 +548,7 @@ RightLayout.VerticalAlignment = Enum.VerticalAlignment.Top
 -- Function buttons (placeholders for functionality)
 local autoFarmBtn = CreateButton(ButtonFrame4Left, "AutoFarm (Off)", function() end)
 local shootBtn = CreateButton(ButtonFrame4Left, "Shoot", function() end)
-local espBtn = CreateButton(ButtonFrame4Left, "ESP (Off)", function() end)
+local espBtn = CreateButton(ButtonFrame4Left, "ESP (On)", function() end)
 local autoGunBtn = CreateButton(ButtonFrame4Left, "AutoGun", function() end)
 local flingMurdererBtn = CreateButton(ButtonFrame4Right, "Fling Murderer", function() end)
 local flingSheriffBtn = CreateButton(ButtonFrame4Right, "Fling Sheriff", function() end)
@@ -2541,11 +2541,11 @@ selectGui.Parent = CoreGui
 local selectBtn = Instance.new("TextButton")
 selectBtn.Size = UDim2.new(0, 110, 0, 35)
 selectBtn.Position = UDim2.new(0, 300, 0, 200)
-selectBtn.BackgroundColor3 = Color3.fromRGB(255, 200, 200)
+selectBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
 selectBtn.Text = "Set Target"
 selectBtn.Font = Enum.Font.GothamBold
 selectBtn.TextSize = 14
-selectBtn.TextColor3 = Color3.new(0, 0, 0)
+selectBtn.TextColor3 = Color3.new(230, 230, 230)
 selectBtn.Parent = selectGui
 Instance.new("UICorner", selectBtn).CornerRadius = UDim.new(0, 8)
 
