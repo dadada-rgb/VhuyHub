@@ -12,6 +12,13 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local StarterGui = game:GetService("StarterGui")
 local Camera = Workspace.CurrentCamera
 
+local TextChatService = game:GetService("TextChatService")
+
+local chatWindow = TextChatService:FindFirstChild("ChatWindowConfiguration")
+if chatWindow then
+    chatWindow.Enabled = true -- Bật lại chat window
+end
+
 --// GUI Setup
 local playerGui = LocalPlayer:WaitForChild("PlayerGui")
 local gui = Instance.new("ScreenGui")
