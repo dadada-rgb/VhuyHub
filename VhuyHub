@@ -596,10 +596,92 @@ aimbotButton = CreateButton(ButtonFrame1, "Aimlock: OFF", function()
     sendNotification("AIMLOCK", Config.AimbotEnabled and "ON" or "OFF")
 end)
 
-checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O: OFF", function()
+checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O: ON", function()
     Config.checkKOAimbot = not Config.checkKOAimbot
     checkKOAimbotButton.Text = "Check K.O: " .. (Config.checkKOAimbot and "ON" or "OFF")
     sendNotification("CHECK K.O", Config.checkKOAimbot and "ON" or "OFF")
+end)
+
+-- Config mặc định
+Config.RapidFireEnabled = Config.RapidFireEnabled or true -- mặc định bật
+Config.RapidFireDelay = 0.01
+
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local LocalPlayer = game:GetService("Players").LocalPlayer
+
+-- =============================
+-- Logic 1: Spam Activate
+-- =============================
+local utility = {}
+utility.get_gun = function()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    for _, tool in next, char:GetChildren() do
+        if tool:IsA("Tool") and (tool:FindFirstChild("Ammo") or tool:FindFirstChild("AmmoCount") or tool:FindFirstChild("GunScript")) then
+            return tool
+        end
+    end
+end
+utility.rapid = function(tool)
+    tool:Activate()
+end
+
+local isFiring = false
+UserInputService.InputBegan:Connect(function(i, gp)
+    if gp then return end
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        local gun = utility.get_gun()
+        if Config.RapidFireEnabled and gun and not isFiring then
+            isFiring = true
+            task.spawn(function()
+                while isFiring and Config.RapidFireEnabled do
+                    utility.rapid(gun)
+                    task.wait(Config.RapidFireDelay)
+                end
+            end)
+        end
+    end
+end)
+UserInputService.InputEnded:Connect(function(i)
+    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+        isFiring = false
+    end
+end)
+
+-- =============================
+-- Logic 2: Hook GunScript delay
+-- =============================
+local Orginal = {}
+RunService.RenderStepped:Connect(function()
+    if not Config.RapidFireEnabled then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool and (tool:FindFirstChild("GunScript") or tool:FindFirstChild("Ammo") or tool:FindFirstChild("AmmoCount")) then
+        for _, connection in ipairs(getconnections(tool.Activated)) do
+            local func = connection.Function
+            if func then
+                local funcInfo = debug.getinfo(func)
+                for i = 1, funcInfo.nups do
+                    local c, n = debug.getupvalue(func, i)
+                    if type(c) == "number" then
+                        if not Orginal[i] then
+                            Orginal[i] = c
+                        end
+                        debug.setupvalue(func, i, Config.RapidFireEnabled and 0.0000000001 or Orginal[i])
+                    end
+                end
+            end
+        end
+    end
+end)
+
+rapidFireButton = CreateButton(ButtonFrame1, "Rapid Fire: " .. (Config.RapidFireEnabled and "ON" or "OFF"), function()
+    Config.RapidFireEnabled = not Config.RapidFireEnabled
+    rapidFireButton.Text = "Rapid Fire: " .. (Config.RapidFireEnabled and "ON" or "OFF")
+    sendNotification("Rapid Fire", Config.RapidFireEnabled and "Enabled" or "Disabled")
 end)
 
 -- Config mặc định
@@ -1338,115 +1420,7 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Nút Animation ON/OFF (R6 = 4283774086, R15 = 10714068222)
-local animEnabled = false
-local animTrack = nil
 
-local function stopAnim()
-    if animTrack then
-        animTrack:Stop()
-        animTrack = nil
-    end
-    animEnabled = false
-end
-
-local animButton = CreateButton(ButtonFrame2Left, "BangPlayer: OFF", function()
-    animEnabled = not animEnabled
-    if not animEnabled then
-        stopAnim()
-        animButton.Text = "BangPlayer: OFF"
-        sendNotification("BangPlayer", "Đã tắt")
-    else
-        local target = getClosestSelected()
-        if not target or not target.Character or not target.Character:FindFirstChild("HumanoidRootPart") then
-            animEnabled = false
-            animButton.Text = "BangPlayer: OFF"
-            sendNotification("BangPlayer", "Không tìm thấy target!")
-            return
-        end
-
-        local myChar = LocalPlayer.Character
-        local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
-        local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-        if not (myHum and myHRP) then return end
-
-        -- Xoá quần áo
-        pcall(function() myChar:FindFirstChildOfClass("Pants"):Destroy() end)
-        pcall(function() myChar:FindFirstChildOfClass("Shirt"):Destroy() end)
-
-        -- Chọn animation theo rig type
-        local anim = Instance.new("Animation")
-        if myHum.RigType == Enum.HumanoidRigType.R6 then
-            anim.AnimationId = "http://www.roblox.com/asset/?id=4283774086"
-        else -- R15
-            anim.AnimationId = "http://www.roblox.com/asset/?id=10714068222"
-        end
-
-        animTrack = myHum:LoadAnimation(anim)
-        animTrack:Play()
-        animTrack:AdjustSpeed(10)
-
-        animButton.Text = target.Name .. " (ON)"
-        sendNotification("BangPlayer", "Đang chạy trên " .. target.Name)
-
-        -- Teleport loop
-        task.spawn(function()
-            while animEnabled and myChar and myChar.Parent and target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") do
-                task.wait()
-                myHRP.CFrame = target.Character.HumanoidRootPart.CFrame
-            end
-            stopAnim()
-            animButton.Text = "Anim: OFF"
-        end)
-    end
-end)
-
--- Cập nhật text theo target khi ON
-RunService.RenderStepped:Connect(function()
-    if animEnabled then
-        local target = getClosestSelected()
-        if target then
-            animButton.Text = target.Name .. " (ON)"
-        else
-            animButton.Text = "BangPlayer: ON (No Target)"
-        end
-    end
-end)
-
--- Invisible (client-side only, safe & universal)
-local invisibleEnabled = false
-
-local invisibleButton = CreateButton(ButtonFrame2Left, "Invisible: OFF", function()
-    invisibleEnabled = not invisibleEnabled
-    invisibleButton.Text = "Invisible: " .. (invisibleEnabled and "ON" or "OFF")
-    sendNotification("Invisible", invisibleEnabled and "Enabled" or "Disabled")
-
-    local char = LocalPlayer.Character
-    if not char then return end
-
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if invisibleEnabled then
-                -- Dùng LocalTransparencyModifier để chỉ bạn thấy mờ
-                part.LocalTransparencyModifier = 0.5
-            else
-                part.LocalTransparencyModifier = 0
-            end
-        end
-    end
-end)
-
--- Khi respawn thì giữ trạng thái invisible nếu đang bật
-LocalPlayer.CharacterAdded:Connect(function(char)
-    if invisibleEnabled then
-        task.wait(0.5) -- chờ nhân vật load
-        for _, part in ipairs(char:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.LocalTransparencyModifier = 0.5
-            end
-        end
-    end
-end)
 
 local antiAfkEnabled = false
 local antiAfkLoop
