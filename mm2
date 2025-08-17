@@ -562,100 +562,294 @@ Players.PlayerRemoving:Connect(function()
     end
 end)
 
--- GUI setup
-local playerGui = localplayer:WaitForChild("PlayerGui")
-local gui = Instance.new("ScreenGui", playerGui)
+--// Services
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+local LocalizationService = game:GetService("LocalizationService")
+local LocalPlayer = Players.LocalPlayer
+
+--// GUI Setup
+local playerGui = LocalPlayer:WaitForChild("PlayerGui")
+local gui = Instance.new("ScreenGui")
 gui.Name = "zX9qW2"
 gui.ResetOnSpawn = false
 gui.IgnoreGuiInset = true
+gui.Parent = playerGui
 
--- Nút ẩn/hiện Frame
+--========================
+-- Helpers
+--========================
+local function attachButtonEffects(btn, shrinkPx)
+    local orig = btn.Size
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(70,70,70)}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(55,55,55)}):Play()
+    end)
+    btn.MouseButton1Click:Connect(function()
+        local s = shrinkPx or 3
+        local toSmall = UDim2.new(orig.X.Scale, math.max(0, orig.X.Offset - s), orig.Y.Scale, math.max(0, orig.Y.Offset - s))
+        local t1 = TweenService:Create(btn, TweenInfo.new(0.08), {Size = toSmall})
+        local t2 = TweenService:Create(btn, TweenInfo.new(0.08), {Size = orig})
+        t1:Play(); t1.Completed:Wait(); t2:Play()
+    end)
+end
+
+local function makeSmoothDraggable(frame, speed)
+    speed = speed or 0.2
+    local dragging, dragInput, dragStart, startPos
+    local function update(input)
+        local delta = input.Position - dragStart
+        local goal = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+        TweenService:Create(frame, TweenInfo.new(speed, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {Position = goal}):Play()
+    end
+    frame.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then dragging = false end
+            end)
+        end
+    end)
+    frame.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+    end)
+    UserInputService.InputChanged:Connect(function(input)
+        if input == dragInput and dragging then update(input) end
+    end)
+end
+
+--========================
+-- Toggle Button (kéo được, tránh chồng vào Settings)
+--========================
 local ToggleButton = Instance.new("TextButton")
-ToggleButton.Size = UDim2.new(0, 40, 0, 40)
-ToggleButton.Position = UDim2.new(0, 10, 0, 10)
-ToggleButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-ToggleButton.Text = ">"
-ToggleButton.TextColor3 = Color3.fromRGB(0, 0, 0)
+ToggleButton.Size = UDim2.new(0, 45, 0, 45)
+ToggleButton.Position = UDim2.new(0, 15, 0, 250)
+ToggleButton.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+ToggleButton.Text = "≡"
+ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
 ToggleButton.TextSize = 20
-ToggleButton.Font = Enum.Font.SourceSansBold
-ToggleButton.Active = true
-ToggleButton.Draggable = true
+ToggleButton.Font = Enum.Font.GothamBold
 ToggleButton.Parent = gui
-Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(0, 10)
+attachButtonEffects(ToggleButton, 5)
+makeSmoothDraggable(ToggleButton, 0.18)
 
--- Frame chính
+--========================
+-- MainFrame (kéo mượt)
+--========================
 local MainFrame = Instance.new("Frame")
-MainFrame.Name = "MainFrame"
-MainFrame.Size = UDim2.new(0, 280, 0, 200)
-MainFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
-MainFrame.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-MainFrame.Active = true
-MainFrame.Draggable = true
+MainFrame.Size = UDim2.new(0, 320, 0, 240)
+MainFrame.Position = UDim2.new(0.08, 0, 0.2, 0)
+MainFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+MainFrame.Visible = false
 MainFrame.Parent = gui
-Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 8)
+Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 12)
+makeSmoothDraggable(MainFrame, 0.2)
 
--- Xử lý ẩn/hiện Frame
-ToggleButton.MouseButton1Click:Connect(function()
-    MainFrame.Visible = not MainFrame.Visible
-    ToggleButton.Text = MainFrame.Visible and ">" or "<"
-end)
+-- Shadow
+local shadow = Instance.new("ImageLabel", MainFrame)
+shadow.Size = UDim2.new(1, 30, 1, 30)
+shadow.Position = UDim2.new(0, -15, 0, -15)
+shadow.Image = "rbxassetid://1316045217"
+shadow.ImageColor3 = Color3.fromRGB(0,0,0)
+shadow.ImageTransparency = 0.4
+shadow.ScaleType = Enum.ScaleType.Slice
+shadow.SliceCenter = Rect.new(10,10,118,118)
+shadow.ZIndex = -1
+shadow.BackgroundTransparency = 1
 
--- Frame bên trái (4 nút)
-local LeftButtonFrame = Instance.new("Frame")
-LeftButtonFrame.Size = UDim2.new(0.5, -5, 1, -25)
-LeftButtonFrame.Position = UDim2.new(0, 5, 0, 20)
-LeftButtonFrame.BackgroundTransparency = 1
-LeftButtonFrame.Parent = MainFrame
+-- Title
+local Title = Instance.new("TextLabel", MainFrame)
+Title.Size = UDim2.new(1, -10, 0, 35)
+Title.Position = UDim2.new(0, 5, 0, 5)
+Title.Text = "DhuyxDtuyen"
+Title.Font = Enum.Font.GothamBold
+Title.TextSize = 18
+Title.TextColor3 = Color3.fromRGB(255, 255, 255)
+Title.BackgroundTransparency = 1
 
-local LeftLayout = Instance.new("UIListLayout")
-LeftLayout.Padding = UDim.new(0, 5)
-LeftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-LeftLayout.SortOrder = Enum.SortOrder.LayoutOrder
-LeftLayout.Parent = LeftButtonFrame
+--========================
+-- Tabs
+--========================
+local TabHolder = Instance.new("Frame", MainFrame)
+TabHolder.Size = UDim2.new(1, -10, 0, 30)
+TabHolder.Position = UDim2.new(0, 5, 0, 40)
+TabHolder.BackgroundTransparency = 1
+local TabLayout = Instance.new("UIListLayout", TabHolder)
+TabLayout.FillDirection = Enum.FillDirection.Horizontal
+TabLayout.Padding = UDim.new(0, 5)
 
--- Frame bên phải (4 nút)
-local RightButtonFrame = Instance.new("Frame")
-RightButtonFrame.Size = UDim2.new(0.5, -5, 1, -25)
-RightButtonFrame.Position = UDim2.new(0.5, 0, 0, 20)
-RightButtonFrame.BackgroundTransparency = 1
-RightButtonFrame.Parent = MainFrame
-
-local RightLayout = Instance.new("UIListLayout")
-RightLayout.Padding = UDim.new(0, 5)
-RightLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-RightLayout.SortOrder = Enum.SortOrder.LayoutOrder
-RightLayout.Parent = RightButtonFrame
-
--- Hàm tạo nút
-local function createButton(name, text, parent)
-    local btn = Instance.new("TextButton")
-    btn.Name = name
-    btn.Text = text
-    btn.Size = UDim2.new(0, 120, 0, 25)
-    btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    btn.BackgroundTransparency = 0.2
-    btn.TextColor3 = Color3.fromRGB(0, 0, 0)
-    btn.Font = Enum.Font.SourceSansBold
-    btn.TextSize = 12
-    btn.ZIndex = 5
-    btn.AutoButtonColor = true
-    btn.Selectable = true
-    btn.Active = true
-    btn.Parent = parent
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+local function createTab(name)
+    local btn = Instance.new("TextButton", TabHolder)
+    btn.Size = UDim2.new(0, 150, 1, 0)
+    btn.Text = name
+    btn.Font = Enum.Font.Gotham
+    btn.TextSize = 14
+    btn.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,6)
+    attachButtonEffects(btn, 3)
     return btn
 end
 
--- Tạo 8 nút (4 bên trái, 4 bên phải)
-local autoFarmBtn = createButton("jH4mP8", "AutoFarm (Off)", LeftButtonFrame)
-local shootBtn = createButton("tR7nY5", "Shoot", LeftButtonFrame)
-local espBtn = createButton("uP5kQ3", "ESP (Off)", LeftButtonFrame)
-local autoGunBtn = createButton("vQ2zW9", "AutoGun", LeftButtonFrame)
+local Tab1Btn = createTab("Functions")
+local Tab2Btn = createTab("Info")
 
-local flingMurdererBtn = createButton("flingMurderer", "Fling Murderer", RightButtonFrame)
-local flingSheriffBtn = createButton("flingSheriff", "Fling Sheriff", RightButtonFrame)
-local killAllBtn = createButton("killAll", "Kill All", RightButtonFrame)
-local tpLobbyBtn = createButton("tpLobby", "TP Lobby", RightButtonFrame)
+-- Pages container
+local Pages = Instance.new("Frame", MainFrame)
+Pages.Size = UDim2.new(1, -10, 1, -80)
+Pages.Position = UDim2.new(0, 5, 0, 75)
+Pages.BackgroundTransparency = 1
+Pages.ClipsDescendants = true  -- tránh tràn ra ngoài
+
+local Page1 = Instance.new("Frame", Pages) -- Functions
+Page1.Size = UDim2.new(1,0,1,0)
+Page1.BackgroundTransparency = 1
+
+local Page2 = Instance.new("Frame", Pages) -- Info
+Page2.Size = UDim2.new(1,0,1,0)
+Page2.BackgroundTransparency = 1
+Page2.Visible = false
+
+Tab1Btn.MouseButton1Click:Connect(function() switchPage(Page1) end)
+Tab2Btn.MouseButton1Click:Connect(function() switchPage(Page2) end)
+
+--========================
+-- FUNCTIONS PAGE (2 cột, 8 nút)
+--========================
+local LeftCol = Instance.new("Frame", Page1)
+LeftCol.Size = UDim2.new(0.5, -5, 1, 0)
+LeftCol.Position = UDim2.new(0, 0, 0, 0)
+LeftCol.BackgroundTransparency = 1
+local LeftLayout = Instance.new("UIListLayout", LeftCol)
+LeftLayout.Padding = UDim.new(0, 8)
+LeftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+LeftLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+local RightCol = Instance.new("Frame", Page1)
+RightCol.Size = UDim2.new(0.5, -5, 1, 0)
+RightCol.Position = UDim2.new(0.5, 5, 0, 0)
+RightCol.BackgroundTransparency = 1
+local RightLayout = Instance.new("UIListLayout", RightCol)
+RightLayout.Padding = UDim.new(0, 8)
+RightLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+RightLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+local function createFuncButton(name, text, parent)
+    local btn = Instance.new("TextButton", parent)
+    btn.Name = name                 -- giữ nguyên name để không lỗi logic
+    btn.Text = text
+    btn.Size = UDim2.new(0, 130, 0, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(65, 65, 75)  -- khác nền để nổi rõ
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 13
+    btn.AutoButtonColor = false
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Thickness = 1.5
+    stroke.Color = Color3.fromRGB(100, 100, 120)
+    attachButtonEffects(btn, 3)
+    return btn
+end
+
+-- 8 nút như bản đầu (đúng tên)
+local autoFarmBtn     = createFuncButton("jH4mP8",      "AutoFarm (Off)", LeftCol)
+local shootBtn        = createFuncButton("tR7nY5",      "Shoot",          LeftCol)
+local espBtn          = createFuncButton("uP5kQ3",      "ESP (Off)",      LeftCol)
+local autoGunBtn      = createFuncButton("vQ2zW9",      "AutoGun",        LeftCol)
+
+local flingMurdererBtn= createFuncButton("flingMurderer","Fling Murderer", RightCol)
+local flingSheriffBtn = createFuncButton("flingSheriff", "Fling Sheriff",  RightCol)
+local killAllBtn      = createFuncButton("killAll",      "Kill All",       RightCol)
+local tpLobbyBtn      = createFuncButton("tpLobby",      "TP Lobby",       RightCol)
+
+--========================
+-- INFO PAGE (mỗi thông tin 1 dòng)
+--========================
+-- avatar
+local Avatar = Instance.new("ImageLabel", Page2)
+Avatar.Size = UDim2.new(0,80,0,80)
+Avatar.Position = UDim2.new(0,10,0,10)
+Avatar.BackgroundTransparency = 1
+Avatar.Image = "rbxthumb://type=AvatarHeadShot&id="..LocalPlayer.UserId.."&w=150&h=150"
+
+-- khối text
+local InfoPanel = Instance.new("Frame", Page2)
+InfoPanel.Position = UDim2.new(0,100,0,10)
+InfoPanel.Size = UDim2.new(1,-110,1,-20)
+InfoPanel.BackgroundTransparency = 1
+InfoPanel.ClipsDescendants = true
+
+local InfoLayout = Instance.new("UIListLayout", InfoPanel)
+InfoLayout.Padding = UDim.new(0, 6)
+InfoLayout.HorizontalAlignment = Enum.HorizontalAlignment.Left
+InfoLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+
+local function mkLine()
+    local l = Instance.new("TextLabel")
+    l.Size = UDim2.new(1, -10, 0, 22)
+    l.BackgroundTransparency = 1
+    l.Font = Enum.Font.Gotham
+    l.TextSize = 14
+    l.TextColor3 = Color3.fromRGB(220,220,220)
+    l.TextXAlignment = Enum.TextXAlignment.Left
+    l.TextWrapped = false
+    l.ClipsDescendants = true
+    l.Parent = InfoPanel
+    return l
+end
+
+local lineDisplay = mkLine()
+local lineUser    = mkLine()
+local lineFPS     = mkLine()
+local lineTime    = mkLine()
+local lineCountry = mkLine()
+local lineFriends = mkLine()
+
+-- set static
+lineDisplay.Text = "Display Name : "..LocalPlayer.DisplayName
+lineUser.Text    = "Username     : @"..LocalPlayer.Name
+
+-- Country (best-effort)
+task.spawn(function()
+    local c = "Unknown"
+    pcall(function()
+        c = LocalizationService:GetCountryRegionForPlayerAsync(LocalPlayer) or "Unknown"
+    end)
+    lineCountry.Text = "Country      : "..c
+end)
+
+-- Friends online (nếu available)
+task.spawn(function()
+    local ok, list = pcall(function() return Players:GetFriendsOnline() end)
+    local count = (ok and type(list)=="table") and #list or 0
+    lineFriends.Text = "Friends Online: "..count
+end)
+
+-- FPS + Time update định kỳ (nhẹ, không giật)
+local lastDt = 1/60
+RunService.RenderStepped:Connect(function(dt) lastDt = dt end)
+task.spawn(function()
+    while task.wait(0.5) do
+        local fps = math.clamp(math.floor(1 / (lastDt > 0 and lastDt or 1/240)), 1, 999)
+        lineFPS.Text  = "FPS          : "..fps
+        lineTime.Text = "Time         : "..os.date("%H:%M")
+    end
+end)
+
+--========================
+-- Toggle open/close
+--========================
+ToggleButton.MouseButton1Click:Connect(function()
+    MainFrame.Visible = not MainFrame.Visible
+end)
 
 -- AutoFarm Toggle
 autoFarmBtn.MouseButton1Click:Connect(function()
