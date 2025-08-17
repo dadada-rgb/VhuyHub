@@ -251,7 +251,7 @@ local Tab5Btn = createTab("Info")
 
 --// Pages
 local Pages = Instance.new("Frame", MainFrame)
-Pages.Size = UDim2.new(1, -10, 1, -100)
+Pages.Size = UDim2.new(1, -10, 1, -105)
 Pages.Position = UDim2.new(0, 5, 0, 100)
 Pages.BackgroundTransparency = 1
 Pages.ClipsDescendants = true
@@ -623,7 +623,7 @@ title.Position = UDim2.new(0.5, 0, 0.5, 0)
 title.Size = UDim2.new(0, 400, 0, 120)
 title.Text = "DhuyxDtuyen"
 title.Font = Enum.Font.GothamBlack
-title.TextColor3 = Color3.fromRGB(50, 50, 50))
+title.TextColor3 = Color3.fromRGB(55, 55, 55)
 title.TextScaled = true
 title.TextTransparency = 1
 title.BackgroundTransparency = 1
@@ -635,7 +635,7 @@ corner.Parent = title
 
 local gradient = Instance.new("UIGradient")
 gradient.Color = ColorSequence.new{
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(50, 50, 50)),
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(55, 55, 55)),
     ColorSequenceKeypoint.new(1, Color3.fromRGB(230, 230, 230))
 }
 gradient.Rotation = 45
@@ -2546,7 +2546,7 @@ selectGui.Parent = CoreGui
 local selectBtn = Instance.new("TextButton")
 selectBtn.Size = UDim2.new(0, 110, 0, 35)
 selectBtn.Position = UDim2.new(0, 300, 0, 200)
-selectBtn.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+selectBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 selectBtn.Text = "Set Target"
 selectBtn.Font = Enum.Font.GothamBold
 selectBtn.TextSize = 14
