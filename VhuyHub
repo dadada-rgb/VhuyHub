@@ -1617,11 +1617,6 @@ local function getClosestSelected()
     return closest
 end
 
--- Xóa nút BangPlayer cũ nếu tồn tại
-if bangButton then
-    bangButton:Destroy()
-end
-
 -- Biến toàn cục
 local animEnabled = false
 local animTrack = nil
@@ -1662,20 +1657,8 @@ local function getClosestSelected()
     return closest
 end
 
--- Tạo nút BangPlayer
-bangButton = Instance.new("TextButton")
-bangButton.Size = UDim2.new(0, 180, 0, 30)
-bangButton.Position = UDim2.new(0, 5, 0, 10)
-bangButton.BackgroundColor3 = Color3.fromRGB(255, 179, 186)
-bangButton.Text = "BangPlayer: OFF"
-bangButton.TextColor3 = Color3.fromRGB(0, 0, 0)
-bangButton.Font = Enum.Font.GothamBold
-bangButton.TextSize = 14
-bangButton.Parent = ButtonFrame2Left
-Instance.new("UICorner", bangButton).CornerRadius = UDim.new(0, 6)
-animateButton(bangButton)
-
-bangButton.MouseButton1Click:Connect(function()
+-- Tạo nút BangPlayer sử dụng CreateButton
+bangButton = CreateButton(ButtonFrame2Left, "BangPlayer: OFF", function()
     animEnabled = not animEnabled
     
     if not animEnabled then
@@ -1704,12 +1687,6 @@ bangButton.MouseButton1Click:Connect(function()
         -- Chọn animation theo rig type
         local anim = Instance.new("Animation")
         anim.AnimationId = myHum.RigType == Enum.HumanoidRigType.R6 and "rbxassetid://148840371" or "rbxassetid://5918726674"
-        
-        -- Xóa quần áo nếu có
-        pcall(function()
-            myChar.Pants:Destroy()
-            myChar.Shirt:Destroy()
-        end)
 
         -- Phát animation
         animTrack = myHum:LoadAnimation(anim)
