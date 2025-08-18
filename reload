@@ -11,6 +11,7 @@ local Lighting = game:GetService("Lighting")
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local StarterGui = game:GetService("StarterGui")
 local Camera = Workspace.CurrentCamera
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local TextChatService = game:GetService("TextChatService")
 
@@ -42,27 +43,29 @@ local Config = {
     FlySpeed = 35,
     SpeedAmount = 20,
     clickTpEnabled = false,
-    CustomPing = nil,
     RapidFireEnabled = true,
     RapidFireDelay = 0.01,
     MacroLegitEnabled = false,
     AntiLockEnabled = false,
     AntiLockType = "Behind",
     LookAtEnabled = false,
-    CsyncOrbitEnabled = false,
+    AutoArmorEnabled = false,
+    AutoReloadEnabled = false,
     CsyncRandomEnabled = false,
+    CsyncOrbitEnabled = false,
     CsyncRadius = 10,
     CsyncHeight = 5,
     CsyncSpeed = 2,
     RainbowHitEffectEnabled = true,
     AutoWallhopEnabled = false,
-    KorAnimEnabled = true,
+    AntiAfkEnabled = false,
+    BangEnabled = false,
     SpinbotEnabled = false,
     SpinbotSpeed = 450,
-    AutoReloadEnabled = false
+    AntiFlingEnabled = false,
+    HiddenFling = false
 }
 
---// Keybinds
 local Keybinds = {}
 
 --// Helpers
@@ -143,14 +146,7 @@ local function CreateButton(parent, name, callback)
 
     keyBox:GetPropertyChangedSignal("Text"):Connect(function()
         local text = keyBox.Text:upper()
-        if text == "" then
-            for k, v in pairs(Keybinds) do
-                if v == callback then
-                    Keybinds[k] = nil
-                    break
-                end
-            end
-        elseif text == "BUTTON" then
+        if text == "BUTTON" then
             local screenGui = Instance.new("ScreenGui")
             screenGui.IgnoreGuiInset = true
             screenGui.Parent = game:GetService("CoreGui")
@@ -168,8 +164,15 @@ local function CreateButton(parent, name, callback)
             makeSmoothDraggable(screenBtn, 0.18)
             attachButtonEffects(screenBtn, 3)
             screenBtn.MouseButton1Click:Connect(callback)
+        elseif text == "" then
+            for k in pairs(Keybinds) do
+                if Keybinds[k] == callback then
+                    Keybinds[k] = nil
+                end
+            end
         else
             if Enum.KeyCode[text] then
+                Keybinds[text] = nil
                 Keybinds[text] = callback
             end
         end
@@ -237,34 +240,12 @@ PingClock.Parent = MainFrame
 task.spawn(function()
     local lastDt = 1/60
     RunService.RenderStepped:Connect(function(dt) lastDt = dt end)
-    while task.wait(0.5) do
+    while task.wait(1) do
         local ping = Config.CustomPing or math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
         local fps = math.clamp(math.floor(1 / (lastDt > 0 and lastDt or 1/240)), 1, 999)
         local timeStr = os.date("%H:%M")
         PingClock.Text = string.format("Ping: %d ms | FPS: %d | %s", ping, fps, timeStr)
-    end
-end)
-
-local PingBox = Instance.new("TextBox")
-PingBox.Size = UDim2.new(0, 80, 0, 25)
-PingBox.Position = UDim2.new(1, -85, 0, 5)
-PingBox.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
-PingBox.BackgroundTransparency = 0.2
-PingBox.TextColor3 = Color3.fromRGB(0, 0, 0)
-PingBox.TextSize = 14
-PingBox.Font = Enum.Font.Gotham
-PingBox.PlaceholderText = "Ping (ms)"
-PingBox.Text = ""
-PingBox.ClearTextOnFocus = false
-PingBox.Parent = Title
-Instance.new("UICorner", PingBox).CornerRadius = UDim.new(0, 6)
-
-PingBox:GetPropertyChangedSignal("Text"):Connect(function()
-    local input = tonumber(PingBox.Text)
-    if input and input >= 0 then
-        Config.CustomPing = math.clamp(input, 10, 1000)
-    else
-        Config.CustomPing = nil
+        Config.CustomPing = ping
     end
 end)
 
@@ -389,7 +370,7 @@ local function updatePlayerList()
         local playerLabel = Instance.new("TextLabel", playerFrame)
         playerLabel.Size = UDim2.new(1, -5, 1, 0)
         playerLabel.BackgroundTransparency = 1
-        playerLabel.Text = player.DisplayName
+        playerLabel.Text = player.DisplayName .. " (@" .. player.Name .. ")"
         playerLabel.TextColor3 = Color3.fromRGB(0, 0, 0)
         playerLabel.TextSize = 14
         playerLabel.Font = Enum.Font.Gotham
@@ -430,6 +411,16 @@ ButtonLayout2Right.SortOrder = Enum.SortOrder.LayoutOrder
 ButtonLayout2Right.Padding = UDim.new(0, 6)
 ButtonLayout2Right:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
     ButtonFrame2Right.CanvasSize = UDim2.new(0, 0, 0, ButtonLayout2Right.AbsoluteContentSize.Y)
+end)
+
+local flingPlayerBtn = CreateButton(ButtonFrame2Left, "Fling Player", function()
+    local closest = getClosestSelected()
+    if closest then
+        miniFling(closest)
+        sendNotification("Fling", "Flinged " .. closest.Name)
+    else
+        sendNotification("Fling", "No selected player nearby")
+    end
 end)
 
 --// Page 3 (Scripts)
@@ -491,42 +482,63 @@ CreateScriptItem("Emote", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/
 CreateScriptItem("Infinite Yield", "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source")
 
 --// Page 4 (Functions)
-local ButtonFrame4 = Instance.new("Frame", Page4)
-ButtonFrame4.Size = UDim2.new(1, 0, 1, 0)
-ButtonFrame4.BackgroundTransparency = 1
-local FuncLayout = Instance.new("UIListLayout", ButtonFrame4)
-FuncLayout.SortOrder = Enum.SortOrder.LayoutOrder
-FuncLayout.Padding = UDim.new(0, 6)
-FuncLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-    Page4.CanvasSize = UDim2.new(0, 0, 0, FuncLayout.AbsoluteContentSize.Y)
+local ButtonFrame4Left = Instance.new("ScrollingFrame", Page4)
+ButtonFrame4Left.Size = UDim2.new(0.5, -5, 1, 0)
+ButtonFrame4Left.Position = UDim2.new(0, 0, 0, 0)
+ButtonFrame4Left.BackgroundTransparency = 1
+ButtonFrame4Left.ScrollBarThickness = 4
+ButtonFrame4Left.CanvasSize = UDim2.new(0, 0, 0, 0)
+local LeftLayout = Instance.new("UIListLayout", ButtonFrame4Left)
+LeftLayout.Padding = UDim.new(0, 8)
+LeftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+LeftLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+LeftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ButtonFrame4Left.CanvasSize = UDim2.new(0, 0, 0, LeftLayout.AbsoluteContentSize.Y)
 end)
 
-local autoFarmBtn = CreateButton(ButtonFrame4, "AutoFarm (Off)", function()
-    autoFarm = not autoFarm
-    autoFarmBtn.Text = "AutoFarm (" .. (autoFarm and "On" or "Off") .. ")"
-    if autoFarm then
+local ButtonFrame4Right = Instance.new("ScrollingFrame", Page4)
+ButtonFrame4Right.Size = UDim2.new(0.5, -5, 1, 0)
+ButtonFrame4Right.Position = UDim2.new(0.5, 5, 0, 0)
+ButtonFrame4Right.BackgroundTransparency = 1
+ButtonFrame4Right.ScrollBarThickness = 4
+ButtonFrame4Right.CanvasSize = UDim2.new(0, 0, 0, 0)
+local RightLayout = Instance.new("UIListLayout", ButtonFrame4Right)
+RightLayout.Padding = UDim.new(0, 8)
+RightLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+RightLayout.VerticalAlignment = Enum.VerticalAlignment.Top
+RightLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    ButtonFrame4Right.CanvasSize = UDim2.new(0, 0, 0, RightLayout.AbsoluteContentSize.Y)
+end)
+
+local autoFarmBtn = CreateButton(ButtonFrame4Left, "AutoFarm (Off)", function()
+    Config.AutoFarmEnabled = not Config.AutoFarmEnabled
+    autoFarmBtn.Text = "AutoFarm (" .. (Config.AutoFarmEnabled and "On" or "Off") .. ")"
+    sendNotification("AutoFarm", Config.AutoFarmEnabled and "ON" or "OFF")
+    if Config.AutoFarmEnabled then
         task.spawn(autoFarmCoins)
     end
 end)
 
-local shootBtn = CreateButton(ButtonFrame4, "Shoot", function()
+local shootBtn = CreateButton(ButtonFrame4Left, "Shoot", function()
     task.spawn(shootMurderer)
+    sendNotification("Shoot", "Shot fired")
 end)
 
-local espBtn = CreateButton(ButtonFrame4, "ESP (Off)", function()
-    espActive = not espActive
-    espBtn.Text = "ESP (" .. (espActive and "On" or "Off") .. ")"
-    if espActive then
+local espBtn = CreateButton(ButtonFrame4Left, "ESP (Off)", function()
+    Config.ESPEnabled = not Config.ESPEnabled
+    espBtn.Text = "ESP (" .. (Config.ESPEnabled and "On" or "Off") .. ")"
+    sendNotification("ESP", Config.ESPEnabled and "ON" or "OFF")
+    if Config.ESPEnabled then
         reloadESP()
     else
         espcontainer:ClearAllGroups()
     end
 end)
 
-local autoGunBtn = CreateButton(ButtonFrame4, "AutoGun", function()
+local autoGunBtn = CreateButton(ButtonFrame4Left, "AutoGun", function()
     local map = getMap()
     if not map or not map:FindFirstChild("GunDrop") then
-        sendNotification("No dropped gun to be teleported to.")
+        sendNotification("AutoGun", "No dropped gun")
         return
     end
     local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
@@ -535,33 +547,35 @@ local autoGunBtn = CreateButton(ButtonFrame4, "AutoGun", function()
         hrp.CFrame = map:FindFirstChild("GunDrop"):GetPivot() + Vector3.new(0, 2, 0)
         LocalPlayer.Backpack.ChildAdded:Wait()
         hrp.CFrame = previousPosition
-        sendNotification("Gun picked up.")
+        sendNotification("AutoGun", "Gun picked up")
     else
-        sendNotification("No valid character to teleport.")
+        sendNotification("AutoGun", "No character")
     end
 end)
 
-local flingMurdererBtn = CreateButton(ButtonFrame4, "Fling Murderer", function()
+local flingMurdererBtn = CreateButton(ButtonFrame4Right, "Fling Murderer", function()
     local target = findMurderer()
     if target then
         miniFling(target)
+        sendNotification("Fling", "Flinged Murderer")
     else
-        sendNotification("Không tìm thấy murderer.")
+        sendNotification("Fling", "No murderer")
     end
 end)
 
-local flingSheriffBtn = CreateButton(ButtonFrame4, "Fling Sheriff", function()
+local flingSheriffBtn = CreateButton(ButtonFrame4Right, "Fling Sheriff", function()
     local target = findSheriff()
     if target then
         miniFling(target)
+        sendNotification("Fling", "Flinged Sheriff")
     else
-        sendNotification("Không tìm thấy sheriff.")
+        sendNotification("Fling", "No sheriff")
     end
 end)
 
-local killAllBtn = CreateButton(ButtonFrame4, "Kill All", function()
+local killAllBtn = CreateButton(ButtonFrame4Right, "Kill All", function()
     if findMurderer() ~= LocalPlayer then
-        sendNotification("You're not murderer.")
+        sendNotification("Kill All", "Not murderer")
         return
     end
     if not LocalPlayer.Character:FindFirstChild("Knife") then
@@ -570,7 +584,7 @@ local killAllBtn = CreateButton(ButtonFrame4, "Kill All", function()
             hum:EquipTool(LocalPlayer.Backpack:FindFirstChild("Knife"))
             task.wait(0.1)
         else
-            sendNotification("You don't have the knife..?")
+            sendNotification("Kill All", "No knife")
             return
         end
     end
@@ -590,13 +604,20 @@ local killAllBtn = CreateButton(ButtonFrame4, "Kill All", function()
             player.Character:FindFirstChild("HumanoidRootPart").Anchored = false
         end
     end
-    sendNotification("Auto Kill All executed.")
+    sendNotification("Kill All", "Executed")
 end)
 
-local tpLobbyBtn = CreateButton(ButtonFrame4, "TP Lobby", function()
+local tpLobbyBtn = CreateButton(ButtonFrame4Right, "TP Lobby", function()
     local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     local hrp = character:FindFirstChild("HumanoidRootPart") or character:WaitForChild("HumanoidRootPart")
     hrp.CFrame = CFrame.new(-107, 152, 41)
+    sendNotification("TP Lobby", "Teleported")
+end)
+
+local bangBtn = CreateButton(ButtonFrame4Right, "BangPlayer: OFF", function()
+    Config.BangEnabled = not Config.BangEnabled
+    bangBtn.Text = "BangPlayer: " .. (Config.BangEnabled and "ON" or "OFF")
+    sendNotification("BangPlayer", Config.BangEnabled and "ON" or "OFF")
 end)
 
 --// Page 5 (Info)
@@ -689,6 +710,23 @@ function sendNotification(title, text, duration)
     end)
 end
 
+-- Cấu trúc config mặc định
+local Config = {
+    Buttons = {}, -- Lưu keybind + trạng thái của từng chức năng
+    ESPEnabled = true,
+    SpeedEnabled = false,
+    FlyEnabled = false,
+    AimbotEnabled = false,
+    FullbrightEnabled = false,
+    NoclipEnabled = false,
+    ShiftAmount = 0.5,
+    SelectedPlayers = {},
+    FlySpeed = 35,
+    SpeedAmount = 20,
+    clickTpEnabled = false,
+    CustomPing = nil
+}
+
 local autoSelect = false
 local tbEnabled = true
 local fovRadius = 20
@@ -699,6 +737,7 @@ local savedWaypoint = nil
 local noclipConnection = nil
 local Keybinds = {} 
 
+-- Biến lưu trạng thái Lighting cũ cho Fullbright
 local oldLighting = {
     Brightness = Lighting.Brightness,
     GlobalShadows = Lighting.GlobalShadows,
@@ -708,10 +747,12 @@ local oldLighting = {
     ClockTime = Lighting.ClockTime
 }
 
+-- Tạo hiệu ứng mờ nền
 local blur = Instance.new("BlurEffect")
 blur.Size = 20
 blur.Parent = Lighting
 
+-- Tạo GUI intro
 local introGui = Instance.new("ScreenGui")
 introGui.Name = "VhuyIntroGui"
 introGui.IgnoreGuiInset = true
@@ -749,9 +790,11 @@ gradient.Color = ColorSequence.new{
 gradient.Rotation = 45
 gradient.Parent = title
 
+-- Hiệu ứng fade in
 TweenService:Create(title, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {TextTransparency = 0}):Play()
 TweenService:Create(bg, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.In), {BackgroundTransparency = 0.4}):Play()
 
+-- Hiệu ứng fade out
 task.delay(4, function()
     TweenService:Create(title, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {TextTransparency = 1}):Play()
     TweenService:Create(bg, TweenInfo.new(1.5, Enum.EasingStyle.Sine, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
@@ -761,6 +804,7 @@ task.delay(4, function()
     end)
 end)
 
+-- Nút cho trang 1
 espButton = CreateButton(ButtonFrame1, "ESP: OFF", function()
     Config.ESPEnabled = not Config.ESPEnabled
     espButton.Text = "ESP: " .. (Config.ESPEnabled and "ON" or "OFF")
@@ -783,8 +827,19 @@ aimbotButton = CreateButton(ButtonFrame1, "Aimlock: OFF", function()
     Config.AimbotEnabled = not Config.AimbotEnabled
     aimbotButton.Text = "Aimlock: " .. (Config.AimbotEnabled and "ON" or "OFF")
     sendNotification("AIMLOCK", Config.AimbotEnabled and "ON" or "OFF")
+    if Config.AimbotEnabled and UserInputService.TouchEnabled then
+        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+        Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, GetPredictedPosition(Player.Character[Config.HitPart or "Head"]))
+    end
 end)
 
+-- Config mặc định
+Config.RapidFireEnabled = Config.RapidFireEnabled or true -- mặc định bật
+Config.RapidFireDelay = 0.01
+
+-- =============================
+-- Logic 1: Spam Activate
+-- =============================
 local utility = {}
 utility.get_gun = function()
     local char = LocalPlayer.Character
@@ -821,6 +876,9 @@ UserInputService.InputEnded:Connect(function(i)
     end
 end)
 
+-- =============================
+-- Logic 2: Hook GunScript delay
+-- =============================
 local Orginal = {}
 RunService.RenderStepped:Connect(function()
     if not Config.RapidFireEnabled then return end
@@ -853,6 +911,10 @@ rapidFireButton = CreateButton(ButtonFrame1, "Rapid Fire: " .. (Config.RapidFire
     sendNotification("Rapid Fire", Config.RapidFireEnabled and "Enabled" or "Disabled")
 end)
 
+-- Config mặc định
+if Config.MacroLegitEnabled == nil then Config.MacroLegitEnabled = false end
+
+-- Nút Macro Legit
 macroLegitButton = CreateButton(ButtonFrame1, "Macro Legit: " .. (Config.MacroLegitEnabled and "ON" or "OFF"), function()
     Config.MacroLegitEnabled = not Config.MacroLegitEnabled
     macroLegitButton.Text = "Macro Legit: " .. (Config.MacroLegitEnabled and "ON" or "OFF")
@@ -871,6 +933,10 @@ macroLegitButton = CreateButton(ButtonFrame1, "Macro Legit: " .. (Config.MacroLe
     end
 end)
 
+-- ======= CONFIG MẶC ĐỊNH =======
+Config.AntiLockEnabled = Config.AntiLockEnabled or false
+Config.AntiLockType = Config.AntiLockType or "Behind"
+
 local antiLockModes = {
     Behind = true, Down = true, ForWard = true,
     Left = true, One = true, Right = true,
@@ -883,6 +949,7 @@ antiLockButton = CreateButton(ButtonFrame1, "AntiLock: " .. (Config.AntiLockEnab
     sendNotification("AntiLock", Config.AntiLockEnabled and "Enabled" or "Disabled")
 end)
 
+-- Ô nhập mode cho AntiLock
 local modeBox = Instance.new("TextBox")
 modeBox.Size = UDim2.new(1, 0, 0, 20)
 modeBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -909,6 +976,7 @@ modeBox.FocusLost:Connect(function()
     sendNotification("AntiLock", "Type set to: " .. Config.AntiLockType)
 end)
 
+-- ======= LOGIC ANTILOCK =======
 if _G.__vhuyhub_antilock_conn then
     _G.__vhuyhub_antilock_conn:Disconnect()
 end
@@ -920,7 +988,7 @@ _G.__vhuyhub_antilock_conn = RunService.Heartbeat:Connect(function()
     local hrp = char and char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    local dir = Vector3.new(0, 0, -1)
+    local dir = Vector3.new(0, 0, -1) -- default Behind
     local t = Config.AntiLockType
     if     t == "Behind"  then dir = Vector3.new(0,  0, -1)
     elseif t == "Down"    then dir = Vector3.new(0, -1,  0)
@@ -940,6 +1008,10 @@ _G.__vhuyhub_antilock_conn = RunService.Heartbeat:Connect(function()
     end
 end)
 
+-- ==== CONFIG ====
+if Config.LookAtEnabled == nil then Config.LookAtEnabled = false end
+
+-- ==== UTILS ====
 local function getMyHumanoid()
     local char = LocalPlayer.Character
     if not char then return nil,nil,nil end
@@ -971,13 +1043,12 @@ end
 
 local lastTargetName, lastNotify = nil, 0
 
-RunService.Heartbeat:Connect(function()
+-- LOOK AT chỉ hoạt động khi Csync bật
+RunService.RenderStepped:Connect(function()
     if not (Config.CsyncOrbitEnabled or Config.CsyncRandomEnabled) then
-        Config.LookAtEnabled = false
         return
     end
     
-    Config.LookAtEnabled = true
     local char, hum, hrp = getMyHumanoid()
     if not (hum and hrp) then return end
     hum.AutoRotate = false
@@ -995,6 +1066,7 @@ RunService.Heartbeat:Connect(function()
     hrp.CFrame = hrp.CFrame:Lerp(CFrame.lookAt(myPos, facePos), 0.35)
 end)
 
+-- Khi chết → tự reset AutoRotate
 LocalPlayer.CharacterAdded:Connect(function()
     task.defer(function()
         local _, hum = getMyHumanoid()
@@ -1002,6 +1074,7 @@ LocalPlayer.CharacterAdded:Connect(function()
     end)
 end)
 
+-- Auto Armor Button
 autoArmorEnabled = false
 
 autoArmorButton = CreateButton(ButtonFrame1, "Auto Armor: OFF", function()
@@ -1010,6 +1083,7 @@ autoArmorButton = CreateButton(ButtonFrame1, "Auto Armor: OFF", function()
     sendNotification("Auto Armor", autoArmorEnabled and "Enabled" or "Disabled")
 end)
 
+-- Auto Armor Logic
 local cloneref = getgenv().cloneref or function(...) return ... end
 local fireclickdetector = getgenv().fireclickdetector or function(...) return nil end
 local GameReference = cloneref(game)
@@ -1025,7 +1099,7 @@ local LocalCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait(
 local LocalHumanoid = LocalCharacter:FindFirstChildOfClass("Humanoid") or LocalCharacter:WaitForChild("Humanoid", 1e9)
 local LocalRootPart = LocalHumanoid and LocalHumanoid.RootPart or LocalCharacter:WaitForChild("HumanoidRootPart", 1e9)
 
-local BuyMaxDistance = 1000
+local BuyMaxDistance = 1000 --// Studs \\--
 
 LocalPlayer.CharacterAdded:Connect(function(Character)
     LocalCharacter = Character
@@ -1053,12 +1127,17 @@ RunService.PostSimulation:Connect(function()
     end
 end)
 
+-- ======= CONFIG MẶC ĐỊNH =======
+Config.AutoReloadEnabled = Config.AutoReloadEnabled or false
+
+-- ======= NÚT AUTO RELOAD =======
 autoReloadButton = CreateButton(ButtonFrame1, "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF"), function()
     Config.AutoReloadEnabled = not Config.AutoReloadEnabled
     autoReloadButton.Text = "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF")
     sendNotification("Auto Reload", Config.AutoReloadEnabled and "Enabled" or "Disabled")
 end)
 
+-- ======= LOGIC AUTO RELOAD (theo kiểu _G.AutoReload ban đầu) =======
 if _G.__vhuyhub_autoreload_conn then
     _G.__vhuyhub_autoreload_conn:Disconnect()
 end
@@ -1073,7 +1152,7 @@ _G.__vhuyhub_autoreload_conn = RunService.Heartbeat:Connect(function()
     local ammoVal = tool:FindFirstChild("Ammo") or tool:FindFirstChild("AmmoCount")
     if ammoVal and ammoVal.Value <= 0 then
         game:GetService("ReplicatedStorage").MainEvent:FireServer("Reload", tool)
-        task.wait(1)
+        task.wait(1) -- chờ reload hoàn tất
     end
 end)
 
@@ -1112,6 +1191,18 @@ tpAndStompButton = CreateButton(ButtonFrame1, "TP Player", function()
     end
 end)
 
+-- ========================
+-- Csync Config mặc định
+-- ========================
+if Config.CsyncRandomEnabled == nil then Config.CsyncRandomEnabled = false end
+if Config.CsyncOrbitEnabled == nil then Config.CsyncOrbitEnabled = false end
+if Config.CsyncRadius == nil then Config.CsyncRadius = 10 end
+if Config.CsyncHeight == nil then Config.CsyncHeight = 5 end
+if Config.CsyncSpeed == nil then Config.CsyncSpeed = 2 end
+
+-- ========================
+-- Hàm hỗ trợ
+-- ========================
 local function isKO(plr)
     local char = plr and plr.Character
     local be = char and char:FindFirstChild("BodyEffects")
@@ -1124,6 +1215,24 @@ local function isGrabbed(plr)
     return char and char:FindFirstChild("GRABBING_CONSTRAINT")
 end
 
+local function isObstructed(targetPlr)
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return true end
+
+    local thrp = targetPlr.Character and targetPlr.Character:FindFirstChild("HumanoidRootPart")
+    if not thrp then return true end
+
+    local origin = myHRP.Position
+    local direction = (thrp.Position - origin)
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.FilterDescendantsInstances = {myChar, targetPlr.Character}
+
+    local result = Workspace:Raycast(origin, direction, rayParams)
+    return result ~= nil
+end
+
 local function getClosestSelected()
     local myChar = LocalPlayer.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
@@ -1133,7 +1242,7 @@ local function getClosestSelected()
         if selected then
             local plr = Players:FindFirstChild(name)
             local hrp = plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart")
-            if hrp and not isKO(plr) and not isGrabbed(plr) then
+            if hrp then
                 local dist = (myHRP.Position - hrp.Position).Magnitude
                 if not minDist or dist < minDist then
                     closest, minDist = plr, dist
@@ -1159,31 +1268,33 @@ local function getNextTarget(currentTarget)
     end
     table.sort(candidates, function(a, b)
         local ha = a.Character and a.Character:FindFirstChild("HumanoidRootPart")
-        local hb = b.Character and b.Character:FindFirstChild("HumanoidRootPart")
+        local hb = b.Character and b:FindFirstChild("HumanoidRootPart")
         if not ha or not hb then return false end
         return (myHRP.Position - ha.Position).Magnitude < (myHRP.Position - hb.Position).Magnitude
     end)
     return candidates[1]
 end
 
+-- ========================
+-- Nút GUI
+-- ========================
 csyncRandomButton = CreateButton(ButtonFrame1, "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF"), function()
     Config.CsyncRandomEnabled = not Config.CsyncRandomEnabled
-    if Config.CsyncRandomEnabled then
-        Config.AimbotEnabled = true
-    end
+    Config.CsyncOrbitEnabled = false
     csyncRandomButton.Text = "Csync Random: " .. (Config.CsyncRandomEnabled and "ON" or "OFF")
+    csyncOrbitButton.Text = "Csync Orbit: OFF"
     sendNotification("Csync Random", Config.CsyncRandomEnabled and "Enabled" or "Disabled")
 end)
 
 csyncOrbitButton = CreateButton(ButtonFrame1, "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF"), function()
     Config.CsyncOrbitEnabled = not Config.CsyncOrbitEnabled
-    if Config.CsyncOrbitEnabled then
-        Config.AimbotEnabled = true
-    end
+    Config.CsyncRandomEnabled = false
     csyncOrbitButton.Text = "Csync Orbit: " .. (Config.CsyncOrbitEnabled and "ON" or "OFF")
+    csyncRandomButton.Text = "Csync Random: OFF"
     sendNotification("Csync Orbit", Config.CsyncOrbitEnabled and "Enabled" or "Disabled")
 end)
 
+-- Frame nhập Radius, Height, Speed
 local boxFrame = Instance.new("Frame")
 boxFrame.Size = UDim2.new(1, 0, 0, 40)
 boxFrame.BackgroundTransparency = 1
@@ -1237,8 +1348,10 @@ local csyncPaused = false
 
 if _G.VHUB_CSYNC_LOOP then _G.VHUB_CSYNC_LOOP:Disconnect() end
 _G.VHUB_CSYNC_LOOP = RunService.Heartbeat:Connect(function()
-    if not currentTarget or not currentTarget.Parent then
-        currentTarget = getClosestSelected()
+    currentTarget = getClosestSelected()
+    if not currentTarget then
+        csyncPaused = true
+        return
     end
 
     if csyncPaused then
@@ -1249,12 +1362,7 @@ _G.VHUB_CSYNC_LOOP = RunService.Heartbeat:Connect(function()
         end
     end
 
-    if not currentTarget then
-        csyncPaused = true
-        return
-    end
-
-    if isKO(currentTarget) or isGrabbed(currentTarget) then
+    if isKO(currentTarget) or isGrabbed(currentTarget) or isObstructed(currentTarget) then
         local nextTarget = getNextTarget(currentTarget)
         if nextTarget then
             currentTarget = nextTarget
@@ -1285,9 +1393,14 @@ _G.VHUB_CSYNC_LOOP = RunService.Heartbeat:Connect(function()
             )
             myHRP.CFrame = CFrame.new(hrp.Position + offset, hrp.Position)
         end
+
+        Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, hrp.Position)
     end
 end)
 
+-- ========================
+-- Khi chết → tắt Csync + Look At
+-- ========================
 LocalPlayer.CharacterAdded:Connect(function()
     task.wait(1)
     if Config.CsyncOrbitEnabled or Config.CsyncRandomEnabled then
@@ -1319,6 +1432,7 @@ customFovButton = CreateButton(ButtonFrame2Left, "Custom FOV: OFF", function()
     end
 end)
 
+-- Ô nhập giá trị FOV
 local fovBox = Instance.new("TextBox")
 fovBox.Size = UDim2.new(1, -10, 0, 25)
 fovBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -1341,21 +1455,26 @@ fovBox:GetPropertyChangedSignal("Text"):Connect(function()
     end
 end)
 
+-- Config
+getgenv().KorAnimEnabled = true
 getgenv().RightUpperLegAccessories = {
-    {id = 18457575895},
+    {id = 18457575895}, -- accessory ID
 }
-getgenv().KorAnimDelay = 1
+getgenv().KorAnimDelay = 1 -- thời gian chờ sau khi spawn trước khi chỉnh
 
 local function hideRightLegAndAddAccessories(character)
     local rightUpperLeg = character:FindFirstChild("RightUpperLeg")
     if rightUpperLeg then
+        -- Ẩn Upper Leg
         rightUpperLeg.Transparency = 1
 
+        -- Xóa Lower Leg & Foot
         local rightLowerLeg = character:FindFirstChild("RightLowerLeg")
         local rightFoot = character:FindFirstChild("RightFoot")
         if rightLowerLeg then rightLowerLeg:Destroy() end
         if rightFoot then rightFoot:Destroy() end
 
+        -- Gắn accessories
         for _, accessoryData in ipairs(getgenv().RightUpperLegAccessories) do
             local accessory = game:GetObjects("rbxassetid://" .. tostring(accessoryData.id))[1]
             if accessory then
@@ -1380,14 +1499,17 @@ local function applyKorAnim(character)
     hideRightLegAndAddAccessories(character)
 end
 
+-- Theo dõi khi spawn nhân vật mới
 game.Players.LocalPlayer.CharacterAdded:Connect(function(char)
     applyKorAnim(char)
 end)
 
+-- Nếu đang sống thì áp dụng luôn
 if game.Players.LocalPlayer.Character then
     applyKorAnim(game.Players.LocalPlayer.Character)
 end
 
+-- Đổi animation liên tục
 game:GetService("RunService").Stepped:Connect(function()
     if not getgenv().KorAnimEnabled then return end
     local char = game.Players.LocalPlayer.Character
@@ -1420,12 +1542,17 @@ fullbrightButton = CreateButton(ButtonFrame2Left, "Fullbright: OFF", function()
     sendNotification("FULLBRIGHT", Config.FullbrightEnabled and "ON" or "OFF")
 end)
 
+-- Auto Wallhop Config
+if Config.AutoWallhopEnabled == nil then Config.AutoWallhopEnabled = false end
+
+-- Nút bật/tắt
 autoWallhopButton = CreateButton(ButtonFrame2Left, "Auto Wallhop: " .. (Config.AutoWallhopEnabled and "ON" or "OFF"), function()
     Config.AutoWallhopEnabled = not Config.AutoWallhopEnabled
     autoWallhopButton.Text = "Auto Wallhop: " .. (Config.AutoWallhopEnabled and "ON" or "OFF")
     sendNotification("Auto Wallhop", Config.AutoWallhopEnabled and "Enabled" or "Disabled")
 end)
 
+-- Biến cập nhật khi respawn
 local character, humanoid, rootPart
 
 local function updateCharacterRefs()
@@ -1437,19 +1564,21 @@ end
 updateCharacterRefs()
 LocalPlayer.CharacterAdded:Connect(updateCharacterRefs)
 
+-- Check tường trước mặt
 local function isWallInFront()
     if not rootPart then return false end
     local raycastParams = RaycastParams.new()
     raycastParams.FilterDescendantsInstances = {character}
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
 
-    local origin = rootPart.Position + Vector3.new(0, 2, 0)
-    local direction = rootPart.CFrame.LookVector * 2
+    local origin = rootPart.Position + Vector3.new(0, 2, 0) -- raycast từ ngực
+    local direction = rootPart.CFrame.LookVector * 2 -- khoảng cách 2 studs
     local result = Workspace:Raycast(origin, direction, raycastParams)
 
     return result and result.Instance ~= nil
 end
 
+-- Thực hiện wallhop
 local isPerformingWallHop = false
 local function performWallHop()
     if not Config.AutoWallhopEnabled or isPerformingWallHop or not humanoid or not rootPart then return end
@@ -1457,7 +1586,7 @@ local function performWallHop()
 
     while Config.AutoWallhopEnabled and isWallInFront() do
         humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
-        rootPart.AssemblyLinearVelocity = Vector3.new(0, 60, 0)
+        rootPart.AssemblyLinearVelocity = Vector3.new(0, 60, 0) -- lực nhảy
         rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, math.rad(-35), 0)
         task.wait(0.5)
     end
@@ -1465,17 +1594,23 @@ local function performWallHop()
     isPerformingWallHop = false
 end
 
+-- Loop
 RunService.Heartbeat:Connect(function()
     if Config.AutoWallhopEnabled then
         performWallHop()
     end
 end)
 
+-- Config mặc định
+if Config.RainbowHitEffectEnabled == nil then Config.RainbowHitEffectEnabled = true end
+
+-- Hàm tạo Skibidi RedRizz Aura (đổi thành màu trắng)
 local function createSkibidiRedRizz(character)
     local attachment = Instance.new("Attachment")
     attachment.Name = "SkibidiAura"
     attachment.Parent = character and (character:FindFirstChild("LowerTorso") or character:FindFirstChild("HumanoidRootPart"))
 
+    -- HealingWave1
     local HealingWave1 = Instance.new("ParticleEmitter")
     HealingWave1.Name = "Healing Wave 1"
     HealingWave1.Lifetime = NumberRange.new(1.5, 1.5)
@@ -1494,7 +1629,7 @@ local function createSkibidiRedRizz(character)
     HealingWave1.VelocitySpread = 10
     HealingWave1.Speed = NumberRange.new(3, 6)
     HealingWave1.Brightness = 10
-    HealingWave1.Color = ColorSequence.new(Color3.new(1,1,1))
+    HealingWave1.Color = ColorSequence.new(Color3.new(1,1,1)) -- trắng
     HealingWave1.Size = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 3.0624998),
         NumberSequenceKeypoint.new(0.6420546, 1.9999999),
@@ -1507,6 +1642,7 @@ local function createSkibidiRedRizz(character)
     HealingWave1.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
     HealingWave1.Parent = attachment
 
+    -- HealingWave2
     local HealingWave2 = Instance.new("ParticleEmitter")
     HealingWave2.Name = "Healing Wave 2"
     HealingWave2.Lifetime = NumberRange.new(1.5, 1.5)
@@ -1523,7 +1659,7 @@ local function createSkibidiRedRizz(character)
     HealingWave2.VelocitySpread = 10
     HealingWave2.Speed = NumberRange.new(3, 5)
     HealingWave2.Brightness = 10
-    HealingWave2.Color = ColorSequence.new(Color3.new(1,1,1))
+    HealingWave2.Color = ColorSequence.new(Color3.new(1,1,1)) -- trắng
     HealingWave2.Size = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 3.125),
         NumberSequenceKeypoint.new(0.4165329, 1.3749999),
@@ -1536,6 +1672,7 @@ local function createSkibidiRedRizz(character)
     HealingWave2.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
     HealingWave2.Parent = attachment
 
+    -- Sparks
     local Sparks = Instance.new("ParticleEmitter")
     Sparks.Name = "Sparks"
     Sparks.Lifetime = NumberRange.new(0.5, 2)
@@ -1545,7 +1682,7 @@ local function createSkibidiRedRizz(character)
     Sparks.VelocitySpread = 180
     Sparks.Speed = NumberRange.new(5, 15)
     Sparks.Brightness = 10
-    Sparks.Color = ColorSequence.new(Color3.new(1,1,1))
+    Sparks.Color = ColorSequence.new(Color3.new(1,1,1)) -- trắng
     Sparks.Size = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 0),
         NumberSequenceKeypoint.new(0.14687, 0.4374999),
@@ -1559,6 +1696,7 @@ local function createSkibidiRedRizz(character)
     Sparks.Orientation = Enum.ParticleOrientation.VelocityParallel
     Sparks.Parent = attachment
 
+    -- StarSparks
     local StarSparks = Instance.new("ParticleEmitter")
     StarSparks.Name = "Star Sparks"
     StarSparks.Lifetime = NumberRange.new(1.5, 1.5)
@@ -1568,7 +1706,7 @@ local function createSkibidiRedRizz(character)
     StarSparks.VelocitySpread = 180
     StarSparks.Speed = NumberRange.new(5, 10)
     StarSparks.Brightness = 10
-    StarSparks.Color = ColorSequence.new(Color3.new(1,1,1))
+    StarSparks.Color = ColorSequence.new(Color3.new(1,1,1)) -- trắng
     StarSparks.Size = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 0),
         NumberSequenceKeypoint.new(0.1492777, 0.6874996),
@@ -1584,11 +1722,13 @@ local function createSkibidiRedRizz(character)
     return attachment
 end
 
+-- Hàm tạo rainbow color theo thời gian
 local function rainbowColor()
     local t = tick() % 5 / 5
     return Color3.fromHSV(t, 1, 1)
 end
 
+-- Nút bật/tắt Aura Hit Effect
 rainbowHitButton = CreateButton(ButtonFrame2Left, "Aura Hit Effect: " .. (Config.RainbowHitEffectEnabled and "ON" or "OFF"), function()
     Config.RainbowHitEffectEnabled = not Config.RainbowHitEffectEnabled
     rainbowHitButton.Text = "Aura Hit Effect: " .. (Config.RainbowHitEffectEnabled and "ON" or "OFF")
@@ -1607,6 +1747,7 @@ rainbowHitButton = CreateButton(ButtonFrame2Left, "Aura Hit Effect: " .. (Config
     end
 end)
 
+-- Khi script load, nếu config bật sẵn thì tạo aura luôn
 task.defer(function()
     local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
     if Config.RainbowHitEffectEnabled and not char:FindFirstChild("SkibidiAura") then
@@ -1614,15 +1755,17 @@ task.defer(function()
     end
 end)
 
+-- Giữ aura khi respawn
 LocalPlayer.CharacterAdded:Connect(function(char)
     if Config.RainbowHitEffectEnabled then
-        task.wait(1)
+        task.wait(1) -- chờ load nhân vật đầy đủ
         if not char:FindFirstChild("SkibidiAura") then
             createSkibidiRedRizz(char)
         end
     end
 end)
 
+-- Theo dõi máu player (địch mất máu = rainbow highlight)
 local lastHealth = {}
 RunService.Heartbeat:Connect(function()
     if not Config.RainbowHitEffectEnabled then return end
@@ -1666,9 +1809,10 @@ antiAfkButton = CreateButton(ButtonFrame2Left, "Anti AFK: OFF", function()
     sendNotification("ANTI AFK", antiAfkEnabled and "ON" or "OFF")
 
     if antiAfkEnabled then
+        -- Vòng lặp tự nhảy mỗi 60 giây
         antiAfkLoop = task.spawn(function()
             while antiAfkEnabled do
-                task.wait(60)
+                task.wait(60) -- Đợi 60 giây
                 pcall(function()
                     local hum = game.Players.LocalPlayer.Character and game.Players.LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
                     if hum then
@@ -1685,6 +1829,7 @@ antiAfkButton = CreateButton(ButtonFrame2Left, "Anti AFK: OFF", function()
     end
 end)
 
+-- Hàm tìm player gần nhất trong danh sách SelectedPlayers
 local function getClosestSelected()
     local closest, dist = nil, math.huge
     local myChar = LocalPlayer.Character
@@ -1706,10 +1851,12 @@ local function getClosestSelected()
     return closest
 end
 
+-- Biến toàn cục
 local animEnabled = false
 local animTrack = nil
 local bangConnection = nil
 
+-- Hàm dừng animation và teleport
 local function stopAnimAndTp()
     if animTrack then
         animTrack:Stop()
@@ -1722,6 +1869,29 @@ local function stopAnimAndTp()
     animEnabled = false
 end
 
+-- Hàm tìm player gần nhất trong danh sách SelectedPlayers
+local function getClosestSelected()
+    local closest, dist = nil, math.huge
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return nil end
+
+    for name, selected in pairs(Config.SelectedPlayers or {}) do
+        if selected then
+            local plr = Players:FindFirstChild(name)
+            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+                local d = (myHRP.Position - plr.Character.HumanoidRootPart.Position).Magnitude
+                if d < dist then
+                    dist = d
+                    closest = plr
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- Tạo nút BangPlayer sử dụng CreateButton
 bangButton = CreateButton(ButtonFrame2Left, "BangPlayer: OFF", function()
     animEnabled = not animEnabled
     
@@ -1748,9 +1918,11 @@ bangButton = CreateButton(ButtonFrame2Left, "BangPlayer: OFF", function()
             return
         end
 
+        -- Chọn animation theo rig type
         local anim = Instance.new("Animation")
         anim.AnimationId = myHum.RigType == Enum.HumanoidRigType.R6 and "rbxassetid://148840371" or "rbxassetid://5918726674"
 
+        -- Phát animation
         animTrack = myHum:LoadAnimation(anim)
         animTrack:Play()
         animTrack:AdjustSpeed(10)
@@ -1758,8 +1930,7 @@ bangButton = CreateButton(ButtonFrame2Left, "BangPlayer: OFF", function()
         bangButton.Text = "BangPlayer: ON (" .. target.Name .. ")"
         sendNotification("BangPlayer", "Đang dính theo " .. target.Name)
 
-        myHRP.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 1)
-
+        -- Teleport liên tục
         bangConnection = RunService.Heartbeat:Connect(function()
             if animEnabled and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
                 myHRP.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 1)
@@ -1772,27 +1943,32 @@ bangButton = CreateButton(ButtonFrame2Left, "BangPlayer: OFF", function()
     end
 end)
 
+-- Xử lý khi respawn
 LocalPlayer.CharacterAdded:Connect(function()
     if animEnabled then
-        task.wait(0.5)
+        task.wait(0.5) -- Đợi nhân vật load
         local target = getClosestSelected()
         if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
             local myChar = LocalPlayer.Character
             local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
             local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
             if myHum and myHRP then
+                -- Chọn lại animation theo rig type
                 local anim = Instance.new("Animation")
                 anim.AnimationId = myHum.RigType == Enum.HumanoidRigType.R6 and "rbxassetid://148840371" or "rbxassetid://5918726674"
                 
+                -- Xóa quần áo nếu có
                 pcall(function()
                     myChar.Pants:Destroy()
                     myChar.Shirt:Destroy()
                 end)
 
+                -- Phát lại animation
                 animTrack = myHum:LoadAnimation(anim)
                 animTrack:Play()
                 animTrack:AdjustSpeed(10)
 
+                -- Teleport liên tục
                 bangConnection = RunService.Heartbeat:Connect(function()
                     if animEnabled and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
                         myHRP.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 1)
@@ -1837,9 +2013,10 @@ noclipButton = CreateButton(ButtonFrame2Left, "Noclip: OFF", function()
     noclipButton.Text = "Noclip: " .. (Config.NoclipEnabled and "ON" or "OFF")
 end)
 
+-- Đảm bảo noclip vẫn bật khi respawn
 LocalPlayer.CharacterAdded:Connect(function()
     if Config.NoclipEnabled then
-        task.wait(0.5)
+        task.wait(0.5) -- đợi nhân vật load
         noclipConnection = RunService.Stepped:Connect(function()
             local char = LocalPlayer.Character
             if char and char:FindFirstChildOfClass("Humanoid") then
@@ -1853,6 +2030,11 @@ LocalPlayer.CharacterAdded:Connect(function()
     end
 end)
 
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+
+-- ID animation
 local animations = {
     happier = "http://www.roblox.com/asset/?id=15609995579",
     happy   = "http://www.roblox.com/asset/?id=14352343065",
@@ -1861,6 +2043,7 @@ local animations = {
 
 local currentTrack = nil
 
+-- Hàm dừng animation
 local function stopAnimation()
     if currentTrack then
         currentTrack:Stop()
@@ -1868,15 +2051,19 @@ local function stopAnimation()
     end
 end
 
+-- Hàm phát animation
 local function playAnimation(animId)
     local char = LocalPlayer.Character
     if not char or not char:FindFirstChildOfClass("Humanoid") then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
 
+    -- Đang di chuyển thì không phát
     if hum.MoveDirection.Magnitude > 0 then return end
 
+    -- Ngừng animation cũ nếu có
     stopAnimation()
 
+    -- Tạo animator nếu chưa có
     local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
 
     local anim = Instance.new("Animation")
@@ -1886,10 +2073,12 @@ local function playAnimation(animId)
     currentTrack = track
 end
 
+-- Khi respawn vẫn dùng được
 LocalPlayer.CharacterAdded:Connect(function()
     currentTrack = nil
 end)
 
+-- Liên tục kiểm tra nếu bắt đầu di chuyển thì dừng animation
 RunService.RenderStepped:Connect(function()
     local char = LocalPlayer.Character
     if char and currentTrack then
@@ -1900,6 +2089,7 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- Tạo 2 nút
 CreateButton(ButtonFrame2Right, "Happier Jump", function()
     playAnimation(animations.happier)
 end)
@@ -1923,13 +2113,14 @@ local function giveClickTpTool()
         local mouse = LocalPlayer:GetMouse()
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
             if mouse and mouse.Hit then
-                local targetPos = mouse.Hit.p + Vector3.new(0, 3, 0)
+                local targetPos = mouse.Hit.p + Vector3.new(0, 3, 0) -- cách mặt đất 3 stud
                 LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(targetPos)
             end
         end
     end)
 end
 
+-- Nút bật/tắt
 clickTpButton = CreateButton(ButtonFrame2Right, "Click TP: OFF", function()
     Config.clickTpEnabled = not Config.clickTpEnabled
     sendNotification("GIVECLICKTOOL", Config.clickTpEnabled and "ON" or "OFF")
@@ -1945,9 +2136,10 @@ clickTpButton = CreateButton(ButtonFrame2Right, "Click TP: OFF", function()
     end
 end)
 
+-- Khi respawn thì gắn lại tool nếu đang bật
 LocalPlayer.CharacterAdded:Connect(function()
     if Config.clickTpEnabled then
-        task.wait(0.5)
+        task.wait(0.5) -- đợi nhân vật load
         giveClickTpTool()
     end
 end)
@@ -1970,12 +2162,18 @@ tpWaypointButton = CreateButton(ButtonFrame2Right, "TP to Waypoint", function()
     end
 end)
 
+-- Config mặc định
+if Config.SpinbotEnabled == nil then Config.SpinbotEnabled = false end
+if Config.SpinbotSpeed == nil then Config.SpinbotSpeed = 450 end
+
+-- Nút bật/tắt Spinbot
 spinbotButton = CreateButton(ButtonFrame2Right, "Spinbot: " .. (Config.SpinbotEnabled and "ON" or "OFF"), function()
     Config.SpinbotEnabled = not Config.SpinbotEnabled
     spinbotButton.Text = "Spinbot: " .. (Config.SpinbotEnabled and "ON" or "OFF")
     sendNotification("Spinbot", Config.SpinbotEnabled and "Enabled" or "Disabled")
 end)
 
+-- Ô nhập Speed
 local spinbotSpeedBox = Instance.new("TextBox")
 spinbotSpeedBox.Size = UDim2.new(1, 0, 0, 20)
 spinbotSpeedBox.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
@@ -1997,6 +2195,7 @@ spinbotSpeedBox.FocusLost:Connect(function()
     end
 end)
 
+-- Logic Spinbot
 RunService.RenderStepped:Connect(function(delta)
     if Config.SpinbotEnabled then
         local char = LocalPlayer.Character
@@ -2012,6 +2211,7 @@ RunService.RenderStepped:Connect(function(delta)
     end
 end)
 
+-- Anti Fling Button (Page 2, Right Side)
 antiFlingEnabled = false
 
 antiFlingButton = CreateButton(ButtonFrame2Right, "Anti Fling: OFF", function()
@@ -2020,6 +2220,7 @@ antiFlingButton = CreateButton(ButtonFrame2Right, "Anti Fling: OFF", function()
     sendNotification("Anti Fling", antiFlingEnabled and "Enabled" or "Disabled")
 end)
 
+-- Anti Fling Logic
 if _G.__antifling_conn then
     _G.__antifling_conn:Disconnect()
 end
@@ -2082,26 +2283,25 @@ flintTouchButton = CreateButton(ButtonFrame2Right, "FlintTouch: OFF", function()
 end)
 
 local function FlingAll()
-    hiddenFling = true
-    flintTouchButton.Text = "FlintTouch: ON"
-    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return end
-
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            local targetRoot = plr.Character.HumanoidRootPart
-            for i = 1, 10 do
-                myRoot.CFrame = targetRoot.CFrame + Vector3.new(math.random(-2, 2), 0, math.random(-2, 2))
-                task.wait(0.05)
-                myRoot.CFrame = targetRoot.CFrame + Vector3.new(math.random(-2, 2), 0, math.random(-2, 2))
-                task.wait(0.05)
-            end
+    local oldPos = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character.HumanoidRootPart.CFrame
+    local players = Players:GetPlayers()
+    for i = 2, #players do
+        local plr = players[i]
+        if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
+            miniFling(plr)
+            task.wait(0.1)
         end
     end
+    if oldPos then
+        LocalPlayer.Character.HumanoidRootPart.CFrame = oldPos
+    end
+    flingAllButton.Text = "Fling All"
+    sendNotification("Fling All", "Completed")
 end
 
 flingAllButton = CreateButton(ButtonFrame2Right, "Fling All", FlingAll)
 
+-- ESP
 local espGui = Instance.new("ScreenGui")
 espGui.Name = "SafeESP"
 espGui.ResetOnSpawn = false
@@ -2119,14 +2319,18 @@ local function IsValidTarget(player)
         return false
     end
 
-    local bodyEffects = player.Character:FindFirstChild("BodyEffects")
-    local koValue = bodyEffects and bodyEffects:FindFirstChild("K.O")
-    if koValue and koValue.Value then
-        return false
+    -- Kiểm tra trạng thái K.O nếu checkKOAimbot được bật
+    if Config.checkKOAimbot then
+        local bodyEffects = player.Character:FindFirstChild("BodyEffects")
+        local koValue = bodyEffects and bodyEffects:FindFirstChild("K.O")
+        if koValue and koValue.Value then
+            return false -- Bỏ qua người chơi nếu họ bị K.O
+        end
     end
 
+    -- Kiểm tra trạng thái Grab
     if player.Character:FindFirstChild("GRABBING_CONSTRAINT") then
-        return false
+        return false -- Bỏ qua nếu đang bị grab
     end
 
     return true
@@ -2302,7 +2506,7 @@ end
 
 local function click()
     if UserInputService.TouchEnabled then
-        local touchPos = UserInputService:GetMouseLocation()
+        local touchPos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.Begin, touchPos)
         task.wait()
         VirtualInputManager:SendTouchEvent(0, Enum.UserInputState.End, touchPos)
@@ -2384,6 +2588,7 @@ local function GetClosestValidPlayer()
             local targetPart = plr.Character:FindFirstChild(getgenv().Aimbot.Hitpart)
             local targetHRP = plr.Character:FindFirstChild("HumanoidRootPart")
             if targetPart and targetHRP then
+                -- Tính khoảng cách 3D trong game
                 local dist = (myHRP.Position - targetHRP.Position).Magnitude
                 if dist < shortestDistance then
                     closestPlayer = plr
@@ -2396,7 +2601,7 @@ local function GetClosestValidPlayer()
     return closestPlayer
 end
 
-RunService.Heartbeat:Connect(function(deltaTime)
+RunService.RenderStepped:Connect(function(deltaTime)
     UpdateESP()
     UpdateSpeed()
     UpdateFly(deltaTime)
@@ -2407,7 +2612,11 @@ RunService.Heartbeat:Connect(function(deltaTime)
             local part = Player.Character[getgenv().Aimbot.Hitpart]
             local predictedPos = GetPredictedPosition(part)
             if not IsObstructed(Camera.CFrame.Position, predictedPos) then
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
+                if UserInputService.TouchEnabled then
+                    Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, predictedPos)
+                else
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
+                end
             end
         end
     end
@@ -2419,6 +2628,7 @@ RunService.Heartbeat:Connect(function(deltaTime)
                 local cap = part
                 task.wait(0)
                 if tbEnabled and distToCursor(cap) <= fovRadius then
+                    -- Kiểm tra raycast
                     local origin = Camera.CFrame.Position
                     local direction = (cap.Position - origin)
                     local rayParams = RaycastParams.new()
@@ -2427,6 +2637,7 @@ RunService.Heartbeat:Connect(function(deltaTime)
 
                     local result = Workspace:Raycast(origin, direction, rayParams)
 
+                    -- Nếu không có va chạm hoặc hit trúng đúng part của target => bắn
                     if not result or result.Instance:IsDescendantOf(cap.Parent) then
                         click()
                     end
@@ -2464,6 +2675,7 @@ task.spawn(function()
     end
 end)
 
+-- === Nút Select Target ===
 local CoreGui = game:GetService("CoreGui")
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -2472,6 +2684,7 @@ local LocalPlayer = Players.LocalPlayer
 
 local FOV_RADIUS = 200
 
+-- Hàm lấy player gần chuột nhất trong FOV
 local function GetClosestValidPlayer()
     local closest, shortestDist = nil, math.huge
     local mousePos = UserInputService:GetMouseLocation()
@@ -2492,9 +2705,10 @@ local function GetClosestValidPlayer()
     return closest
 end
 
+-- Tạo nút nổi ngoài màn hình
 local selectGui = Instance.new("ScreenGui")
 selectGui.Name = "SelectTargetGui"
-selectGui.ResetOnSpawn = false
+selectGui.ResetOnSpawn = false -- chết không mất
 selectGui.Parent = CoreGui
 
 local selectBtn = Instance.new("TextButton")
@@ -2508,6 +2722,7 @@ selectBtn.TextColor3 = Color3.new(230, 230, 230)
 selectBtn.Parent = selectGui
 Instance.new("UICorner", selectBtn).CornerRadius = UDim.new(0, 8)
 
+-- Cho phép kéo nút
 local dragging, dragStart, startPos
 selectBtn.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
@@ -2532,6 +2747,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
+-- Xử lý khi click
 selectBtn.MouseButton1Click:Connect(function()
     local target = GetClosestValidPlayer()
     if target then
@@ -2555,7 +2771,7 @@ selectBtn.MouseButton1Click:Connect(function()
         end
 
         if UpdateSelectedPlayersUI then
-            UpdateSelectedPlayersUI()
+            UpdateSelectedPlayersUI() -- cập nhật danh sách GUI ngay
         end
     else
         game.StarterGui:SetCore("SendNotification", {
@@ -2566,9 +2782,10 @@ selectBtn.MouseButton1Click:Connect(function()
     end
 end)
 
+-- Bắt sự kiện bấm chuột giữa để chọn target
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if gameProcessed then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton3 then
+    if input.UserInputType == Enum.UserInputType.MouseButton3 then -- Chuột giữa
         local target = GetClosestValidPlayer()
         if target then
             local displayName = target.DisplayName
@@ -2602,16 +2819,6 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         end
     end
 end)
-
--- Services
-local UserInputService = game:GetService("UserInputService")
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
-local localplayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
 
 -- Configuration
 local ESP_ENABLED = false
@@ -2714,7 +2921,7 @@ local function findMurderer()
         end
     end
     for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= localplayer and plr.Character then
+        if plr ~= LocalPlayer and plr.Character then
             if plr.Backpack:FindFirstChild("Knife") or (plr.Character and plr.Character:FindFirstChild("Knife")) then
                 return plr
             end
@@ -2731,7 +2938,7 @@ local function findSheriff()
     end
     if playerData then
         for player, data in pairs(playerData) do
-            if data.Role == "Sheriff" then
+            if data.Role = "Sheriff" then
                 local plr = Players:FindFirstChild(player)
                 if plr and plr.Character then
                     return plr
@@ -2744,13 +2951,13 @@ end
 
 local function findSheriffThatsNotMe()
     for _, plr in ipairs(Players:GetPlayers()) do
-        if plr ~= localplayer and plr.Character and (plr.Backpack:FindFirstChild("Gun") or (plr.Character and plr.Character:FindFirstChild("Gun"))) then
+        if plr ~= LocalPlayer and plr.Character and (plr.Backpack:FindFirstChild("Gun") or (plr.Character and plr.Character:FindFirstChild("Gun"))) then
             return plr
         end
     end
     if playerData then
         for player, data in pairs(playerData) do
-            if data.Role == "Sheriff" and Players:FindFirstChild(player) ~= localplayer then
+            if data.Role == "Sheriff" and Players:FindFirstChild(player) ~= LocalPlayer then
                 local plr = Players:FindFirstChild(player)
                 if plr and plr.Character then
                     return plr
@@ -2763,10 +2970,10 @@ end
 
 -- ESP functions
 local function reloadESP()
-    if not espActive then return end
+    if not Config.ESPEnabled then return end
     espcontainer:RemoveGroup("players")
     for _, player in ipairs(Players:GetPlayers()) do
-        if player.Character and player ~= localplayer then
+        if player.Character and player ~= LocalPlayer then
             task.spawn(function()
                 if player == findMurderer() then
                     espcontainer:Add(player.Character, {
@@ -2813,7 +3020,7 @@ local function getPredictedPosition(player, shootOffset)
         local velocity = playerHRP.AssemblyLinearVelocity
         local playerMoveDirection = playerHum.MoveDirection
         local predictedPosition = playerPosition + (velocity * Vector3.new(0, 0.5, 0)) * (shootOffset / 15) + playerMoveDirection * shootOffset
-        predictedPosition = predictedPosition * (((localplayer:GetNetworkPing() * 1000) * ((OFFSET_TO_PING_MULT - 1) * 0.01)) + 1)
+        predictedPosition = predictedPosition * (((LocalPlayer:GetNetworkPing() * 1000) * ((OFFSET_TO_PING_MULT - 1) * 0.01)) + 1)
         return predictedPosition
     end)
     if not success then
@@ -2826,17 +3033,17 @@ end
 local function shootMurderer()
     if tick() - lastShot < 0.5 then return end 
     lastShot = tick()
-    if findSheriff() ~= localplayer then
+    if findSheriff() ~= LocalPlayer then
         return
     end
     local murderer = findMurderer() or findSheriffThatsNotMe()
     if not murderer then
         return
     end
-    if not localplayer.Character:FindFirstChild("Gun") then
-        local hum = localplayer.Character:FindFirstChild("Humanoid")
-        if localplayer.Backpack:FindFirstChild("Gun") then
-            hum:EquipTool(localplayer.Backpack:FindFirstChild("Gun"))
+    if not LocalPlayer.Character:FindFirstChild("Gun") then
+        local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+        if LocalPlayer.Backpack:FindFirstChild("Gun") then
+            hum:EquipTool(LocalPlayer.Backpack:FindFirstChild("Gun"))
             task.wait(math.random(0.05, 0.1) + ANTI_CHEAT_DELAY)
         else
             return
@@ -2854,7 +3061,7 @@ local function shootMurderer()
         [3] = "AH2"
     }
     pcall(function()
-        localplayer.Character.Gun.KnifeLocal.CreateBeam.RemoteFunction:InvokeServer(unpack(args))
+        LocalPlayer.Character.Gun.KnifeLocal.CreateBeam.RemoteFunction:InvokeServer(unpack(args))
     end)
     task.wait(math.random(0, ANTI_CHEAT_DELAY))
 end
@@ -2904,12 +3111,12 @@ local function autoFarmCoins()
         f:Play()
         f.Completed:Wait()
     end
-    while autoFarm do
+    while Config.AutoFarmEnabled do
         local z = findCoin()
         if z then
             moveToCoin(z)
             local h = z:FindFirstChild("CoinVisual")
-            while h and not h:GetAttribute("Collected") and h.Parent and autoFarm do
+            while h and not h:GetAttribute("Collected") and h.Parent and Config.AutoFarmEnabled do
                 local x = findCoin()
                 if x and x ~= z then
                     break
@@ -2924,22 +3131,25 @@ end
 -- Auto-Shoot when Sheriff and Autofarm is Active
 local function checkLineOfSight(startPos, endPos)
     local raycastParams = RaycastParams.new()
-    raycastParams.FilterDescendantsInstances = {localplayer.Character, Workspace:FindFirstChild("CoinContainer")}
+    raycastParams.FilterDescendantsInstances = {LocalPlayer.Character, Workspace:FindFirstChild("CoinContainer")}
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
     raycastParams.IgnoreWater = true
     local raycastResult = Workspace:Raycast(startPos, (endPos - startPos).Unit * (endPos - startPos).Magnitude, raycastParams)
     return not raycastResult or raycastResult.Instance:IsDescendantOf(findMurderer().Character)
 end
 
+-- Thêm biến để giới hạn tần suất killAll
 local lastKillAll = tick()
 
+-- Auto-Shoot khi là Sheriff và Auto-Kill khi là Murderer trong AutoFarm
 RunService.Heartbeat:Connect(function()
-    if not autoFarm or not isScriptRunning then return end
+    if not Config.AutoFarmEnabled then return end
     
-    if findSheriff() == localplayer then
+    -- Kiểm tra Sheriff
+    if findSheriff() == LocalPlayer then
         local murderer = findMurderer()
-        if murderer and murderer.Character and murderer.Character:FindFirstChild("HumanoidRootPart") and localplayer.Character and localplayer.Character:FindFirstChild("HumanoidRootPart") then
-            local startPos = localplayer.Character.HumanoidRootPart.Position
+        if murderer and murderer.Character and murderer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local startPos = LocalPlayer.Character.HumanoidRootPart.Position
             local endPos = murderer.Character.HumanoidRootPart.Position
             if checkLineOfSight(startPos, endPos) then
                 task.spawn(shootMurderer)
@@ -2947,42 +3157,43 @@ RunService.Heartbeat:Connect(function()
         end
     end
     
-    if findMurderer() == localplayer and tick() - lastKillAll >= 1 then
+    -- Kiểm tra Murderer và gọi killAll
+    if findMurderer() == LocalPlayer and tick() - lastKillAll >= 1 then
         lastKillAll = tick()
-        if not localplayer.Character:FindFirstChild("Knife") then
-            local hum = localplayer.Character:FindFirstChild("Humanoid")
-            if localplayer.Backpack:FindFirstChild("Knife") then
-                hum:EquipTool(localplayer.Backpack:FindFirstChild("Knife"))
+        if not LocalPlayer.Character:FindFirstChild("Knife") then
+            local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+            if LocalPlayer.Backpack:FindFirstChild("Knife") then
+                hum:EquipTool(LocalPlayer.Backpack:FindFirstChild("Knife"))
                 task.wait(0.1)
             else
-                sendNotification("You don't have the knife..?")
+                sendNotification("Kill All", "No knife")
                 return
             end
         end
 
-        for _, player in ipairs(game.Players:GetPlayers()) do
-            if player ~= localplayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                 local targetPart = player.Character:FindFirstChild("HumanoidRootPart")
                 targetPart.Anchored = true
-                targetPart.CFrame = localplayer.Character:FindFirstChild("HumanoidRootPart").CFrame + localplayer.Character:FindFirstChild("HumanoidRootPart").CFrame.LookVector * 1
+                targetPart.CFrame = LocalPlayer.Character:FindFirstChild("HumanoidRootPart").CFrame + LocalPlayer.Character:FindFirstChild("HumanoidRootPart").CFrame.LookVector * 1
                 task.wait(0.05)
             end
         end
 
         local args = { [1] = "Slash" }
-        localplayer.Character.Knife.Stab:FireServer(unpack(args))
+        LocalPlayer.Character.Knife.Stab:FireServer(unpack(args))
         task.wait(0.1)
-        for _, player in ipairs(game.Players:GetPlayers()) do
-            if player ~= localplayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                 player.Character:FindFirstChild("HumanoidRootPart").Anchored = false
             end
         end
-        sendNotification("Auto Kill All executed.")
+        sendNotification("Kill All", "Executed")
     end
 end)
 
 function miniFling(playerToFling)
-    local Character = localplayer.Character
+    local Character = LocalPlayer.Character
     local Humanoid = Character and Character:FindFirstChildOfClass("Humanoid")
     local RootPart = Humanoid and Humanoid.RootPart
 
@@ -2994,24 +3205,26 @@ function miniFling(playerToFling)
     local Handle = Accessory and Accessory:FindFirstChild("Handle")
 
     if not Character or not Humanoid or not RootPart or not TCharacter then
-        sendNotification("Không tìm thấy nhân vật hợp lệ của bạn hoặc mục tiêu.")
+        sendNotification("Fling", "Invalid character")
         return
     end
 
     if not TRootPart and not THead and not Handle then
-        sendNotification("Không tìm thấy bộ phận hợp lệ để fling.")
+        sendNotification("Fling", "No valid part")
         return
     end
 
     if THumanoid and THumanoid.Sit then
-        sendNotification("Mục tiêu đang ngồi, không thể fling.")
+        sendNotification("Fling", "Target sitting")
         return
     end
 
+    -- Lưu vị trí gốc
     if RootPart.Velocity.Magnitude < 50 then
         getgenv().OldPos = RootPart.CFrame
     end
 
+    -- Chuyển camera tới mục tiêu
     if THead then
         workspace.CurrentCamera.CameraSubject = THead
     elseif Handle then
@@ -3020,6 +3233,7 @@ function miniFling(playerToFling)
         workspace.CurrentCamera.CameraSubject = THumanoid
     end
 
+    -- Hàm di chuyển và fling
     local function FPos(BasePart, Pos, Ang)
         RootPart.CFrame = CFrame.new(BasePart.Position) * Pos * Ang
         Character:SetPrimaryPartCFrame(CFrame.new(BasePart.Position) * Pos * Ang)
@@ -3027,6 +3241,7 @@ function miniFling(playerToFling)
         RootPart.RotVelocity = Vector3.new(9e8, 9e8, 9e8)
     end
 
+    -- Hàm thực hiện fling
     local function SFBasePart(BasePart)
         local TimeToWait = 2
         local Time = tick()
@@ -3062,16 +3277,20 @@ function miniFling(playerToFling)
         until BasePart.Velocity.Magnitude > 500 or BasePart.Parent ~= TCharacter or not TCharacter.Parent or THumanoid.Sit or Humanoid.Health <= 0 or tick() > Time + TimeToWait
     end
 
+    -- Vô hiệu hóa FallenPartsDestroyHeight
     workspace.FallenPartsDestroyHeight = 0/0
 
+    -- Tạo BodyVelocity để tăng lực fling
     local BV = Instance.new("BodyVelocity")
     BV.Name = "FlingVelocity"
     BV.Parent = RootPart
     BV.Velocity = Vector3.new(9e8, 9e8, 9e8)
     BV.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
 
+    -- Vô hiệu hóa trạng thái ngồi
     Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
 
+    -- Chọn bộ phận để fling
     if TRootPart and THead and (TRootPart.CFrame.p - THead.CFrame.p).Magnitude > 5 then
         SFBasePart(THead)
     elseif TRootPart then
@@ -3081,13 +3300,15 @@ function miniFling(playerToFling)
     elseif Handle then
         SFBasePart(Handle)
     else
-        sendNotification("Không tìm thấy bộ phận hợp lệ để fling.")
+        sendNotification("Fling", "No valid part")
     end
 
+    -- Dọn dẹp
     BV:Destroy()
     Humanoid:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
     workspace.CurrentCamera.CameraSubject = Humanoid
 
+    -- Trở về vị trí gốc
     if getgenv().OldPos then
         repeat
             RootPart.CFrame = getgenv().OldPos * CFrame.new(0, 0.5, 0)
@@ -3103,11 +3324,12 @@ function miniFling(playerToFling)
         until (RootPart.Position - getgenv().OldPos.p).Magnitude < 25
     end
     workspace.FallenPartsDestroyHeight = getgenv().FPDH or -500
-    sendNotification("Đã fling " .. playerToFling.Name)
+    sendNotification("Fling", "Flinged " .. playerToFling.Name)
 end
 
+-- Event connections
 Workspace.ChildAdded:Connect(function(ch)
-    if ch == getMap() and espActive then
+    if ch == getMap() and Config.ESPEnabled then
         task.spawn(function()
             task.wait(math.random(1, 2))
             if findMurderer() then
@@ -3118,26 +3340,26 @@ Workspace.ChildAdded:Connect(function(ch)
 end)
 
 Workspace.ChildRemoved:Connect(function(ch)
-    if ch == getMap() and espActive then
+    if ch == getMap() and Config.ESPEnabled then
         playerData = {}
         espcontainer:ClearAllGroups()
     end
 end)
 
-localplayer.CharacterAdded:Connect(function()
+LocalPlayer.CharacterAdded:Connect(function()
     task.wait(math.random(0.5, 1.5))
-    if autoFarm then
+    if Config.AutoFarmEnabled then
         task.spawn(autoFarmCoins)
     end
-    if espActive then
+    if Config.ESPEnabled then
         reloadESP()
     end
 end)
 
 Players.PlayerAdded:Connect(function(player)
-    if player ~= localplayer then
+    if player ~= LocalPlayer then
         player.CharacterAdded:Connect(function()
-            if espActive then
+            if Config.ESPEnabled then
                 task.wait(math.random(0.5, 1.5))
                 reloadESP()
             end
@@ -3146,53 +3368,31 @@ Players.PlayerAdded:Connect(function(player)
 end)
 
 Players.PlayerRemoving:Connect(function()
-    if espActive then
+    if Config.ESPEnabled then
         task.wait(math.random(0.5, 1.5))
         reloadESP()
     end
 end)
 
-local function initialize()
-    local success = pcall(function()
-        localplayer:WaitForChild("PlayerGui", 10)
-        ReplicatedStorage:WaitForChild("Remotes", 10):WaitForChild("Gameplay", 10):WaitForChild("PlayerDataChanged", 10)
-    end)
-    if not success or not isMurderMystery2() then
-        return
-    end
-    isScriptRunning = true
-    pcall(function()
-        local gameplay = ReplicatedStorage.Remotes.Gameplay.PlayerDataChanged
-        gameplay.OnClientEvent:Connect(function(data)
-            playerData = data
-            if espActive then
-                reloadESP()
-            end
-        end)
-    end)
-    if espActive then
-        reloadESP()
-    end
-end
-
-pcall(initialize)
-
+-- Save Config
 local function saveConfig()
-    local json = game:GetService("HttpService"):JSONEncode(Config)
-    writefile("dhuyx_config.json", json)
+    local success, encoded = pcall(game:GetService("HttpService").JSONEncode, game:GetService("HttpService"), Config)
+    if success then
+        writefile("dhuyx_config.json", encoded)
+    end
 end
 
+LocalPlayer.CharacterAdded:Connect(saveConfig)
+LocalPlayer.CharacterRemoving:Connect(saveConfig)
+
+-- Load Config
 local function loadConfig()
     if isfile("dhuyx_config.json") then
-        local json = readfile("dhuyx_config.json")
-        local loadedConfig = game:GetService("HttpService"):JSONDecode(json)
-        for k, v in pairs(loadedConfig) do
+        local decoded = game:GetService("HttpService"):JSONDecode(readfile("dhuyx_config.json"))
+        for k, v in pairs(decoded) do
             Config[k] = v
         end
     end
 end
 
 loadConfig()
-
-LocalPlayer.CharacterAdded:Connect(saveConfig)
-Players.PlayerRemoving:Connect(saveConfig)
