@@ -1346,11 +1346,13 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Hàm tạo Skibidi RedRizz Aura (đổi thành màu trắng)
+-- Hàm tạo Skibidi RedRizz Aura (đổi màu trắng và fade trắng ↔ đen)
 local function createSkibidiRedRizz(character)
     local attachment = Instance.new("Attachment")
     attachment.Name = "SkibidiAura"
     attachment.Parent = character and (character:FindFirstChild("LowerTorso") or character:FindFirstChild("HumanoidRootPart"))
+
+    local emitters = {}
 
     -- HealingWave1
     local HealingWave1 = Instance.new("ParticleEmitter")
@@ -1371,7 +1373,7 @@ local function createSkibidiRedRizz(character)
     HealingWave1.VelocitySpread = 10
     HealingWave1.Speed = NumberRange.new(3, 6)
     HealingWave1.Brightness = 10
-    HealingWave1.Color = ColorSequence.new(Color3.new(1,1,1)) -- trắng
+    HealingWave1.Color = ColorSequence.new(Color3.new(1,1,1))
     HealingWave1.Size = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 3.0624998),
         NumberSequenceKeypoint.new(0.6420546, 1.9999999),
@@ -1383,6 +1385,7 @@ local function createSkibidiRedRizz(character)
     HealingWave1.Rotation = NumberRange.new(-180, 180)
     HealingWave1.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
     HealingWave1.Parent = attachment
+    table.insert(emitters, HealingWave1)
 
     -- HealingWave2
     local HealingWave2 = Instance.new("ParticleEmitter")
@@ -1401,7 +1404,7 @@ local function createSkibidiRedRizz(character)
     HealingWave2.VelocitySpread = 10
     HealingWave2.Speed = NumberRange.new(3, 5)
     HealingWave2.Brightness = 10
-    HealingWave2.Color = ColorSequence.new(Color3.new(1,1,1)) -- trắng
+    HealingWave2.Color = ColorSequence.new(Color3.new(1,1,1))
     HealingWave2.Size = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 3.125),
         NumberSequenceKeypoint.new(0.4165329, 1.3749999),
@@ -1413,6 +1416,7 @@ local function createSkibidiRedRizz(character)
     HealingWave2.Rotation = NumberRange.new(-180, 180)
     HealingWave2.Orientation = Enum.ParticleOrientation.VelocityPerpendicular
     HealingWave2.Parent = attachment
+    table.insert(emitters, HealingWave2)
 
     -- Sparks
     local Sparks = Instance.new("ParticleEmitter")
@@ -1424,7 +1428,7 @@ local function createSkibidiRedRizz(character)
     Sparks.VelocitySpread = 180
     Sparks.Speed = NumberRange.new(5, 15)
     Sparks.Brightness = 10
-    Sparks.Color = ColorSequence.new(Color3.new(1,1,1)) -- trắng
+    Sparks.Color = ColorSequence.new(Color3.new(1,1,1))
     Sparks.Size = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 0),
         NumberSequenceKeypoint.new(0.14687, 0.4374999),
@@ -1437,6 +1441,7 @@ local function createSkibidiRedRizz(character)
     Sparks.RotSpeed = NumberRange.new(-30, 30)
     Sparks.Orientation = Enum.ParticleOrientation.VelocityParallel
     Sparks.Parent = attachment
+    table.insert(emitters, Sparks)
 
     -- StarSparks
     local StarSparks = Instance.new("ParticleEmitter")
@@ -1448,7 +1453,7 @@ local function createSkibidiRedRizz(character)
     StarSparks.VelocitySpread = 180
     StarSparks.Speed = NumberRange.new(5, 10)
     StarSparks.Brightness = 10
-    StarSparks.Color = ColorSequence.new(Color3.new(1,1,1)) -- trắng
+    StarSparks.Color = ColorSequence.new(Color3.new(1,1,1))
     StarSparks.Size = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 0),
         NumberSequenceKeypoint.new(0.1492777, 0.6874996),
@@ -1460,14 +1465,21 @@ local function createSkibidiRedRizz(character)
     StarSparks.RotSpeed = NumberRange.new(-30, 30)
     StarSparks.Rotation = NumberRange.new(-30, 30)
     StarSparks.Parent = attachment
+    table.insert(emitters, StarSparks)
+
+    -- Update màu liên tục (fade trắng ↔ đen)
+    task.spawn(function()
+        while attachment.Parent do
+            local t = math.sin(tick() * 2) * 0.5 + 0.5 -- dao động 0 -> 1
+            local col = Color3.new(t,t,t)
+            for _, e in ipairs(emitters) do
+                e.Color = ColorSequence.new(col)
+            end
+            task.wait(0.05)
+        end
+    end)
 
     return attachment
-end
-
--- Hàm tạo màu fade từ trắng sang đen và ngược lại
-local function fadeColor()
-    local t = math.sin(tick() * 0.5) * 0.5 + 0.5  -- Chu kỳ 2pi giây, fade mượt
-    return Color3.new(t, t, t)  -- Từ đen (0) đến trắng (1)
 end
 
 -- Nút bật/tắt Aura Hit Effect
