@@ -28,7 +28,38 @@ gui.IgnoreGuiInset = true
 gui.Parent = playerGui
 
 --// Config
-local Config = { CustomPing = nil }
+local Config = { 
+    CustomPing = nil,
+    Buttons = {}, -- Lưu keybind + trạng thái của từng chức năng
+    ESPEnabled = true,
+    SpeedEnabled = false,
+    FlyEnabled = false,
+    AimbotEnabled = false,
+    FullbrightEnabled = false,
+    NoclipEnabled = false,
+    ShiftAmount = 0.5,
+    SelectedPlayers = {},
+    FlySpeed = 35,
+    SpeedAmount = 20,
+    clickTpEnabled = false,
+    checkKOAimbot = true,
+    RapidFireEnabled = true,
+    RapidFireDelay = 0.01,
+    MacroLegitEnabled = false,
+    AntiLockEnabled = false,
+    AntiLockType = "Behind",
+    LookAtEnabled = false,
+    AutoReloadEnabled = false,
+    CsyncRandomEnabled = false,
+    CsyncOrbitEnabled = false,
+    CsyncRadius = 10,
+    CsyncHeight = 5,
+    CsyncSpeed = 2,
+    RainbowHitEffectEnabled = true,
+    AutoWallhopEnabled = false,
+    SpinbotEnabled = false,
+    SpinbotSpeed = 450
+}
 local Keybinds = {}
 
 --// Helpers
@@ -109,7 +140,13 @@ local function CreateButton(parent, name, callback)
 
     keyBox:GetPropertyChangedSignal("Text"):Connect(function()
         local text = keyBox.Text:upper()
-        if text == "BUTTON" then
+        if text == "" then
+            for k, v in pairs(Keybinds) do
+                if v == callback then
+                    Keybinds[k] = nil
+                end
+            end
+        elseif text == "BUTTON" then
             local screenGui = Instance.new("ScreenGui")
             screenGui.IgnoreGuiInset = true
             screenGui.Parent = game:GetService("CoreGui")
@@ -205,29 +242,6 @@ task.spawn(function()
     end
 end)
 
-local PingBox = Instance.new("TextBox")
-PingBox.Size = UDim2.new(0, 80, 0, 25)
-PingBox.Position = UDim2.new(1, -85, 0, 5)
-PingBox.BackgroundColor3 = Color3.fromRGB(230, 230, 230)
-PingBox.BackgroundTransparency = 0.2
-PingBox.TextColor3 = Color3.fromRGB(0, 0, 0)
-PingBox.TextSize = 14
-PingBox.Font = Enum.Font.Gotham
-PingBox.PlaceholderText = "Ping (ms)"
-PingBox.Text = ""
-PingBox.ClearTextOnFocus = false
-PingBox.Parent = Title
-Instance.new("UICorner", PingBox).CornerRadius = UDim.new(0, 6)
-
-PingBox:GetPropertyChangedSignal("Text"):Connect(function()
-    local input = tonumber(PingBox.Text)
-    if input and input >= 0 then
-        Config.CustomPing = math.clamp(input, 10, 1000)
-    else
-        Config.CustomPing = nil
-    end
-end)
-
 --// Tabs
 local TabHolder = Instance.new("Frame", MainFrame)
 TabHolder.Size = UDim2.new(1, -10, 0, 30)
@@ -239,7 +253,7 @@ TabLayout.Padding = UDim.new(0, 5)
 
 local function createTab(name)
     local btn = Instance.new("TextButton", TabHolder)
-    btn.Size = UDim2.new(0, 78, 1, 0) -- Adjusted for 5 tabs to fit 400px width
+    btn.Size = UDim2.new(0, 90, 1, 0) -- Adjusted for 4 tabs
     btn.Text = name
     btn.Font = Enum.Font.Gotham
     btn.TextSize = 14
@@ -253,7 +267,6 @@ end
 local Tab1Btn = createTab("Da Hood")
 local Tab2Btn = createTab("Universal")
 local Tab3Btn = createTab("Scripts")
-local Tab4Btn = createTab("Functions")
 local Tab5Btn = createTab("Info")
 
 --// Pages
@@ -277,11 +290,6 @@ Page3.Size = UDim2.new(1, 0, 1, 0)
 Page3.BackgroundTransparency = 1
 Page3.Visible = false
 
-local Page4 = Instance.new("Frame", Pages) -- Functions
-Page4.Size = UDim2.new(1, 0, 1, 0)
-Page4.BackgroundTransparency = 1
-Page4.Visible = false
-
 local Page5 = Instance.new("Frame", Pages) -- Info
 Page5.Size = UDim2.new(1, 0, 1, 0)
 Page5.BackgroundTransparency = 1
@@ -291,14 +299,12 @@ local function switchPage(page)
     Page1.Visible = (page == Page1)
     Page2.Visible = (page == Page2)
     Page3.Visible = (page == Page3)
-    Page4.Visible = (page == Page4)
     Page5.Visible = (page == Page5)
 end
 
 Tab1Btn.MouseButton1Click:Connect(function() switchPage(Page1) end)
 Tab2Btn.MouseButton1Click:Connect(function() switchPage(Page2) end)
 Tab3Btn.MouseButton1Click:Connect(function() switchPage(Page3) end)
-Tab4Btn.MouseButton1Click:Connect(function() switchPage(Page4) end)
 Tab5Btn.MouseButton1Click:Connect(function() switchPage(Page5) end)
 
 --// Page 1 (Da Hood)
@@ -448,35 +454,6 @@ CreateScriptItem("Doors", "https://raw.githubusercontent.com/DarkDoorsKing/Proje
 CreateScriptItem("Emote", "https://raw.githubusercontent.com/dadada-rgb/VhuyHub/refs/heads/main/emote")
 CreateScriptItem("Infinite Yield", "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source")
 
---// Page 4 (Functions)
-local ButtonFrame4Left = Instance.new("Frame", Page4)
-ButtonFrame4Left.Size = UDim2.new(0.5, -5, 1, 0)
-ButtonFrame4Left.Position = UDim2.new(0, 0, 0, 0)
-ButtonFrame4Left.BackgroundTransparency = 1
-local LeftLayout = Instance.new("UIListLayout", ButtonFrame4Left)
-LeftLayout.Padding = UDim.new(0, 8)
-LeftLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-LeftLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-
-local ButtonFrame4Right = Instance.new("Frame", Page4)
-ButtonFrame4Right.Size = UDim2.new(0.5, -5, 1, 0)
-ButtonFrame4Right.Position = UDim2.new(0.5, 5, 0, 0)
-ButtonFrame4Right.BackgroundTransparency = 1
-local RightLayout = Instance.new("UIListLayout", ButtonFrame4Right)
-RightLayout.Padding = UDim.new(0, 8)
-RightLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-RightLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-
--- Function buttons (placeholders for functionality)
-local autoFarmBtn = CreateButton(ButtonFrame4Left, "AutoFarm (Off)", function() end)
-local shootBtn = CreateButton(ButtonFrame4Left, "Shoot", function() end)
-local espBtn = CreateButton(ButtonFrame4Left, "ESP (Off)", function() end)
-local autoGunBtn = CreateButton(ButtonFrame4Left, "AutoGun", function() end)
-local flingMurdererBtn = CreateButton(ButtonFrame4Right, "Fling Murderer", function() end)
-local flingSheriffBtn = CreateButton(ButtonFrame4Right, "Fling Sheriff", function() end)
-local killAllBtn = CreateButton(ButtonFrame4Right, "Kill All", function() end)
-local tpLobbyBtn = CreateButton(ButtonFrame4Right, "TP Lobby", function() end)
-
 --// Page 5 (Info)
 local Avatar = Instance.new("ImageLabel", Page5)
 Avatar.Size = UDim2.new(0, 80, 0, 80)
@@ -566,24 +543,6 @@ function sendNotification(title, text, duration)
         })
     end)
 end
-
--- Cấu trúc config mặc định
-local Config = {
-    Buttons = {}, -- Lưu keybind + trạng thái của từng chức năng
-    ESPEnabled = true,
-    SpeedEnabled = false,
-    FlyEnabled = false,
-    AimbotEnabled = false,
-    FullbrightEnabled = false,
-    NoclipEnabled = false,
-    ShiftAmount = 0.5,
-    SelectedPlayers = {},
-    FlySpeed = 35,
-    SpeedAmount = 20,
-    clickTpEnabled = false,
-    checkKOAimbot = true,
-    CustomPing = nil
-}
 
 local autoSelect = false
 local tbEnabled = true
@@ -687,16 +646,6 @@ aimbotButton = CreateButton(ButtonFrame1, "Aimlock: OFF", function()
     sendNotification("AIMLOCK", Config.AimbotEnabled and "ON" or "OFF")
 end)
 
-checkKOAimbotButton = CreateButton(ButtonFrame1, "Check K.O: ON", function()
-    Config.checkKOAimbot = not Config.checkKOAimbot
-    checkKOAimbotButton.Text = "Check K.O: " .. (Config.checkKOAimbot and "ON" or "OFF")
-    sendNotification("CHECK K.O", Config.checkKOAimbot and "ON" or "OFF")
-end)
-
--- Config mặc định
-Config.RapidFireEnabled = Config.RapidFireEnabled or true -- mặc định bật
-Config.RapidFireDelay = 0.01
-
 -- =============================
 -- Logic 1: Spam Activate
 -- =============================
@@ -771,10 +720,6 @@ rapidFireButton = CreateButton(ButtonFrame1, "Rapid Fire: " .. (Config.RapidFire
     sendNotification("Rapid Fire", Config.RapidFireEnabled and "Enabled" or "Disabled")
 end)
 
--- Config mặc định
-if Config.MacroLegitEnabled == nil then Config.MacroLegitEnabled = false end
-
--- Nút Macro Legit
 macroLegitButton = CreateButton(ButtonFrame1, "Macro Legit: " .. (Config.MacroLegitEnabled and "ON" or "OFF"), function()
     Config.MacroLegitEnabled = not Config.MacroLegitEnabled
     macroLegitButton.Text = "Macro Legit: " .. (Config.MacroLegitEnabled and "ON" or "OFF")
@@ -792,16 +737,6 @@ macroLegitButton = CreateButton(ButtonFrame1, "Macro Legit: " .. (Config.MacroLe
         end)
     end
 end)
-
--- ======= CONFIG MẶC ĐỊNH =======
-Config.AntiLockEnabled = Config.AntiLockEnabled or false
-Config.AntiLockType = Config.AntiLockType or "Behind"
-
-local antiLockModes = {
-    Behind = true, Down = true, ForWard = true,
-    Left = true, One = true, Right = true,
-    Up = true, Zero = true
-}
 
 antiLockButton = CreateButton(ButtonFrame1, "AntiLock: " .. (Config.AntiLockEnabled and "ON" or "OFF"), function()
     Config.AntiLockEnabled = not Config.AntiLockEnabled
@@ -867,9 +802,6 @@ _G.__vhuyhub_antilock_conn = RunService.Heartbeat:Connect(function()
         hrp.Velocity = oldVel
     end
 end)
-
--- ==== CONFIG ====
-if Config.LookAtEnabled == nil then Config.LookAtEnabled = false end
 
 -- ==== UTILS ====
 local function getMyHumanoid()
@@ -989,10 +921,6 @@ RunService.PostSimulation:Connect(function()
     end
 end)
 
--- ======= CONFIG MẶC ĐỊNH =======
-Config.AutoReloadEnabled = Config.AutoReloadEnabled or false
-
--- ======= NÚT AUTO RELOAD =======
 autoReloadButton = CreateButton(ButtonFrame1, "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF"), function()
     Config.AutoReloadEnabled = not Config.AutoReloadEnabled
     autoReloadButton.Text = "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF")
@@ -1052,15 +980,6 @@ tpAndStompButton = CreateButton(ButtonFrame1, "TP Player", function()
         end
     end
 end)
-
--- ========================
--- Csync Config mặc định
--- ========================
-if Config.CsyncRandomEnabled == nil then Config.CsyncRandomEnabled = false end
-if Config.CsyncOrbitEnabled == nil then Config.CsyncOrbitEnabled = false end
-if Config.CsyncRadius == nil then Config.CsyncRadius = 10 end
-if Config.CsyncHeight == nil then Config.CsyncHeight = 5 end
-if Config.CsyncSpeed == nil then Config.CsyncSpeed = 2 end
 
 -- ========================
 -- Hàm hỗ trợ
@@ -1383,10 +1302,6 @@ fullbrightButton = CreateButton(ButtonFrame2Left, "Fullbright: OFF", function()
     sendNotification("FULLBRIGHT", Config.FullbrightEnabled and "ON" or "OFF")
 end)
 
--- Auto Wallhop Config
-if Config.AutoWallhopEnabled == nil then Config.AutoWallhopEnabled = false end
-
--- Nút bật/tắt
 autoWallhopButton = CreateButton(ButtonFrame2Left, "Auto Wallhop: " .. (Config.AutoWallhopEnabled and "ON" or "OFF"), function()
     Config.AutoWallhopEnabled = not Config.AutoWallhopEnabled
     autoWallhopButton.Text = "Auto Wallhop: " .. (Config.AutoWallhopEnabled and "ON" or "OFF")
@@ -1441,9 +1356,6 @@ RunService.Heartbeat:Connect(function()
         performWallHop()
     end
 end)
-
--- Config mặc định
-if Config.RainbowHitEffectEnabled == nil then Config.RainbowHitEffectEnabled = true end
 
 -- Hàm tạo Skibidi RedRizz Aura (đổi thành màu trắng)
 local function createSkibidiRedRizz(character)
@@ -1563,10 +1475,10 @@ local function createSkibidiRedRizz(character)
     return attachment
 end
 
--- Hàm tạo rainbow color theo thời gian
-local function rainbowColor()
-    local t = tick() % 5 / 5
-    return Color3.fromHSV(t, 1, 1)
+-- Hàm tạo màu fade từ trắng sang đen và ngược lại
+local function fadeColor()
+    local t = math.sin(tick() % (2 * math.pi) / 4) * 0.5 + 0.5  -- Chu kỳ 4 giây, từ 0 đến 1
+    return Color3.new(t, t, t)  -- Từ đen (0) đến trắng (1)
 end
 
 -- Nút bật/tắt Aura Hit Effect
@@ -1629,7 +1541,7 @@ RunService.Heartbeat:Connect(function()
                     task.spawn(function()
                         local start = tick()
                         while tick() - start < 1 do
-                            highlight.OutlineColor = rainbowColor()
+                            highlight.OutlineColor = fadeColor()
                             task.wait(0.05)
                         end
                         highlight:Destroy()
@@ -1710,28 +1622,6 @@ local function stopAnimAndTp()
     animEnabled = false
 end
 
--- Hàm tìm player gần nhất trong danh sách SelectedPlayers
-local function getClosestSelected()
-    local closest, dist = nil, math.huge
-    local myChar = LocalPlayer.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myHRP then return nil end
-
-    for name, selected in pairs(Config.SelectedPlayers or {}) do
-        if selected then
-            local plr = Players:FindFirstChild(name)
-            if plr and plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-                local d = (myHRP.Position - plr.Character.HumanoidRootPart.Position).Magnitude
-                if d < dist then
-                    dist = d
-                    closest = plr
-                end
-            end
-        end
-    end
-    return closest
-end
-
 -- Tạo nút BangPlayer sử dụng CreateButton
 bangButton = CreateButton(ButtonFrame2Left, "BangPlayer: OFF", function()
     animEnabled = not animEnabled
@@ -1774,7 +1664,7 @@ bangButton = CreateButton(ButtonFrame2Left, "BangPlayer: OFF", function()
         -- Teleport liên tục
         bangConnection = RunService.Heartbeat:Connect(function()
             if animEnabled and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                myHRP.CFrame = target.Character.HumanoidRootPart.CFrame
+                myHRP.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 1)
             else
                 stopAnimAndTp()
                 bangButton.Text = "BangPlayer: OFF"
@@ -1812,7 +1702,7 @@ LocalPlayer.CharacterAdded:Connect(function()
                 -- Teleport liên tục
                 bangConnection = RunService.Heartbeat:Connect(function()
                     if animEnabled and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                        myHRP.CFrame = target.Character.HumanoidRootPart.CFrame
+                        myHRP.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 1)
                     else
                         stopAnimAndTp()
                         bangButton.Text = "BangPlayer: OFF"
@@ -2003,11 +1893,6 @@ tpWaypointButton = CreateButton(ButtonFrame2Right, "TP to Waypoint", function()
     end
 end)
 
--- Config mặc định
-if Config.SpinbotEnabled == nil then Config.SpinbotEnabled = false end
-if Config.SpinbotSpeed == nil then Config.SpinbotSpeed = 450 end
-
--- Nút bật/tắt Spinbot
 spinbotButton = CreateButton(ButtonFrame2Right, "Spinbot: " .. (Config.SpinbotEnabled and "ON" or "OFF"), function()
     Config.SpinbotEnabled = not Config.SpinbotEnabled
     spinbotButton.Text = "Spinbot: " .. (Config.SpinbotEnabled and "ON" or "OFF")
@@ -2162,13 +2047,10 @@ local function IsValidTarget(player)
         return false
     end
 
-    -- Kiểm tra trạng thái K.O nếu checkKOAimbot được bật
-    if Config.checkKOAimbot then
-        local bodyEffects = player.Character:FindFirstChild("BodyEffects")
-        local koValue = bodyEffects and bodyEffects:FindFirstChild("K.O")
-        if koValue and koValue.Value then
-            return false -- Bỏ qua người chơi nếu họ bị K.O
-        end
+    local bodyEffects = player.Character:FindFirstChild("BodyEffects")
+    local koValue = bodyEffects and bodyEffects:FindFirstChild("K.O")
+    if koValue and koValue.Value then
+        return false -- Bỏ qua người chơi nếu họ bị K.O
     end
 
     -- Kiểm tra trạng thái Grab
@@ -2388,12 +2270,8 @@ getgenv().Aimbot = {
 }
 
 local function GetPing()
-    if Config.CustomPing then
-        return Config.CustomPing
-    end
-    local stats = game:GetService("Stats"):FindFirstChild("Network")
-    local data = stats and stats:FindFirstChild("DataPing")
-    return data and math.clamp(data:GetValue(), 10, 300) or 40
+    local pingStr = PingClock.Text:match("Ping: (%d+) ms")
+    return pingStr and tonumber(pingStr) or 40
 end
 
 local function GetPredictedPosition(part)
