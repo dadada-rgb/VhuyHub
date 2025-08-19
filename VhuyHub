@@ -238,7 +238,7 @@ task.spawn(function()
     local lastDt = 1/60
     RunService.RenderStepped:Connect(function(dt) lastDt = dt end)
     while task.wait(0.5) do
-        local ping = Config.CustomPing or math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+        local ping =  math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
         local fps = math.clamp(math.floor(1 / (lastDt > 0 and lastDt or 1/240)), 1, 999)
         local timeStr = os.date("%H:%M")
         PingClock.Text = string.format("Ping: %d ms | FPS: %d | %s", ping, fps, timeStr)
@@ -933,84 +933,6 @@ LocalPlayer.CharacterAdded:Connect(function()
         local _, hum = getMyHumanoid()
         if hum then hum.AutoRotate = true end
     end)
-end)
-
--- Auto Armor Button
-autoArmorEnabled = false
-
-autoArmorButton = CreateButton(ButtonFrame1, "Auto Armor: OFF", function()
-    autoArmorEnabled = not autoArmorEnabled
-    autoArmorButton.Text = "Auto Armor: " .. (autoArmorEnabled and "ON" or "OFF")
-    sendNotification("Auto Armor", autoArmorEnabled and "Enabled" or "Disabled")
-end)
-
--- Auto Armor Logic
-local cloneref = getgenv().cloneref or function(...) return ... end
-local fireclickdetector = getgenv().fireclickdetector or function(...) return nil end
-local GameReference = cloneref(game)
-
-if not GameReference:IsLoaded() then game.Loaded:Wait() end
-
-local Workspace = cloneref(game:GetService("Workspace"))
-local RunService = cloneref(game:GetService("RunService"))
-local Players = cloneref(game:GetService("Players"))
-
-local LocalPlayer = Players.LocalPlayer
-local LocalCharacter = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local LocalHumanoid = LocalCharacter:FindFirstChildOfClass("Humanoid") or LocalCharacter:WaitForChild("Humanoid", 1e9)
-local LocalRootPart = LocalHumanoid and LocalHumanoid.RootPart or LocalCharacter:WaitForChild("HumanoidRootPart", 1e9)
-
-local BuyMaxDistance = 1000 --// Studs \\--
-
-LocalPlayer.CharacterAdded:Connect(function(Character)
-    LocalCharacter = Character
-    LocalHumanoid = LocalCharacter:FindFirstChildOfClass("Humanoid") or LocalCharacter:WaitForChild("Humanoid", 1e9)
-    LocalRootPart = LocalHumanoid and LocalHumanoid.RootPart or LocalCharacter:WaitForChild("HumanoidRootPart", 1e9)
-end)
-
-RunService.PostSimulation:Connect(function()
-    if not autoArmorEnabled then return end
-    if not LocalCharacter or not LocalHumanoid or not LocalRootPart then return end
-
-    local Ignored = Workspace:FindFirstChild("Ignored") or Workspace:FindFirstChild("MAP") or Workspace:FindFirstChild("Blacklisted")
-    if Ignored then
-        local Shop = Ignored:FindFirstChild("Shop") or Ignored:FindFirstChild("Shops") or Ignored:FindFirstChild("Pads") or Ignored:FindFirstChild("BuyPads") or Ignored:FindFirstChild("Bought")
-        if Shop then
-            for _, Child in ipairs(Shop:GetChildren()) do
-                if Child.Name:lower():find("armor") and Child:IsA("Model") and Child:FindFirstChildOfClass("ClickDetector") then
-                    local Head = Child:FindFirstChild("Head") or Child:FindFirstChild("Part")
-                    if Head and Head:IsA("BasePart") and (Head.Position - LocalRootPart.Position).Magnitude <= BuyMaxDistance then
-                        fireclickdetector(Child:FindFirstChildOfClass("ClickDetector"))
-                    end
-                end
-            end
-        end
-    end
-end)
-
-autoReloadButton = CreateButton(ButtonFrame1, "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF"), function()
-    Config.AutoReloadEnabled = not Config.AutoReloadEnabled
-    autoReloadButton.Text = "Auto Reload: " .. (Config.AutoReloadEnabled and "ON" or "OFF")
-    sendNotification("Auto Reload", Config.AutoReloadEnabled and "Enabled" or "Disabled")
-end)
-
--- ======= LOGIC AUTO RELOAD (theo kiểu _G.AutoReload ban đầu) =======
-if _G.__vhuyhub_autoreload_conn then
-    _G.__vhuyhub_autoreload_conn:Disconnect()
-end
-
-_G.__vhuyhub_autoreload_conn = RunService.Heartbeat:Connect(function()
-    if not Config.AutoReloadEnabled then return end
-
-    local char = LocalPlayer.Character
-    local tool = char and char:FindFirstChildWhichIsA("Tool")
-    if not tool then return end
-
-    local ammoVal = tool:FindFirstChild("Ammo") or tool:FindFirstChild("AmmoCount")
-    if ammoVal and ammoVal.Value <= 0 then
-        game:GetService("ReplicatedStorage").MainEvent:FireServer("Reload", tool)
-        task.wait(1) -- chờ reload hoàn tất
-    end
 end)
 
 triggerBotButton = CreateButton(ButtonFrame1, "TriggerBot: " .. (tbEnabled and "ON" or "OFF"), function()
@@ -2143,7 +2065,7 @@ local function CreateESP(player)
     highlight.Enabled = false
     highlight.FillTransparency = 0.6
     highlight.OutlineTransparency = 0.2
-    highlight.FillColor = Color3.fromRGB(255, 179, 186)
+    highlight.FillColor = Color3.fromRGB(55, 55, 55)
     highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
     highlight.Adornee = player.Character
     highlight.Parent = espGui
