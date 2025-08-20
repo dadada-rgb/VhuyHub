@@ -44,7 +44,7 @@ local Config = {
     FlySpeed = 35,
     SpeedAmount = 20,
     clickTpEnabled = false,
-    RapidFireEnabled = true,
+    RapidFireEnabled = false,
     RapidFireDelay = 0.01,
     MacroLegitEnabled = false,
     AntiLockEnabled = false,
@@ -664,6 +664,8 @@ predictionBox.Parent = ButtonFrame1
 Instance.new("UICorner", predictionBox).CornerRadius = UDim.new(0, 6)
 
 predictionBox:GetPropertyChangedSignal("Text"):Connect(function()
+    if Config.AutoPredictionEnabled then return end -- khi auto bật thì bỏ qua input
+
     local num = tonumber(predictionBox.Text)
     if num then
         Config.CustomPing = num
@@ -713,9 +715,59 @@ autoPredictionButton = CreateButton(ButtonFrame1, "Auto Prediction: OFF", functi
     sendNotification("Auto Prediction", Config.AutoPredictionEnabled and "ON" or "OFF")
 end)
 
+-- Auto update prediction theo bảng cố định
+task.spawn(function()
+    while task.wait(0.5) do
+        if Config.AutoPredictionEnabled then
+            local ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
+            Config.CustomPing = ping
+
+            local pred = 0.15
+            if ping < 20 then pred = 0.11
+            elseif ping < 30 then pred = 0.115
+            elseif ping < 40 then pred = 0.119
+            elseif ping < 50 then pred = 0.122
+            elseif ping < 60 then pred = 0.13
+            elseif ping < 70 then pred = 0.131
+            elseif ping < 80 then pred = 0.134
+            elseif ping < 90 then pred = 0.136
+            elseif ping < 100 then pred = 0.14
+            elseif ping < 110 then pred = 0.142
+            elseif ping < 120 then pred = 0.143
+            elseif ping < 130 then pred = 0.145
+            elseif ping < 140 then pred = 0.148
+            elseif ping < 150 then pred = 0.15
+            elseif ping < 160 then pred = 0.151
+            elseif ping < 170 then pred = 0.153
+            elseif ping < 180 then pred = 0.155
+            elseif ping < 190 then pred = 0.158
+            elseif ping < 200 then pred = 0.165
+            elseif ping < 210 then pred = 0.167
+            elseif ping < 220 then pred = 0.169
+            elseif ping < 230 then pred = 0.171
+            elseif ping < 240 then pred = 0.173
+            elseif ping < 250 then pred = 0.175
+            elseif ping < 300 then pred = 0.18
+            elseif ping < 350 then pred = 0.185
+            elseif ping < 400 then pred = 0.19
+            elseif ping < 450 then pred = 0.195
+            elseif ping < 500 then pred = 0.2
+            elseif ping < 600 then pred = 0.21
+            elseif ping < 700 then pred = 0.22
+            elseif ping < 800 then pred = 0.23
+            elseif ping < 900 then pred = 0.24
+            elseif ping < 1000 then pred = 0.25
+            else pred = 0.3 end
+
+            Config.CustomPrediction = pred
+        end
+    end
+end)
+
 -- =============================
--- Logic 1: Spam Activate
+-- Logic Rapid Fire (PC + Mobile)
 -- =============================
+
 local utility = {}
 utility.get_gun = function()
     local char = LocalPlayer.Character
@@ -726,14 +778,17 @@ utility.get_gun = function()
         end
     end
 end
+
 utility.rapid = function(tool)
     tool:Activate()
 end
 
 local isFiring = false
+
+-- Input bắt đầu (chuột hoặc cảm ứng)
 UserInputService.InputBegan:Connect(function(i, gp)
     if gp then return end
-    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
         local gun = utility.get_gun()
         if Config.RapidFireEnabled and gun and not isFiring then
             isFiring = true
@@ -746,38 +801,11 @@ UserInputService.InputBegan:Connect(function(i, gp)
         end
     end
 end)
+
+-- Input kết thúc (chuột hoặc cảm ứng)
 UserInputService.InputEnded:Connect(function(i)
-    if i.UserInputType == Enum.UserInputType.MouseButton1 then
+    if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
         isFiring = false
-    end
-end)
-
--- =============================
--- Logic 2: Hook GunScript delay
--- =============================
-local Orginal = {}
-RunService.RenderStepped:Connect(function()
-    if not Config.RapidFireEnabled then return end
-    local char = LocalPlayer.Character
-    if not char then return end
-
-    local tool = char:FindFirstChildOfClass("Tool")
-    if tool and (tool:FindFirstChild("GunScript") or tool:FindFirstChild("Ammo") or tool:FindFirstChild("AmmoCount")) then
-        for _, connection in ipairs(getconnections(tool.Activated)) do
-            local func = connection.Function
-            if func then
-                local funcInfo = debug.getinfo(func)
-                for i = 1, funcInfo.nups do
-                    local c, n = debug.getupvalue(func, i)
-                    if type(c) == "number" then
-                        if not Orginal[i] then
-                            Orginal[i] = c
-                        end
-                        debug.setupvalue(func, i, Config.RapidFireEnabled and 0.0000000001 or Orginal[i])
-                    end
-                end
-            end
-        end
     end
 end)
 
@@ -2309,8 +2337,9 @@ local function GetPrediction()
 end
 
 local function GetPing()
-    local pingStr = PingClock.Text:match("Ping: (%d+) ms")
-    return pingStr and tonumber(pingStr) or 40
+    local stats = game:GetService("Stats")
+    local ping = stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+    return math.floor(ping)
 end
 
 local function GetPredictedPosition(part)
