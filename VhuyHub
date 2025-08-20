@@ -2284,10 +2284,11 @@ RunService.RenderStepped:Connect(function(deltaTime)
             local root = Player.Character:FindFirstChild("HumanoidRootPart") or part
             local vel = (root.AssemblyLinearVelocity or root.Velocity or Vector3.zero)
 
-            -- dùng prediction đã tính
+            -- Prediction
             local pred = tonumber(Config.Prediction) or 0.15
             local predictedPos = part.Position + vel * pred
 
+            -- Check obstruction
             if not IsObstructed(Camera.CFrame.Position, predictedPos) then
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
             end
@@ -2303,16 +2304,17 @@ RunService.RenderStepped:Connect(function(deltaTime)
                 task.wait(0)
                 if tbEnabled and distToCursor(cap) <= fovRadius then
                     local origin = Camera.CFrame.Position
-                    local direction = (cap.Position - origin)
+                    local direction = (cap.Position - origin).Unit * 5000 -- Ray đủ xa
                     local rayParams = RaycastParams.new()
                     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
                     rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
 
                     local result = Workspace:Raycast(origin, direction, rayParams)
 
-                    if not result or result.Instance:IsDescendantOf(cap.Parent) then
+                    -- Chỉ bắn nếu raycast trúng chính xác target (không bị che)
+                    if result and result.Instance and result.Instance:IsDescendantOf(cap.Parent) then
                         if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
-                            -- Mobile: ưu tiên dùng Tool:Activate()
+                            -- Mobile
                             local char = LocalPlayer.Character
                             local fired = false
                             if char then
