@@ -61,7 +61,6 @@ local Config = {
     SpinbotEnabled = false,
     SpinbotSpeed = 450,
     AutoPredictionEnabled = false,
-    CustomPrediction = 0.15
 }
 local Keybinds = {}
 
@@ -649,7 +648,36 @@ aimbotButton = CreateButton(ButtonFrame1, "Aimlock: OFF", function()
     sendNotification("AIMLOCK", Config.AimbotEnabled and "ON" or "OFF")
 end)
 
--- Ô nhập ping
+-- Hàm GetPing
+local function GetPing()
+    local stats = game:GetService("Stats"):FindFirstChild("Network")
+    local data = stats and stats:FindFirstChild("DataPing")
+    return data and math.clamp(data:GetValue(), 10, 300) or 40
+end
+
+-- Hàm prediction VIP
+local function CalculateVIPPrediction(ping)
+    ping = math.clamp(ping, 10, 300)
+    local minPred, maxPred = 0.12, 0.20
+    local predLinear = minPred + (ping - 10) / 290 * (maxPred - minPred)
+    local predSmooth = minPred + math.sqrt((ping - 10) / 290) * (maxPred - minPred)
+    return math.clamp(predLinear*0.4 + predSmooth*0.6, minPred, maxPred)
+end
+
+-- Loop cập nhật Prediction
+task.spawn(function()
+    while task.wait(0.2) do
+        local ping = GetPing()
+        if Config.AutoPredictionEnabled then
+            Config.Prediction = CalculateVIPPrediction(ping)
+        else
+            local cp = Config.CustomPing or ping
+            Config.Prediction = CalculateVIPPrediction(cp)
+        end
+    end
+end)
+
+-- Ô nhập Ping (bỏ qua khi AutoPrediction bật)
 local predictionBox = Instance.new("TextBox")
 predictionBox.Size = UDim2.new(1, -10, 0, 25)
 predictionBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
@@ -657,55 +685,17 @@ predictionBox.BackgroundTransparency = 0.2
 predictionBox.TextColor3 = Color3.fromRGB(0, 0, 0)
 predictionBox.TextSize = 14
 predictionBox.Font = Enum.Font.Gotham
-predictionBox.PlaceholderText = "Ping prediction"
-predictionBox.Text = tostring(Config.CustomPing)
+predictionBox.PlaceholderText = "Nhập Ping"
+predictionBox.Text = tostring(Config.CustomPing or 40)
 predictionBox.ClearTextOnFocus = false
 predictionBox.Parent = ButtonFrame1
 Instance.new("UICorner", predictionBox).CornerRadius = UDim.new(0, 6)
 
 predictionBox:GetPropertyChangedSignal("Text"):Connect(function()
     if Config.AutoPredictionEnabled then return end -- khi auto bật thì bỏ qua input
-
     local num = tonumber(predictionBox.Text)
     if num then
-        Config.CustomPing = num
-        local pred = 0.15
-        if num < 20 then pred = 0.11
-        elseif num < 30 then pred = 0.115
-        elseif num < 40 then pred = 0.119
-        elseif num < 50 then pred = 0.122
-        elseif num < 60 then pred = 0.13
-        elseif num < 70 then pred = 0.131
-        elseif num < 80 then pred = 0.134
-        elseif num < 90 then pred = 0.136
-        elseif num < 100 then pred = 0.14
-        elseif num < 110 then pred = 0.142
-        elseif num < 120 then pred = 0.143
-        elseif num < 130 then pred = 0.145
-        elseif num < 140 then pred = 0.148
-        elseif num < 150 then pred = 0.15
-        elseif num < 160 then pred = 0.151
-        elseif num < 170 then pred = 0.153
-        elseif num < 180 then pred = 0.155
-        elseif num < 190 then pred = 0.158
-        elseif num < 200 then pred = 0.165
-        elseif num < 210 then pred = 0.167
-        elseif num < 220 then pred = 0.169
-        elseif num < 230 then pred = 0.171
-        elseif num < 240 then pred = 0.173
-        elseif num < 250 then pred = 0.175
-        elseif num < 300 then pred = 0.18
-        elseif num < 350 then pred = 0.185
-        elseif num < 400 then pred = 0.19
-        elseif num < 450 then pred = 0.195
-        elseif num < 500 then pred = 0.2
-        elseif num < 600 then pred = 0.21
-        elseif num < 700 then pred = 0.22
-        elseif num < 800 then pred = 0.23
-        elseif num < 900 then pred = 0.24
-        elseif num < 1000 then pred = 0.25
-        else pred = 0.3 end
-        Config.CustomPrediction = pred
+        Config.CustomPing = math.clamp(num, 10, 300)
     end
 end)
 
@@ -713,55 +703,6 @@ autoPredictionButton = CreateButton(ButtonFrame1, "Auto Prediction: OFF", functi
     Config.AutoPredictionEnabled = not Config.AutoPredictionEnabled
     autoPredictionButton.Text = "Auto Prediction: " .. (Config.AutoPredictionEnabled and "ON" or "OFF")
     sendNotification("Auto Prediction", Config.AutoPredictionEnabled and "ON" or "OFF")
-end)
-
--- Auto update prediction theo bảng cố định
-task.spawn(function()
-    while task.wait(0.5) do
-        if Config.AutoPredictionEnabled then
-            local ping = math.floor(game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue())
-            Config.CustomPing = ping
-
-            local pred = 0.15
-            if ping < 20 then pred = 0.11
-            elseif ping < 30 then pred = 0.115
-            elseif ping < 40 then pred = 0.119
-            elseif ping < 50 then pred = 0.122
-            elseif ping < 60 then pred = 0.13
-            elseif ping < 70 then pred = 0.131
-            elseif ping < 80 then pred = 0.134
-            elseif ping < 90 then pred = 0.136
-            elseif ping < 100 then pred = 0.14
-            elseif ping < 110 then pred = 0.142
-            elseif ping < 120 then pred = 0.143
-            elseif ping < 130 then pred = 0.145
-            elseif ping < 140 then pred = 0.148
-            elseif ping < 150 then pred = 0.15
-            elseif ping < 160 then pred = 0.151
-            elseif ping < 170 then pred = 0.153
-            elseif ping < 180 then pred = 0.155
-            elseif ping < 190 then pred = 0.158
-            elseif ping < 200 then pred = 0.165
-            elseif ping < 210 then pred = 0.167
-            elseif ping < 220 then pred = 0.169
-            elseif ping < 230 then pred = 0.171
-            elseif ping < 240 then pred = 0.173
-            elseif ping < 250 then pred = 0.175
-            elseif ping < 300 then pred = 0.18
-            elseif ping < 350 then pred = 0.185
-            elseif ping < 400 then pred = 0.19
-            elseif ping < 450 then pred = 0.195
-            elseif ping < 500 then pred = 0.2
-            elseif ping < 600 then pred = 0.21
-            elseif ping < 700 then pred = 0.22
-            elseif ping < 800 then pred = 0.23
-            elseif ping < 900 then pred = 0.24
-            elseif ping < 1000 then pred = 0.25
-            else pred = 0.3 end
-
-            Config.CustomPrediction = pred
-        end
-    end
 end)
 
 -- =============================
@@ -1361,7 +1302,7 @@ local function performWallHop()
         humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
         rootPart.AssemblyLinearVelocity = Vector3.new(0, 60, 0) -- lực nhảy
         rootPart.CFrame = rootPart.CFrame * CFrame.Angles(0, math.rad(-35), 0)
-        task.wait(0.5)
+        task.wait(0.4)
     end
 
     isPerformingWallHop = false
@@ -2293,66 +2234,6 @@ getgenv().Aimbot = {
     Hitpart = "Head",
 }
 
-local function GetPrediction()
-    if Config.AutoPredictionEnabled then
-        local ping = GetPing()
-        if ping < 20 then return 0.11
-        elseif ping < 30 then return 0.115
-        elseif ping < 40 then return 0.119
-        elseif ping < 50 then return 0.122
-        elseif ping < 60 then return 0.13
-        elseif ping < 70 then return 0.131
-        elseif ping < 80 then return 0.134
-        elseif ping < 90 then return 0.136
-        elseif ping < 100 then return 0.14
-        elseif ping < 110 then return 0.142
-        elseif ping < 120 then return 0.143
-        elseif ping < 130 then return 0.145
-        elseif ping < 140 then return 0.148
-        elseif ping < 150 then return 0.15
-        elseif ping < 160 then return 0.151
-        elseif ping < 170 then return 0.153
-        elseif ping < 180 then return 0.155
-        elseif ping < 190 then return 0.158
-        elseif ping < 200 then return 0.165
-        elseif ping < 210 then return 0.167
-        elseif ping < 220 then return 0.169
-        elseif ping < 230 then return 0.171
-        elseif ping < 240 then return 0.173
-        elseif ping < 250 then return 0.175
-        elseif ping < 300 then return 0.18
-        elseif ping < 350 then return 0.185
-        elseif ping < 400 then return 0.19
-        elseif ping < 450 then return 0.195
-        elseif ping < 500 then return 0.2
-        elseif ping < 600 then return 0.21
-        elseif ping < 700 then return 0.22
-        elseif ping < 800 then return 0.23
-        elseif ping < 900 then return 0.24
-        elseif ping < 1000 then return 0.25
-        else return 0.3 end
-    else
-        return Config.CustomPrediction
-    end
-end
-
-local function GetPing()
-    local stats = game:GetService("Stats")
-    local ping = stats.Network.ServerStatsItem["Data Ping"]:GetValue()
-    return math.floor(ping)
-end
-
-local function GetPredictedPosition(part)
-    if not part or not part:IsA("BasePart") then return part.Position end
-    local velocity = part.Velocity
-    local origin = Camera.CFrame.Position
-    local distance = (part.Position - origin).Magnitude
-    local prediction = GetPrediction()
-    local delay = prediction
-    local distanceFactor = math.clamp(distance / 100, 1, 3)
-    return part.Position + velocity * delay * distanceFactor
-end
-
 local function IsObstructed(origin, targetPos)
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
@@ -2395,17 +2276,25 @@ RunService.RenderStepped:Connect(function(deltaTime)
     UpdateSpeed()
     UpdateFly(deltaTime)
 
+    -- AIMLOCK
     if Config.AimbotEnabled and getgenv().Aimbot.Status then
         Player = GetClosestValidPlayer()
         if Player and Player.Character and Player.Character:FindFirstChild(getgenv().Aimbot.Hitpart) then
             local part = Player.Character[getgenv().Aimbot.Hitpart]
-            local predictedPos = GetPredictedPosition(part)
+            local root = Player.Character:FindFirstChild("HumanoidRootPart") or part
+            local vel = (root.AssemblyLinearVelocity or root.Velocity or Vector3.zero)
+
+            -- dùng prediction đã tính
+            local pred = tonumber(Config.Prediction) or 0.15
+            local predictedPos = part.Position + vel * pred
+
             if not IsObstructed(Camera.CFrame.Position, predictedPos) then
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
             end
         end
     end
 
+    -- TRIGGERBOT
     if tbEnabled then
         local part = GetBestTargetPart()
         if part then
@@ -2413,7 +2302,6 @@ RunService.RenderStepped:Connect(function(deltaTime)
                 local cap = part
                 task.wait(0)
                 if tbEnabled and distToCursor(cap) <= fovRadius then
-                    -- Kiểm tra raycast
                     local origin = Camera.CFrame.Position
                     local direction = (cap.Position - origin)
                     local rayParams = RaycastParams.new()
@@ -2422,9 +2310,27 @@ RunService.RenderStepped:Connect(function(deltaTime)
 
                     local result = Workspace:Raycast(origin, direction, rayParams)
 
-                    -- Nếu không có va chạm hoặc hit trúng đúng part của target => bắn
                     if not result or result.Instance:IsDescendantOf(cap.Parent) then
-                        click()
+                        if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
+                            -- Mobile: ưu tiên dùng Tool:Activate()
+                            local char = LocalPlayer.Character
+                            local fired = false
+                            if char then
+                                for _, tool in ipairs(char:GetChildren()) do
+                                    if tool:IsA("Tool") then
+                                        pcall(function() tool:Activate() end)
+                                        fired = true
+                                        break
+                                    end
+                                end
+                            end
+                            if not fired then
+                                click() -- fallback tap
+                            end
+                        else
+                            -- PC
+                            click()
+                        end
                     end
                 end
             end)
